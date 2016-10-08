@@ -21,6 +21,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -49,16 +50,6 @@ public final class FastHttpDateFormat {
             new SimpleDateFormat(RFC1123_DATE, Locale.US);
 
 
-    /**
-     * The set of SimpleDateFormat formats to use in getDateHeader().
-     */
-    private static final SimpleDateFormat formats[] = {
-        new SimpleDateFormat(RFC1123_DATE, Locale.US),
-        new SimpleDateFormat("EEEEEE, dd-MMM-yy HH:mm:ss zzz", Locale.US),
-        new SimpleDateFormat("EEE MMMM d HH:mm:ss yyyy", Locale.US)
-    };
-
-
     private static final TimeZone gmtZone = TimeZone.getTimeZone("GMT");
 
 
@@ -66,13 +57,7 @@ public final class FastHttpDateFormat {
      * GMT timezone - all HTTP dates are on GMT
      */
     static {
-
         format.setTimeZone(gmtZone);
-
-        formats[0].setTimeZone(gmtZone);
-        formats[1].setTimeZone(gmtZone);
-        formats[2].setTimeZone(gmtZone);
-
     }
 
 
@@ -91,15 +76,13 @@ public final class FastHttpDateFormat {
     /**
      * Formatter cache.
      */
-    private static final ConcurrentHashMap<Long, String> formatCache =
-            new ConcurrentHashMap<>(CACHE_SIZE);
+    private static final Map<Long, String> formatCache = new ConcurrentHashMap<>(CACHE_SIZE);
 
 
     /**
      * Parser cache.
      */
-    private static final ConcurrentHashMap<String, Long> parseCache =
-            new ConcurrentHashMap<>(CACHE_SIZE);
+    private static final Map<String, Long> parseCache = new ConcurrentHashMap<>(CACHE_SIZE);
 
 
     // --------------------------------------------------------- Public Methods
@@ -107,6 +90,7 @@ public final class FastHttpDateFormat {
 
     /**
      * Get the current date in HTTP format.
+     * @return the HTTP date
      */
     public static final String getCurrentDate() {
 
@@ -126,11 +110,14 @@ public final class FastHttpDateFormat {
 
     /**
      * Get the HTTP format of the specified date.
+     * @param value The date
+     * @param threadLocalformat Local format to avoid synchronization
+     * @return the HTTP date
      */
     public static final String formatDate
         (long value, DateFormat threadLocalformat) {
 
-        Long longValue = new Long(value);
+        Long longValue = Long.valueOf(value);
         String cachedDate = formatCache.get(longValue);
         if (cachedDate != null) {
             return cachedDate;
@@ -153,6 +140,9 @@ public final class FastHttpDateFormat {
 
     /**
      * Try to parse the given date as a HTTP date.
+     * @param value The HTTP date
+     * @param threadLocalformats Local format to avoid synchronization
+     * @return the date as a long
      */
     public static final long parseDate(String value,
                                        DateFormat[] threadLocalformats) {
@@ -167,8 +157,7 @@ public final class FastHttpDateFormat {
             date = internalParseDate(value, threadLocalformats);
             updateParseCache(value, date);
         } else {
-            date = internalParseDate(value, formats);
-            updateParseCache(value, date);
+            throw new IllegalArgumentException();
         }
         if (date == null) {
             return (-1L);
@@ -194,7 +183,7 @@ public final class FastHttpDateFormat {
         if (date == null) {
             return null;
         }
-        return new Long(date.getTime());
+        return Long.valueOf(date.getTime());
     }
 
 

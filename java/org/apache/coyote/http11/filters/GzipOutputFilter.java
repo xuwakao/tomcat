@@ -19,12 +19,14 @@ package org.apache.coyote.http11.filters;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.coyote.OutputBuffer;
 import org.apache.coyote.Response;
 import org.apache.coyote.http11.OutputFilter;
-import org.apache.tomcat.util.buf.ByteChunk;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 /**
  * Gzip output filter.
@@ -34,11 +36,7 @@ import org.apache.tomcat.util.buf.ByteChunk;
 public class GzipOutputFilter implements OutputFilter {
 
 
-    /**
-     * Logger.
-     */
-    protected static final org.apache.juli.logging.Log log =
-        org.apache.juli.logging.LogFactory.getLog(GzipOutputFilter.class);
+    protected static final Log log = LogFactory.getLog(GzipOutputFilter.class);
 
 
     // ----------------------------------------------------- Instance Variables
@@ -64,21 +62,20 @@ public class GzipOutputFilter implements OutputFilter {
 
     // --------------------------------------------------- OutputBuffer Methods
 
-
-    /**
-     * Write some bytes.
-     *
-     * @return number of bytes written by the filter
-     */
     @Override
-    public int doWrite(ByteChunk chunk, Response res)
-        throws IOException {
+    public int doWrite(ByteBuffer chunk) throws IOException {
         if (compressionStream == null) {
             compressionStream = new GZIPOutputStream(fakeOutputStream, true);
         }
-        compressionStream.write(chunk.getBytes(), chunk.getStart(),
-                                chunk.getLength());
-        return chunk.getLength();
+        int len = chunk.remaining();
+        if (chunk.hasArray()) {
+            compressionStream.write(chunk.array(), chunk.arrayOffset() + chunk.position(), len);
+        } else {
+            byte[] bytes = new byte[len];
+            chunk.put(bytes);
+            compressionStream.write(bytes, 0, len);
+        }
+        return len;
     }
 
 
@@ -159,22 +156,19 @@ public class GzipOutputFilter implements OutputFilter {
 
     protected class FakeOutputStream
         extends OutputStream {
-        protected final ByteChunk outputChunk = new ByteChunk();
-        protected final byte[] singleByteBuffer = new byte[1];
+        protected final ByteBuffer outputChunk = ByteBuffer.allocate(1);
         @Override
         public void write(int b)
             throws IOException {
             // Shouldn't get used for good performance, but is needed for
             // compatibility with Sun JDK 1.4.0
-            singleByteBuffer[0] = (byte) (b & 0xff);
-            outputChunk.setBytes(singleByteBuffer, 0, 1);
-            buffer.doWrite(outputChunk, null);
+            outputChunk.put(0, (byte) (b & 0xff));
+            buffer.doWrite(outputChunk);
         }
         @Override
         public void write(byte[] b, int off, int len)
             throws IOException {
-            outputChunk.setBytes(b, off, len);
-            buffer.doWrite(outputChunk, null);
+            buffer.doWrite(ByteBuffer.wrap(b, off, len));
         }
         @Override
         public void flush() throws IOException {/*NOOP*/}

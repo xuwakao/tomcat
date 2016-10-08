@@ -14,6 +14,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 --%>
+<%@ page session="false" trimDirectiveWhitespaces="true" %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html>
  <head>
@@ -31,6 +32,11 @@
    <h1>403 Access Denied</h1>
    <p>
     You are not authorized to view this page.
+   </p>
+   <p>
+    By default the Host Manager is only accessible from a browser running on the
+    same machine as Tomcat. If you wish to modify this restriction, you'll need
+    to edit the Host Manager's <tt>context.xml</tt> file.
    </p>
    <p>
     If you have already configured the Host Manager application to allow access

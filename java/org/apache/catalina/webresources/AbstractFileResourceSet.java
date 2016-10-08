@@ -18,6 +18,8 @@ package org.apache.catalina.webresources;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.tomcat.util.http.RequestUtil;
@@ -26,21 +28,36 @@ public abstract class AbstractFileResourceSet extends AbstractResourceSet {
 
     protected static final String[] EMPTY_STRING_ARRAY = new String[0];
 
-    protected File fileBase;
-    protected String absoluteBase;
-    protected String canonicalBase;
+    private File fileBase;
+    private String absoluteBase;
+    private String canonicalBase;
+    private boolean readOnly = false;
 
     protected AbstractFileResourceSet(String internalPath) {
         setInternalPath(internalPath);
     }
 
-    protected File file(String name, boolean mustExist) {
+    protected final File getFileBase() {
+        return fileBase;
+    }
+
+    @Override
+    public void setReadOnly(boolean readOnly) {
+        this.readOnly = readOnly;
+    }
+
+    @Override
+    public boolean isReadOnly() {
+        return readOnly;
+    }
+
+    protected final File file(String name, boolean mustExist) {
 
         if (name.equals("/")) {
             name = "";
         }
         File file = new File(fileBase, name);
-        if (file.exists() && file.canRead() || !mustExist) {
+        if (!mustExist || file.canRead()) {
 
             if (getRoot().getAllowLinking()) {
                 return file;
@@ -96,11 +113,32 @@ public abstract class AbstractFileResourceSet extends AbstractResourceSet {
      *
      * @param path Path to be normalized
      */
-    protected String normalize(String path) {
+    private String normalize(String path) {
         return RequestUtil.normalize(path, File.separatorChar == '/');
     }
 
+    @Override
+    public URL getBaseUrl() {
+        try {
+            return getFileBase().toURI().toURL();
+        } catch (MalformedURLException e) {
+            return null;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This is a NO-OP by default for File based resource sets.
+     */
+    @Override
+    public void gc() {
+        // NO-OP
+    }
+
+
     //-------------------------------------------------------- Lifecycle methods
+
     @Override
     protected void initInternal() throws LifecycleException {
         fileBase = new File(getBase(), getInternalPath());

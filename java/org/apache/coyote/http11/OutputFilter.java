@@ -21,7 +21,6 @@ import java.io.IOException;
 
 import org.apache.coyote.OutputBuffer;
 import org.apache.coyote.Response;
-import org.apache.tomcat.util.buf.ByteChunk;
 
 /**
  * Output filter.
@@ -32,19 +31,11 @@ public interface OutputFilter extends OutputBuffer {
 
 
     /**
-     * Write some bytes.
-     *
-     * @return number of bytes written by the filter
-     */
-    @Override
-    public int doWrite(ByteChunk chunk, Response unused)
-        throws IOException;
-
-
-    /**
      * Some filters need additional parameters from the response. All the
      * necessary reading can occur in that method, as this method is called
      * after the response header processing is complete.
+     *
+     * @param response The response to associate with this OutputFilter
      */
     public void setResponse(Response response);
 
@@ -57,6 +48,8 @@ public interface OutputFilter extends OutputBuffer {
 
     /**
      * Set the next buffer in the filter pipeline.
+     *
+     * @param buffer The next buffer instance
      */
     public void setBuffer(OutputBuffer buffer);
 
@@ -69,9 +62,8 @@ public interface OutputFilter extends OutputBuffer {
      * delimitation, in which case the number is the amount of extra bytes or
      * missing bytes, which would indicate an error.
      * Note: It is recommended that extra bytes be swallowed by the filter.
+     *
+     * @throws IOException If an I/O error occurs while writing to the client
      */
-    public long end()
-        throws IOException;
-
-
+    public long end() throws IOException;
 }

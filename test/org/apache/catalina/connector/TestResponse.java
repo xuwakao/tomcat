@@ -17,7 +17,6 @@
 
 package org.apache.catalina.connector;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
@@ -39,6 +38,8 @@ import org.junit.Test;
 import org.apache.catalina.Context;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
+import org.apache.tomcat.unittest.TesterContext;
+import org.apache.tomcat.unittest.TesterRequest;
 import org.apache.tomcat.util.buf.ByteChunk;
 
 /**
@@ -51,12 +52,11 @@ public class TestResponse extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        File docBase = new File(System.getProperty("java.io.tmpdir"));
-        Context ctx = tomcat.addContext("", docBase.getAbsolutePath());
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "servlet", new Bug49598Servlet());
-        ctx.addServletMapping("/", "servlet");
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -100,7 +100,7 @@ public class TestResponse extends TomcatBaseTest {
     }
 
 
-    /**
+    /*
      * Tests an issue noticed during the investigation of BZ 52811.
      */
     @Test
@@ -108,12 +108,11 @@ public class TestResponse extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        File docBase = new File(System.getProperty("java.io.tmpdir"));
-        Context ctx = tomcat.addContext("", docBase.getAbsolutePath());
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "servlet", new CharsetServlet());
-        ctx.addServletMapping("/", "servlet");
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -148,12 +147,11 @@ public class TestResponse extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        File docBase = new File(System.getProperty("java.io.tmpdir"));
-        Context ctx = tomcat.addContext("", docBase.getAbsolutePath());
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "servlet", new Bug52811Servlet());
-        ctx.addServletMapping("/", "servlet");
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -361,6 +359,260 @@ public class TestResponse extends TomcatBaseTest {
         String result = resp.toAbsolute("./..#/../..");
 
         Assert.assertEquals("http://localhost:8080/level1/#/../..", result);
+    }
+
+
+    private void doTestEncodeURL(String location, String expected) {
+        Request req = new TesterRequest(true);
+        req.setRequestedSessionId("1234");
+        req.setRequestedSessionURL(true);
+        Response resp = new Response();
+        resp.setRequest(req);
+
+        String result = resp.encodeURL(location);
+        Assert.assertEquals(expected, result);
+    }
+
+
+    @Test
+    public void testEncodeURL01() throws Exception {
+        doTestEncodeURL("./bar.html", "./bar.html;jsessionid=1234");
+    }
+
+
+    @Test
+    public void testEncodeURL02() throws Exception {
+        doTestEncodeURL(".", ".;jsessionid=1234");
+    }
+
+
+    @Test
+    public void testEncodeURL03() throws Exception {
+        doTestEncodeURL("..", "..;jsessionid=1234");
+    }
+
+
+    @Test
+    public void testEncodeURL04() throws Exception {
+        doTestEncodeURL(".././..", ".././..;jsessionid=1234");
+    }
+
+
+    public void testEncodeURL05() throws Exception {
+        doTestEncodeURL("../../..", "../../..");
+    }
+
+
+    @Test
+    public void testEncodeURL06() throws Exception {
+        doTestEncodeURL("bar.html", "bar.html;jsessionid=1234");
+    }
+
+
+    @Test
+    public void testEncodeURL07() throws Exception {
+        doTestEncodeURL("bar.html?x=/../", "bar.html;jsessionid=1234?x=/../");
+    }
+
+
+    @Test
+    public void testEncodeURL08() throws Exception {
+        doTestEncodeURL("bar.html?x=/../../", "bar.html;jsessionid=1234?x=/../../");
+    }
+
+
+    @Test
+    public void testEncodeURL09() throws Exception {
+        doTestEncodeURL("./.?x=/../../", "./.;jsessionid=1234?x=/../../");
+    }
+
+
+    @Test
+    public void testEncodeURL10() throws Exception {
+        doTestEncodeURL("./..?x=/../../", "./..;jsessionid=1234?x=/../../");
+    }
+
+
+    @Test
+    public void testEncodeURL11() throws Exception {
+        doTestEncodeURL("./..?x=/../..", "./..;jsessionid=1234?x=/../..");
+    }
+
+
+    @Test
+    public void testEncodeURL12() throws Exception {
+        doTestEncodeURL("bar.html#/../", "bar.html;jsessionid=1234#/../");
+    }
+
+
+    @Test
+    public void testEncodeURL13() throws Exception {
+        doTestEncodeURL("bar.html#/../../", "bar.html;jsessionid=1234#/../../");
+    }
+
+
+    @Test
+    public void testEncodeURL14() throws Exception {
+        doTestEncodeURL("./.#/../../", "./.;jsessionid=1234#/../../");
+    }
+
+
+    @Test
+    public void testEncodeURL15() throws Exception {
+        doTestEncodeURL("./..#/../../", "./..;jsessionid=1234#/../../");
+    }
+
+
+    @Test
+    public void testEncodeURL16() throws Exception {
+        doTestEncodeURL("./..#/../..", "./..;jsessionid=1234#/../..");
+    }
+
+
+    private void doTestEncodeRedirectURL(String location, String expected) {
+        Request req = new TesterRequest(true);
+        req.setRequestedSessionId("1234");
+        req.setRequestedSessionURL(true);
+        Response resp = new Response();
+        resp.setRequest(req);
+
+        String result = resp.encodeRedirectURL(location);
+        Assert.assertEquals(expected, result);
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL01() throws Exception {
+        doTestEncodeRedirectURL("./bar.html", "./bar.html;jsessionid=1234");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL02() throws Exception {
+        doTestEncodeRedirectURL(".", ".;jsessionid=1234");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL03() throws Exception {
+        doTestEncodeRedirectURL("..", "..;jsessionid=1234");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL04() throws Exception {
+        doTestEncodeRedirectURL(".././..", ".././..;jsessionid=1234");
+    }
+
+
+    @Test(expected=IllegalArgumentException.class)
+    public void testEncodeRedirectURL05() throws Exception {
+        doTestEncodeRedirectURL("../../..", "throws IAE");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL06() throws Exception {
+        doTestEncodeRedirectURL("bar.html", "bar.html;jsessionid=1234");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL07() throws Exception {
+        doTestEncodeRedirectURL("bar.html?x=/../", "bar.html;jsessionid=1234?x=/../");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL08() throws Exception {
+        doTestEncodeRedirectURL("bar.html?x=/../../", "bar.html;jsessionid=1234?x=/../../");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL09() throws Exception {
+        doTestEncodeRedirectURL("./.?x=/../../", "./.;jsessionid=1234?x=/../../");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL10() throws Exception {
+        doTestEncodeRedirectURL("./..?x=/../../", "./..;jsessionid=1234?x=/../../");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL11() throws Exception {
+        doTestEncodeRedirectURL("./..?x=/../..", "./..;jsessionid=1234?x=/../..");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL12() throws Exception {
+        doTestEncodeRedirectURL("bar.html#/../", "bar.html;jsessionid=1234#/../");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL13() throws Exception {
+        doTestEncodeRedirectURL("bar.html#/../../", "bar.html;jsessionid=1234#/../../");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL14() throws Exception {
+        doTestEncodeRedirectURL("./.#/../../", "./.;jsessionid=1234#/../../");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL15() throws Exception {
+        doTestEncodeRedirectURL("./..#/../../", "./..;jsessionid=1234#/../../");
+    }
+
+
+    @Test
+    public void testEncodeRedirectURL16() throws Exception {
+        doTestEncodeURL("./..#/../..", "./..;jsessionid=1234#/../..");
+    }
+
+
+    @Test
+    public void testSendRedirect01() throws Exception {
+        doTestSendRedirect("../foo", "../foo");
+    }
+
+
+    @Test
+    public void testSendRedirect02() throws Exception {
+        doTestSendRedirect("../foo bar", "../foo bar");
+    }
+
+
+    @Test
+    public void testSendRedirect03() throws Exception {
+        doTestSendRedirect("../foo%20bar", "../foo%20bar");
+    }
+
+
+    private void doTestSendRedirect(String input, String expectedLocation) throws Exception {
+        // Set-up.
+        // Note: Not sufficient for testing relative -> absolute
+        Connector connector = new Connector();
+        org.apache.coyote.Response cResponse = new org.apache.coyote.Response();
+        Response response = new Response();
+        response.setConnector(connector);
+        response.setCoyoteResponse(cResponse);
+        Request request = new Request();
+        org.apache.coyote.Request cRequest = new org.apache.coyote.Request();
+        request.setCoyoteRequest(cRequest);
+        Context context = new TesterContext();
+        request.getMappingData().context = context;
+        response.setRequest(request);
+        // Do test
+        response.sendRedirect(input);
+        String location = response.getHeader("Location");
+        Assert.assertEquals(expectedLocation,  location);
     }
 
 

@@ -22,22 +22,20 @@ import java.nio.ByteBuffer;
 /** Shm
  *
  * @author Mladen Turk
- * @version $Id$
  */
-
 public class Shm {
 
     /**
      * Create and make accessible a shared memory segment.
-     * <br />
-     * A note about Anonymous vs. Named shared memory segments:<br />
+     * <br>
+     * A note about Anonymous vs. Named shared memory segments:<br>
      *         Not all platforms support anonymous shared memory segments, but in
      *         some cases it is preferred over other types of shared memory
      *         implementations. Passing a NULL 'file' parameter to this function
      *         will cause the subsystem to use anonymous shared memory segments.
      *         If such a system is not available, APR_ENOTIMPL is returned.
-     * <br />
-     * A note about allocation sizes:<br />
+     * <br>
+     * A note about allocation sizes:<br>
      *         On some platforms it is necessary to store some metainformation
      *         about the segment within the actual segment. In order to supply
      *         the caller with the requested size it may be necessary for the
@@ -50,26 +48,28 @@ public class Shm {
      * @param pool the pool from which to allocate the shared memory
      *        structure.
      * @return The created shared memory structure.
-     *
+     * @throws Error An error occurred
      */
     public static native long create(long reqsize, String filename, long pool)
         throws Error;
 
     /**
      * Remove shared memory segment associated with a filename.
-     * <br />
+     * <br>
      * This function is only supported on platforms which support
      * name-based shared memory segments, and will return APR_ENOTIMPL on
      * platforms without such support.
      * @param filename The filename associated with shared-memory segment which
      *        needs to be removed
      * @param pool The pool used for file operations
+     * @return the operation status
      */
     public static native int remove(String filename, long pool);
 
     /**
      * Destroy a shared memory segment and associated memory.
      * @param m The shared memory segment structure to destroy.
+     * @return the operation status
      */
     public static native int destroy(long m);
 
@@ -81,6 +81,7 @@ public class Shm {
      * @param pool the pool from which to allocate the shared memory
      *        structure for this process.
      * @return The created shared memory structure.
+     * @throws Error An error occurred
      */
     public static native long attach(String filename, long pool)
         throws Error;
@@ -89,6 +90,7 @@ public class Shm {
      * Detach from a shared memory segment without destroying it.
      * @param m The shared memory structure representing the segment
      *        to detach from.
+     * @return the operation status
      */
     public static native int detach(long m);
 
@@ -107,6 +109,7 @@ public class Shm {
      * Retrieve the length of a shared memory segment in bytes.
      * @param m The shared memory segment from which to retrieve
      *        the segment length.
+     * @return the length of the segment
      */
     public static native long size(long m);
 

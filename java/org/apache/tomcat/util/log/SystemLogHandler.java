@@ -39,6 +39,8 @@ public class SystemLogHandler extends PrintStream {
 
     /**
      * Construct the handler to capture the output of the given steam.
+     *
+     * @param wrapped The stream to capture
      */
     public SystemLogHandler(PrintStream wrapped) {
         super(wrapped);
@@ -56,7 +58,7 @@ public class SystemLogHandler extends PrintStream {
 
 
     /**
-     * Thread <-> CaptureLog associations.
+     * Thread &lt;-&gt; CaptureLog associations.
      */
     private static final ThreadLocal<Stack<CaptureLog>> logs = new ThreadLocal<>();
 
@@ -94,7 +96,9 @@ public class SystemLogHandler extends PrintStream {
 
 
     /**
-     * Stop capturing thread's output and return captured data as a String.
+     * Stop capturing thread's output.
+     *
+     * @return The captured data
      */
     public static String stopCapture() {
         Stack<CaptureLog> stack = logs.get();
@@ -117,6 +121,7 @@ public class SystemLogHandler extends PrintStream {
 
     /**
      * Find PrintStream to which the output must be written to.
+     * @return the print stream
      */
     protected PrintStream findStream() {
         Stack<CaptureLog> stack = logs.get();

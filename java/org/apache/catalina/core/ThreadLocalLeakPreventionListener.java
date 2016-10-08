@@ -127,7 +127,7 @@ public class ThreadLocalLeakPreventionListener implements LifecycleListener,
 
     private void registerListenersForServer(Server server) {
         for (Service service : server.findServices()) {
-            Engine engine = (Engine) service.getContainer();
+            Engine engine = service.getContainer();
             engine.addContainerListener(this);
             registerListenersForEngine(engine);
         }
@@ -194,10 +194,10 @@ public class ThreadLocalLeakPreventionListener implements LifecycleListener,
     private void stopIdleThreads(Context context) {
         if (serverStopping) return;
 
-        if (context instanceof StandardContext &&
+        if (!(context instanceof StandardContext) ||
             !((StandardContext) context).getRenewThreadsWhenStoppingContext()) {
-            log.debug("Not renewing threads when the context is stopping, "
-                + "it is configured not to do it.");
+            log.debug("Not renewing threads when the context is stopping. "
+                + "It is not configured to do it.");
             return;
         }
 

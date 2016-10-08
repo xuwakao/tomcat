@@ -37,7 +37,7 @@ public class Stream {
     private final Iterator<Object> iterator;
 
 
-    public Stream(Iterator<Object > iterator) {
+    public Stream(Iterator<Object> iterator) {
         this.iterator = iterator;
     }
 
@@ -48,7 +48,7 @@ public class Stream {
             protected void findNext() {
                 while (iterator.hasNext()) {
                     Object obj = iterator.next();
-                    if (ELSupport.coerceToBoolean(le.invoke(obj),
+                    if (ELSupport.coerceToBoolean(null, le.invoke(obj),
                             true).booleanValue()) {
                         next = obj;
                         foundNext = true;
@@ -391,7 +391,7 @@ public class Stream {
             match = (Boolean) le.invoke(iterator.next());
         }
 
-        return new Optional(new Boolean(!match.booleanValue()));
+        return new Optional(Boolean.valueOf(!match.booleanValue()));
     }
 
 
@@ -450,10 +450,10 @@ public class Stream {
 
         while (iterator.hasNext()) {
             Object obj = iterator.next();
-            if (isMax && ELSupport.coerceToNumber(le.invoke(obj, result),
+            if (isMax && ELSupport.coerceToNumber(null, le.invoke(obj, result),
                     Integer.class).intValue() > 0) {
                 result = obj;
-            } else if (!isMax && ELSupport.coerceToNumber(le.invoke(obj, result),
+            } else if (!isMax && ELSupport.coerceToNumber(null, le.invoke(obj, result),
                     Integer.class).intValue() < 0) {
                 result = obj;
             }
@@ -468,7 +468,7 @@ public class Stream {
 
 
     private static class LambdaExpressionComparator
-            implements Comparator<Object>{
+            implements Comparator<Object> {
 
         private final LambdaExpression le;
 
@@ -479,7 +479,7 @@ public class Stream {
         @Override
         public int compare(Object o1, Object o2) {
             return ELSupport.coerceToNumber(
-                    le.invoke(o1, o2), Integer.class).intValue();
+                    null, le.invoke(o1, o2), Integer.class).intValue();
         }
     }
 

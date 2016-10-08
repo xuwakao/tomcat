@@ -47,9 +47,7 @@ import org.apache.tomcat.util.res.StringManager;
  * This servlet will display a complete status of the HTTP/1.1 connector.
  *
  * @author Remy Maucherat
- * @version $Id$
  */
-
 public class StatusManagerServlet
     extends HttpServlet implements NotificationListener {
 
@@ -165,7 +163,15 @@ public class StatusManagerServlet
     @Override
     public void destroy() {
 
-        // No actions necessary
+        // Unregister with MBean server
+        String onStr = "JMImplementation:type=MBeanServerDelegate";
+        ObjectName objectName;
+        try {
+            objectName = new ObjectName(onStr);
+            mBeanServer.removeNotificationListener(objectName, this, null, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
     }
 

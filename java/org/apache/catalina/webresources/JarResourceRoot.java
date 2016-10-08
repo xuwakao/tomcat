@@ -20,6 +20,8 @@ import java.io.File;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.cert.Certificate;
+import java.util.jar.Manifest;
 
 import org.apache.catalina.WebResourceRoot;
 import org.apache.juli.logging.Log;
@@ -36,16 +38,16 @@ public class JarResourceRoot extends AbstractResource {
     public JarResourceRoot(WebResourceRoot root, File base, String baseUrl,
             String webAppPath) {
         super(root, webAppPath);
+        // Validate the webAppPath before going any further
+        if (!webAppPath.endsWith("/")) {
+            throw new IllegalArgumentException(sm.getString(
+                    "jarResourceRoot.invalidWebAppPath", webAppPath));
+        }
         this.base = base;
         this.baseUrl = "jar:" + baseUrl;
         // Extract the name from the webAppPath
-        // Strip any trailing '/' character
-        String resourceName;
-        if (webAppPath.endsWith("/")) {
-            resourceName = webAppPath.substring(0, webAppPath.length() - 1);
-        } else {
-            resourceName = webAppPath;
-        }
+        // Strip the trailing '/' character
+        String resourceName = webAppPath.substring(0, webAppPath.length() - 1);
         int i = resourceName.lastIndexOf('/');
         if (i > -1) {
             resourceName = resourceName.substring(i + 1);
@@ -104,7 +106,12 @@ public class JarResourceRoot extends AbstractResource {
     }
 
     @Override
-    public InputStream getInputStream() {
+    protected InputStream doGetInputStream() {
+        return null;
+    }
+
+    @Override
+    public byte[] getContent() {
         return null;
     }
 
@@ -115,19 +122,40 @@ public class JarResourceRoot extends AbstractResource {
 
     @Override
     public URL getURL() {
+        String url = baseUrl + "!/";
         try {
-            return new URL(baseUrl + "!/");
+            return new URL(url);
         } catch (MalformedURLException e) {
             if (log.isDebugEnabled()) {
-                log.debug(sm.getString("fileResource.getUrlFail",
-                        "", baseUrl), e);
+                log.debug(sm.getString("fileResource.getUrlFail", url), e);
             }
             return null;
         }
     }
 
     @Override
+    public URL getCodeBase() {
+        try {
+            return new URL(baseUrl);
+        } catch (MalformedURLException e) {
+            if (getLog().isDebugEnabled()) {
+                getLog().debug(sm.getString("fileResource.getUrlFail", baseUrl), e);
+            }
+            return null;
+        }
+    }
+    @Override
     protected Log getLog() {
         return log;
+    }
+
+    @Override
+    public Certificate[] getCertificates() {
+        return null;
+    }
+
+    @Override
+    public Manifest getManifest() {
+        return null;
     }
 }

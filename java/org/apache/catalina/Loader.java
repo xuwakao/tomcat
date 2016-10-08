@@ -14,13 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 package org.apache.catalina;
 
-
 import java.beans.PropertyChangeListener;
-
 
 /**
  * A <b>Loader</b> represents a Java ClassLoader implementation that can
@@ -50,13 +46,8 @@ import java.beans.PropertyChangeListener;
  * </ul>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public interface Loader {
-
-
-    // ------------------------------------------------------------- Properties
 
 
     /**
@@ -68,13 +59,13 @@ public interface Loader {
 
 
     /**
-     * Return the Java class loader to be used by this Container.
+     * @return the Java class loader to be used by this Container.
      */
     public ClassLoader getClassLoader();
 
 
     /**
-     * Return the Context with which this Loader has been associated.
+     * @return the Context with which this Loader has been associated.
      */
     public Context getContext();
 
@@ -88,7 +79,7 @@ public interface Loader {
 
 
     /**
-     * Return the "follow standard delegation model" flag used to configure
+     * @return the "follow standard delegation model" flag used to configure
      * our ClassLoader.
      */
     public boolean getDelegate();
@@ -104,7 +95,7 @@ public interface Loader {
 
 
     /**
-     * Return the reloadable flag for this Loader.
+     * @return the reloadable flag for this Loader.
      */
     public boolean getReloadable();
 
@@ -115,9 +106,6 @@ public interface Loader {
      * @param reloadable The new reloadable flag
      */
     public void setReloadable(boolean reloadable);
-
-
-    // --------------------------------------------------------- Public Methods
 
 
     /**
@@ -131,6 +119,9 @@ public interface Loader {
     /**
      * Has the internal repository associated with this Loader been modified,
      * such that the loaded classes should be reloaded?
+     *
+     * @return <code>true</code> when the repository has been modified,
+     *         <code>false</code> otherwise
      */
     public boolean modified();
 
@@ -141,6 +132,4 @@ public interface Loader {
      * @param listener The listener to remove
      */
     public void removePropertyChangeListener(PropertyChangeListener listener);
-
-
 }

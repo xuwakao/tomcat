@@ -21,6 +21,8 @@ import java.util.Enumeration;
 import javax.servlet.FilterConfig;
 import javax.servlet.ServletContext;
 
+import org.apache.tomcat.unittest.TesterServletContext;
+
 public class TesterFilterConfigs {
     public static final String HTTPS_WWW_APACHE_ORG = "https://www.apache.org";
     public static final String HTTP_TOMCAT_APACHE_ORG =
@@ -97,6 +99,24 @@ public class TesterFilterConfigs {
                 HTTP_TOMCAT_APACHE_ORG + "," + HTTPS_WWW_APACHE_ORG;
         final String exposedHeaders = CorsFilter.DEFAULT_EXPOSED_HEADERS;
         final String supportCredentials = "false";
+        final String preflightMaxAge =
+                CorsFilter.DEFAULT_PREFLIGHT_MAXAGE;
+        final String decorateRequest = CorsFilter.DEFAULT_DECORATE_REQUEST;
+
+        return generateFilterConfig(allowedHttpHeaders, allowedHttpMethods,
+                allowedOrigins, exposedHeaders, supportCredentials,
+                preflightMaxAge, decorateRequest);
+    }
+
+    public static FilterConfig getFilterConfigSpecificOriginNullAllowed() {
+        final String allowedHttpHeaders =
+                CorsFilter.DEFAULT_ALLOWED_HTTP_HEADERS;
+        final String allowedHttpMethods =
+                CorsFilter.DEFAULT_ALLOWED_HTTP_METHODS;
+        final String allowedOrigins = HTTP_TOMCAT_APACHE_ORG + ",null";
+        final String exposedHeaders = CorsFilter.DEFAULT_EXPOSED_HEADERS;
+        final String supportCredentials =
+                CorsFilter.DEFAULT_SUPPORTS_CREDENTIALS;
         final String preflightMaxAge =
                 CorsFilter.DEFAULT_PREFLIGHT_MAXAGE;
         final String decorateRequest = CorsFilter.DEFAULT_DECORATE_REQUEST;

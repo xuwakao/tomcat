@@ -18,6 +18,7 @@ package org.apache.catalina.valves;
 
 import java.io.IOException;
 
+import javax.servlet.AsyncContext;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -28,6 +29,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.catalina.Context;
+import org.apache.catalina.Wrapper;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
 import org.apache.tomcat.util.buf.ByteChunk;
@@ -38,12 +40,11 @@ public class TestErrorReportValve extends TomcatBaseTest {
     public void testBug53071() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "errorServlet", new ErrorServlet());
-        ctx.addServletMapping("/", "errorServlet");
+        ctx.addServletMappingDecoded("/", "errorServlet");
 
         tomcat.start();
 
@@ -72,12 +73,11 @@ public class TestErrorReportValve extends TomcatBaseTest {
     public void testBug54220DoNotSetNotFound() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "bug54220", new Bug54220Servlet(false));
-        ctx.addServletMapping("/", "bug54220");
+        ctx.addServletMappingDecoded("/", "bug54220");
 
         tomcat.start();
 
@@ -93,12 +93,11 @@ public class TestErrorReportValve extends TomcatBaseTest {
     public void testBug54220SetNotFound() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "bug54220", new Bug54220Servlet(true));
-        ctx.addServletMapping("/", "bug54220");
+        ctx.addServletMappingDecoded("/", "bug54220");
 
         tomcat.start();
 
@@ -131,19 +130,18 @@ public class TestErrorReportValve extends TomcatBaseTest {
     }
 
 
-    /**
+    /*
      * Custom error/status codes should not result in a blank response.
      */
     @Test
     public void testBug54536() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "bug54536", new Bug54536Servlet());
-        ctx.addServletMapping("/", "bug54536");
+        ctx.addServletMappingDecoded("/", "bug54536");
 
         tomcat.start();
 
@@ -167,6 +165,50 @@ public class TestErrorReportValve extends TomcatBaseTest {
         protected void doGet(HttpServletRequest req, HttpServletResponse resp)
                 throws ServletException, IOException {
             resp.sendError(ERROR_STATUS, ERROR_MESSAGE);
+        }
+    }
+
+    @Test
+    public void testBug56042() throws Exception {
+        // Setup Tomcat instance
+        Tomcat tomcat = getTomcatInstance();
+
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
+
+        Bug56042Servlet bug56042Servlet = new Bug56042Servlet();
+        Wrapper wrapper =
+            Tomcat.addServlet(ctx, "bug56042Servlet", bug56042Servlet);
+        wrapper.setAsyncSupported(true);
+        ctx.addServletMappingDecoded("/bug56042Servlet", "bug56042Servlet");
+
+        tomcat.start();
+
+        StringBuilder url = new StringBuilder(48);
+        url.append("http://localhost:");
+        url.append(getPort());
+        url.append("/bug56042Servlet");
+
+        ByteChunk res = new ByteChunk();
+        int rc = getUrl(url.toString(), res, null);
+
+        Assert.assertEquals(HttpServletResponse.SC_BAD_REQUEST, rc);
+    }
+
+    private static class Bug56042Servlet extends HttpServlet {
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+                throws ServletException, IOException {
+            // Only set the status on the first call (the dispatch will trigger
+            // another call to this Servlet)
+            if (resp.getStatus() != HttpServletResponse.SC_BAD_REQUEST) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                AsyncContext ac = req.startAsync();
+                ac.dispatch();
+            }
         }
     }
 }

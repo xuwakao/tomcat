@@ -75,12 +75,13 @@ public final class ByteChunk implements Cloneable, Serializable {
      */
     public static interface ByteInputChannel {
         /**
-         * Read new bytes ( usually the internal conversion buffer ).
-         * The implementation is allowed to ignore the parameters,
-         * and mutate the chunk if it wishes to implement its own buffering.
+         * Read new bytes.
+         *
+         * @return The number of bytes read
+         *
+         * @throws IOException If an I/O occurs while reading the bytes
          */
-        public int realReadBytes(byte cbuf[], int off, int len)
-            throws IOException;
+        public int realReadBytes() throws IOException;
     }
 
     /** Same as java.nio.channel.WrittableByteChannel.
@@ -89,9 +90,23 @@ public final class ByteChunk implements Cloneable, Serializable {
         /**
          * Send the bytes ( usually the internal conversion buffer ).
          * Expect 8k output if the buffer is full.
+         *
+         * @param cbuf bytes that will be written
+         * @param off offset in the bytes array
+         * @param len length that will be written
+         * @throws IOException If an I/O occurs while writing the bytes
          */
         public void realWriteBytes(byte cbuf[], int off, int len)
             throws IOException;
+
+        /**
+         * Send the bytes ( usually the internal conversion buffer ).
+         * Expect 8k output if the buffer is full.
+         *
+         * @param from bytes that will be written
+         * @throws IOException If an I/O occurs while writing the bytes
+         */
+        public void realWriteBytes(ByteBuffer from) throws IOException;
     }
 
     // --------------------
@@ -141,16 +156,11 @@ public final class ByteChunk implements Cloneable, Serializable {
      * Resets the message buff to an uninitialized state.
      */
     public void recycle() {
-        //        buff = null;
         charset=null;
         start=0;
         end=0;
         isSet=false;
         hasHashCode = false;
-    }
-
-    public void reset() {
-        buff=null;
     }
 
     // -------------------- Setup --------------------
@@ -193,21 +203,21 @@ public final class ByteChunk implements Cloneable, Serializable {
     }
 
     /**
-     * Returns the message bytes.
+     * @return the message bytes.
      */
     public byte[] getBytes() {
         return getBuffer();
     }
 
     /**
-     * Returns the message bytes.
+     * @return the message bytes.
      */
     public byte[] getBuffer() {
         return buff;
     }
 
     /**
-     * Returns the start offset of the bytes.
+     * @return the start offset of the bytes.
      * For output this is the end of the buffer.
      */
     public int getStart() {
@@ -226,19 +236,19 @@ public final class ByteChunk implements Cloneable, Serializable {
     }
 
     /**
-     * Returns the length of the bytes.
-     * XXX need to clean this up
+     * @return the length of the bytes.
      */
     public int getLength() {
         return end-start;
     }
 
-    /** Maximum amount of data in this buffer.
-     *
-     *  If -1 or not set, the buffer will grow indefinitely.
-     *  Can be smaller than the current buffer size ( which will not shrink ).
-     *  When the limit is reached, the buffer will be flushed ( if out is set )
-     *  or throw exception.
+    /**
+     * Maximum amount of data in this buffer.
+     * If -1 or not set, the buffer will grow indefinitely.
+     * Can be smaller than the current buffer size ( which will not shrink ).
+     * When the limit is reached, the buffer will be flushed ( if out is set )
+     * or throw exception.
+     * @param limit The new limit
      */
     public void setLimit(int limit) {
         this.limit=limit;
@@ -250,15 +260,17 @@ public final class ByteChunk implements Cloneable, Serializable {
 
     /**
      * When the buffer is empty, read the data from the input channel.
+     * @param in The input channel
      */
     public void setByteInputChannel(ByteInputChannel in) {
         this.in = in;
     }
 
-    /** When the buffer is full, write the data to the output channel.
-     *         Also used when large amount of data is appended.
-     *
-     *  If not set, the buffer will grow to the limit.
+    /**
+     * When the buffer is full, write the data to the output channel.
+     * Also used when large amount of data is appended.
+     * If not set, the buffer will grow to the limit.
+     * @param out The output channel
      */
     public void setByteOutputChannel(ByteOutputChannel out) {
         this.out=out;
@@ -291,11 +303,14 @@ public final class ByteChunk implements Cloneable, Serializable {
         append( src.getBytes(), src.getStart(), src.getLength());
     }
 
-    /** Add data to the buffer
+    /**
+     * Add data to the buffer.
+     * @param src Bytes array
+     * @param off Offset
+     * @param len Length
+     * @throws IOException Writing overflow data to the output channel failed
      */
-    public void append( byte src[], int off, int len )
-        throws IOException
-    {
+    public void append(byte src[], int off, int len) throws IOException {
         // will grow, up to limit
         makeSpace( len );
 
@@ -351,61 +366,141 @@ public final class ByteChunk implements Cloneable, Serializable {
     }
 
 
+    /**
+     * Add data to the buffer.
+     *
+     * @param from the ByteBuffer with the data
+     * @throws IOException Writing overflow data to the output channel failed
+     */
+    public void append(ByteBuffer from) throws IOException {
+        int len = from.remaining();
+
+        // will grow, up to limit
+        makeSpace(len);
+
+        // if we don't have limit: makeSpace can grow as it wants
+        if (limit < 0) {
+            // assert: makeSpace made enough space
+            from.get(buff, end, len);
+            end += len;
+            return;
+        }
+
+        // Optimize on a common case.
+        // If the buffer is empty and the source is going to fill up all the
+        // space in buffer, may as well write it directly to the output,
+        // and avoid an extra copy
+        if (len == limit && end == start && out != null) {
+            out.realWriteBytes(from);
+            from.position(from.limit());
+            return;
+        }
+        // if we have limit and we're below
+        if (len <= limit - end) {
+            // makeSpace will grow the buffer to the limit,
+            // so we have space
+            from.get(buff, end, len);
+            end += len;
+            return;
+        }
+
+        // need more space than we can afford, need to flush
+        // buffer
+
+        // the buffer is already at ( or bigger than ) limit
+
+        // We chunk the data into slices fitting in the buffer limit, although
+        // if the data is written directly if it doesn't fit
+
+        int avail = limit - end;
+        from.get(buff, end, avail);
+        end += avail;
+
+        flushBuffer();
+
+        int fromLimit = from.limit();
+        int remain = len - avail;
+        avail = limit - end;
+        while (remain >= avail) {
+            from.limit(from.position() + avail);
+            out.realWriteBytes(from);
+            from.position(from.limit());
+            remain = remain - avail;
+        }
+
+        from.limit(fromLimit);
+        from.get(buff, end, remain);
+        end += remain;
+    }
+
+
     // -------------------- Removing data from the buffer --------------------
 
-    public int substract()
-        throws IOException {
-
-        if ((end - start) == 0) {
-            if (in == null) {
-                return -1;
-            }
-            int n = in.realReadBytes( buff, 0, buff.length );
-            if (n < 0) {
-                return -1;
-            }
+    public int substract() throws IOException {
+        if (checkEof()) {
+            return -1;
         }
-
-        return (buff[start++] & 0xFF);
-
+        return buff[start++] & 0xFF;
     }
 
-    public byte substractB()
-        throws IOException {
 
-        if ((end - start) == 0) {
-            if (in == null)
-                return -1;
-            int n = in.realReadBytes( buff, 0, buff.length );
-            if (n < 0)
-                return -1;
+    public byte substractB() throws IOException {
+        if (checkEof()) {
+            return -1;
         }
-
-        return (buff[start++]);
-
+        return buff[start++];
     }
 
-    public int substract( byte src[], int off, int len )
-        throws IOException {
 
-        if ((end - start) == 0) {
-            if (in == null) {
-                return -1;
-            }
-            int n = in.realReadBytes( buff, 0, buff.length );
-            if (n < 0) {
-                return -1;
-            }
+    public int substract(byte dest[], int off, int len ) throws IOException {
+        if (checkEof()) {
+            return -1;
         }
-
         int n = len;
         if (len > getLength()) {
             n = getLength();
         }
-        System.arraycopy(buff, start, src, off, n);
+        System.arraycopy(buff, start, dest, off, n);
         start += n;
         return n;
+    }
 
+
+    /**
+     * Transfers bytes from the buffer to the specified ByteBuffer. After the
+     * operation the position of the ByteBuffer will be returned to the one
+     * before the operation, the limit will be the position incremented by
+     * the number of the transfered bytes.
+     *
+     * @param to the ByteBuffer into which bytes are to be written.
+     * @return an integer specifying the actual number of bytes read, or -1 if
+     *         the end of the stream is reached
+     * @throws IOException if an input or output exception has occurred
+     */
+    public int substract(ByteBuffer to) throws IOException {
+        if (checkEof()) {
+            return -1;
+        }
+        int n = Math.min(to.remaining(), getLength());
+        to.put(buff, start, n);
+        to.limit(to.position());
+        to.position(to.position() - n);
+        start += n;
+        return n;
+    }
+
+
+    private boolean checkEof() throws IOException {
+        if ((end - start) == 0) {
+            if (in == null) {
+                return true;
+            }
+            int n = in.realReadBytes();
+            if (n < 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
@@ -413,7 +508,7 @@ public final class ByteChunk implements Cloneable, Serializable {
      * Send the buffer to the sink. Called by append() when the limit is
      * reached. You can also call it explicitly to force the data to be written.
      *
-     * @throws IOException
+     * @throws IOException Writing overflow data to the output channel failed
      */
     public void flushBuffer()
         throws IOException
@@ -427,11 +522,12 @@ public final class ByteChunk implements Cloneable, Serializable {
         end=start;
     }
 
-    /** Make space for len chars. If len is small, allocate
-     *        a reserve space too. Never grow bigger than limit.
+    /**
+     * Make space for len bytes. If len is small, allocate a reserve space too.
+     * Never grow bigger than limit.
+     * @param count The size
      */
-    private void makeSpace(int count)
-    {
+    public void makeSpace(int count) {
         byte[] tmp = null;
 
         int newSize;
@@ -459,19 +555,14 @@ public final class ByteChunk implements Cloneable, Serializable {
         // grow in larger chunks
         if( desiredSize < 2 * buff.length ) {
             newSize= buff.length * 2;
-            if( limit >0 &&
-                newSize > limit ) {
-                newSize=limit;
-            }
-            tmp=new byte[newSize];
         } else {
             newSize= buff.length * 2 + count ;
-            if( limit > 0 &&
-                newSize > limit ) {
-                newSize=limit;
-            }
-            tmp=new byte[newSize];
         }
+
+        if (limit > 0 && newSize > limit) {
+            newSize = limit;
+        }
+        tmp = new byte[newSize];
 
         System.arraycopy(buff, start, tmp, 0, end-start);
         buff = tmp;
@@ -499,8 +590,7 @@ public final class ByteChunk implements Cloneable, Serializable {
         // new String(byte[], int, int, Charset) takes a defensive copy of the
         // entire byte array. This is expensive if only a small subset of the
         // bytes will be used. The code below is from Apache Harmony.
-        CharBuffer cb;
-        cb = charset.decode(ByteBuffer.wrap(buff, start, end-start));
+        CharBuffer cb = charset.decode(ByteBuffer.wrap(buff, start, end-start));
         return new String(cb.array(), cb.arrayOffset(), cb.length());
     }
 
@@ -616,6 +706,7 @@ public final class ByteChunk implements Cloneable, Serializable {
      * Returns true if the message bytes starts with the specified string.
      * @param s the string
      * @param pos The position
+     * @return <code>true</code> if the start matches
      */
     public boolean startsWithIgnoreCase(String s, int pos) {
         byte[] b = buff;
@@ -689,7 +780,7 @@ public final class ByteChunk implements Cloneable, Serializable {
      * Returns the first instance of the given character in this ByteChunk
      * starting at the specified byte. If the character is not found, -1 is
      * returned.
-     * <br/>
+     * <br>
      * NOTE: This only works for characters in the range 0-127.
      *
      * @param c         The character
@@ -705,7 +796,7 @@ public final class ByteChunk implements Cloneable, Serializable {
     /**
      * Returns the first instance of the given character in the given byte array
      * between the specified start and end.
-     * <br/>
+     * <br>
      * NOTE: This only works for characters in the range 0-127.
      *
      * @param bytes The byte array to search

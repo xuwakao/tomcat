@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -15,7 +15,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<project name="Tomcat 8.0 Maven Deployment" default="" basedir="."
+<project name="Tomcat 9.0 Maven Deployment" default="" basedir="."
          xmlns:artifact="urn:maven-artifact-ant">
   <!--
     Built for using Maven Ant Tasks (version 2.1.0 is known to work)
@@ -51,6 +51,7 @@
     <!--sign the jar, the source and the pom -->
     <exec executable="${gpg.exec}" failonerror="true"
           inputstring="${gpg.passphrase}">
+      <arg value="--batch"/>
       <arg value="--passphrase-fd"/>
       <arg value="0"/>
       <arg value="-a"/>
@@ -59,6 +60,7 @@
     </exec>
     <exec executable="${gpg.exec}" failonerror="true"
           inputstring="${gpg.passphrase}">
+      <arg value="--batch"/>
       <arg value="--passphrase-fd"/>
       <arg value="0"/>
       <arg value="-a"/>
@@ -67,6 +69,7 @@
     </exec>
     <exec executable="${gpg.exec}" failonerror="true"
           inputstring="${gpg.passphrase}">
+      <arg value="--batch"/>
       <arg value="--passphrase-fd"/>
       <arg value="0"/>
       <arg value="-a"/>
@@ -130,6 +133,7 @@
     <!--sign the file and pom -->
     <exec executable="${gpg.exec}" failonerror="true"
           inputstring="${gpg.passphrase}">
+      <arg value="--batch"/>
       <arg value="--passphrase-fd"/>
       <arg value="0"/>
       <arg value="-a"/>
@@ -138,6 +142,7 @@
     </exec>
     <exec executable="${gpg.exec}" failonerror="true"
           inputstring="${gpg.passphrase}">
+      <arg value="--batch"/>
       <arg value="--passphrase-fd"/>
       <arg value="0"/>
       <arg value="-a"/>
@@ -195,6 +200,7 @@
     <!--sign the zip, the tar.gz and the pom -->
     <exec executable="${gpg.exec}" failonerror="true"
           inputstring="${gpg.passphrase}">
+      <arg value="--batch"/>
       <arg value="--passphrase-fd"/>
       <arg value="0"/>
       <arg value="-a"/>
@@ -203,6 +209,7 @@
     </exec>
     <exec executable="${gpg.exec}" failonerror="true"
           inputstring="${gpg.passphrase}">
+      <arg value="--batch"/>
       <arg value="--passphrase-fd"/>
       <arg value="0"/>
       <arg value="-a"/>
@@ -211,6 +218,7 @@
     </exec>
     <exec executable="${gpg.exec}" failonerror="true"
           inputstring="${gpg.passphrase}">
+      <arg value="--batch"/>
       <arg value="--passphrase-fd"/>
       <arg value="0"/>
       <arg value="-a"/>
@@ -281,10 +289,13 @@
                   jarFileName="catalina-tribes.jar"
                srcJarFileName="catalina-tribes-src.jar"/>
 
+    <doMavenDeploy artifactId="tomcat-storeconfig"
+                  jarFileName="catalina-storeconfig.jar"
+               srcJarFileName="catalina-storeconfig-src.jar"/>
+
     <doMavenDeploy artifactId="tomcat-jdbc"
                   jarFileName="tomcat-jdbc.jar"
                srcJarFileName="tomcat-jdbc-src.jar"/>
-
 
     <doMavenDeploy artifactId="tomcat-el-api"
                   jarFileName="el-api.jar"
@@ -312,8 +323,8 @@
 
     <doMavenDeploy artifactId="tomcat-api"/>
     <doMavenDeploy artifactId="tomcat-jni"/>
-    <doMavenDeploy artifactId="tomcat-spdy"/>
     <doMavenDeploy artifactId="tomcat-util"/>
+    <doMavenDeploy artifactId="tomcat-util-scan"/>
     <doMavenDeploy artifactId="tomcat-coyote"/>
     <doMavenDeploy artifactId="tomcat-dbcp"/>
     <doMavenDeploy artifactId="tomcat-websocket"/>
@@ -322,14 +333,6 @@
     <doMavenDeployNoSrc artifactId="tomcat-i18n-ja"/>
 
     <!-- Extras jars -->
-    <doMavenDeploy artifactId="tomcat-extras-juli"
-        groupId="org.apache.tomcat.extras"
-        file="${tomcat.extras.path}/tomcat-juli.jar"
-        src="${tomcat.extras.src.path}/tomcat-juli-src.jar" />
-    <doMavenDeploy artifactId="tomcat-extras-juli-adapters"
-        groupId="org.apache.tomcat.extras"
-        file="${tomcat.extras.path}/tomcat-juli-adapters.jar"
-        src="${tomcat.extras.src.path}/tomcat-juli-adapters-src.jar" />
     <doMavenDeploy artifactId="tomcat-catalina-jmx-remote"
         groupId="org.apache.tomcat.extras"
         file="${tomcat.extras.path}/catalina-jmx-remote.jar"
@@ -351,16 +354,16 @@
         file="${tomcat.embed.path}/tomcat-embed-jasper.jar"
         pom="tomcat-embed-jasper.pom"
         src="${tomcat.embed.src.path}/tomcat-embed-jasper-src.jar"/>
-    <doMavenDeploy artifactId="tomcat-embed-logging-juli"
+    <doMavenDeploy artifactId="tomcat-embed-el"
         groupId="org.apache.tomcat.embed"
-        file="${tomcat.embed.path}/tomcat-embed-logging-juli.jar"
-        pom="tomcat-embed-logging-juli.pom"
-        src="${tomcat.embed.src.path}/tomcat-embed-logging-juli-src.jar"/>
-    <doMavenDeploy artifactId="tomcat-embed-logging-log4j"
+        file="${tomcat.embed.path}/tomcat-embed-el.jar"
+        pom="tomcat-embed-el.pom"
+        src="${tomcat.embed.src.path}/tomcat-embed-el-src.jar"/>
+    <doMavenDeploy artifactId="tomcat-embed-websocket"
         groupId="org.apache.tomcat.embed"
-        file="${tomcat.embed.path}/tomcat-embed-logging-log4j.jar"
-        pom="tomcat-embed-logging-log4j.pom"
-        src="${tomcat.embed.src.path}/tomcat-embed-logging-log4j-src.jar"/>
+        file="${tomcat.embed.path}/tomcat-embed-websocket.jar"
+        pom="tomcat-embed-websocket.pom"
+        src="${tomcat.embed.src.path}/tomcat-embed-websocket-src.jar"/>
 
     <!-- Binaries -->
     <doMavenDeployBinaries
@@ -374,7 +377,7 @@
       <param name="maven.repo.repositoryId"
              value="${maven.snapshot.repo.repositoryId}"/>
       <param name="maven.repo.url" value="${maven.snapshot.repo.url}"/>
-      <param name="maven.deploy.version" value="8.0-SNAPSHOT"/>
+      <param name="maven.deploy.version" value="9.0-SNAPSHOT"/>
       <param name="maven.deploy.binary.version"
              value="${maven.asf.release.deploy.version}-dev"/>
     </antcall>

@@ -16,8 +16,12 @@
  */
 package org.apache.tomcat.websocket;
 
+import java.io.OutputStream;
 import java.io.Writer;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -34,15 +38,14 @@ import org.junit.Test;
 import org.apache.catalina.Context;
 import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
-import org.apache.catalina.startup.TomcatBaseTest;
-import org.apache.tomcat.util.descriptor.web.ApplicationListener;
+import org.apache.tomcat.websocket.TesterMessageCountClient.AsyncBinary;
 import org.apache.tomcat.websocket.TesterMessageCountClient.AsyncHandler;
 import org.apache.tomcat.websocket.TesterMessageCountClient.AsyncText;
 import org.apache.tomcat.websocket.TesterMessageCountClient.TesterAnnotatedEndpoint;
 import org.apache.tomcat.websocket.TesterMessageCountClient.TesterEndpoint;
 import org.apache.tomcat.websocket.TesterMessageCountClient.TesterProgrammaticEndpoint;
 
-public class TestWsRemoteEndpoint extends TomcatBaseTest {
+public class TestWsRemoteEndpoint extends WebSocketBaseTest {
 
     private static final String SEQUENCE = "ABCDE";
     private static final int S_LEN = SEQUENCE.length();
@@ -58,23 +61,41 @@ public class TestWsRemoteEndpoint extends TomcatBaseTest {
 
     @Test
     public void testWriterAnnotation() throws Exception {
-        doTestWriter(TesterAnnotatedEndpoint.class);
+        doTestWriter(TesterAnnotatedEndpoint.class, true, TEST_MESSAGE_5K);
     }
 
     @Test
     public void testWriterProgrammatic() throws Exception {
-        doTestWriter(TesterProgrammaticEndpoint.class);
+        doTestWriter(TesterProgrammaticEndpoint.class, true, TEST_MESSAGE_5K);
     }
 
-    private void doTestWriter(Class<?> clazz) throws Exception {
+    @Test
+    public void testWriterZeroLengthAnnotation() throws Exception {
+        doTestWriter(TesterAnnotatedEndpoint.class, true, "");
+    }
+
+    @Test
+    public void testWriterZeroLengthProgrammatic() throws Exception {
+        doTestWriter(TesterProgrammaticEndpoint.class, true, "");
+    }
+
+    @Test
+    public void testStreamAnnotation() throws Exception {
+        doTestWriter(TesterAnnotatedEndpoint.class, false, TEST_MESSAGE_5K);
+    }
+
+    @Test
+    public void testStreamProgrammatic() throws Exception {
+        doTestWriter(TesterProgrammaticEndpoint.class, false, TEST_MESSAGE_5K);
+    }
+
+    private void doTestWriter(Class<?> clazz, boolean useWriter, String testMessage) throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
-        ctx.addApplicationListener(new ApplicationListener(
-                TesterEchoServer.Config.class.getName(), false));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
+        ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
-        ctx.addServletMapping("/", "default");
+        ctx.addServletMappingDecoded("/", "default");
 
         WebSocketContainer wsContainer =
                 ContainerProvider.getWebSocketContainer();
@@ -98,17 +119,121 @@ public class TestWsRemoteEndpoint extends TomcatBaseTest {
         TesterEndpoint tep =
                 (TesterEndpoint) wsSession.getUserProperties().get("endpoint");
         tep.setLatch(latch);
-        AsyncHandler<?> handler = new AsyncText(latch);
+        AsyncHandler<?> handler;
+        if (useWriter) {
+            handler = new AsyncText(latch);
+        } else {
+            handler = new AsyncBinary(latch);
+        }
 
         wsSession.addMessageHandler(handler);
 
-        Writer w = wsSession.getBasicRemote().getSendWriter();
+        if (useWriter) {
+            Writer w = wsSession.getBasicRemote().getSendWriter();
 
-        for (int i = 0; i < 8; i++) {
-            w.write(TEST_MESSAGE_5K);
+            for (int i = 0; i < 8; i++) {
+                w.write(testMessage);
+            }
+
+            w.close();
+        } else {
+            OutputStream s = wsSession.getBasicRemote().getSendStream();
+
+            for (int i = 0; i < 8; i++) {
+                s.write(testMessage.getBytes(StandardCharsets.UTF_8));
+            }
+
+            s.close();
         }
 
-        w.close();
+        boolean latchResult = handler.getLatch().await(10, TimeUnit.SECONDS);
+
+        Assert.assertTrue(latchResult);
+
+        List<String> results = new ArrayList<>();
+        if (useWriter) {
+            @SuppressWarnings("unchecked")
+            List<String> messages = (List<String>) handler.getMessages();
+            results.addAll(messages);
+        } else {
+            // Take advantage of the fact that the message uses characters that
+            // are represented as a single UTF-8 byte so won't be split across
+            // binary messages
+            @SuppressWarnings("unchecked")
+            List<ByteBuffer> messages = (List<ByteBuffer>) handler.getMessages();
+            for (ByteBuffer message : messages) {
+                byte[] bytes = new byte[message.limit()];
+                message.get(bytes);
+                results.add(new String(bytes, StandardCharsets.UTF_8));
+            }
+        }
+
+        int offset = 0;
+        int i = 0;
+        for (String result : results) {
+            if (testMessage.length() == 0) {
+                Assert.assertEquals(0, result.length());
+            } else {
+                // First may be a fragment
+                Assert.assertEquals(SEQUENCE.substring(offset, S_LEN),
+                        result.substring(0, S_LEN - offset));
+                i = S_LEN - offset;
+                while (i + S_LEN < result.length()) {
+                    if (!SEQUENCE.equals(result.substring(i, i + S_LEN))) {
+                        Assert.fail();
+                    }
+                    i += S_LEN;
+                }
+                offset = result.length() - i;
+                if (!SEQUENCE.substring(0, offset).equals(result.substring(i))) {
+                    Assert.fail();
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testWriterErrorAnnotation() throws Exception {
+        doTestWriterError(TesterAnnotatedEndpoint.class);
+    }
+
+    @Test
+    public void testWriterErrorProgrammatic() throws Exception {
+        doTestWriterError(TesterProgrammaticEndpoint.class);
+    }
+
+    private void doTestWriterError(Class<?> clazz) throws Exception {
+        Tomcat tomcat = getTomcatInstance();
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
+        ctx.addApplicationListener(TesterEchoServer.Config.class.getName());
+        Tomcat.addServlet(ctx, "default", new DefaultServlet());
+        ctx.addServletMappingDecoded("/", "default");
+
+        WebSocketContainer wsContainer = ContainerProvider.getWebSocketContainer();
+
+        tomcat.start();
+
+        Session wsSession;
+        URI uri = new URI("ws://localhost:" + getPort() + TesterEchoServer.Config.PATH_WRITER_ERROR);
+        if (Endpoint.class.isAssignableFrom(clazz)) {
+            @SuppressWarnings("unchecked")
+            Class<? extends Endpoint> endpointClazz = (Class<? extends Endpoint>) clazz;
+            wsSession = wsContainer.connectToServer(endpointClazz, Builder.create().build(), uri);
+        } else {
+            wsSession = wsContainer.connectToServer(clazz, uri);
+        }
+
+        CountDownLatch latch = new CountDownLatch(1);
+        TesterEndpoint tep = (TesterEndpoint) wsSession.getUserProperties().get("endpoint");
+        tep.setLatch(latch);
+        AsyncHandler<?> handler;
+        handler = new AsyncText(latch);
+
+        wsSession.addMessageHandler(handler);
+
+        // This should trigger the error
+        wsSession.getBasicRemote().sendText("Start");
 
         boolean latchResult = handler.getLatch().await(10, TimeUnit.SECONDS);
 
@@ -117,23 +242,6 @@ public class TestWsRemoteEndpoint extends TomcatBaseTest {
         @SuppressWarnings("unchecked")
         List<String> messages = (List<String>) handler.getMessages();
 
-        int offset = 0;
-        int i = 0;
-        for (String message : messages) {
-            // First may be a fragment
-            Assert.assertEquals(SEQUENCE.substring(offset, S_LEN),
-                    message.substring(0, S_LEN - offset));
-            i = S_LEN - offset;
-            while (i + S_LEN < message.length()) {
-                if (!SEQUENCE.equals(message.substring(i, i + S_LEN))) {
-                    Assert.fail();
-                }
-                i += S_LEN;
-            }
-            offset = message.length() - i;
-            if (!SEQUENCE.substring(0, offset).equals(message.substring(i))) {
-                Assert.fail();
-            }
-        }
+        Assert.assertEquals(0, messages.size());
     }
 }

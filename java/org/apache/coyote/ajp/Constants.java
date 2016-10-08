@@ -25,14 +25,7 @@ import java.util.Hashtable;
  */
 public final class Constants {
 
-    /**
-     * Package name.
-     */
-    public static final String Package = "org.apache.coyote.ajp";
-
-    public static final int DEFAULT_CONNECTION_LINGER = -1;
     public static final int DEFAULT_CONNECTION_TIMEOUT = -1;
-    public static final boolean DEFAULT_TCP_NO_DELAY = true;
 
     // Prefix codes for message types from server to container
     public static final byte JK_AJP13_FORWARD_REQUEST   = 2;
@@ -81,7 +74,9 @@ public final class Constants {
     /**
      * AJP private request attributes
      */
+    public static final String SC_A_REQ_LOCAL_ADDR  = "AJP_LOCAL_ADDR";
     public static final String SC_A_REQ_REMOTE_PORT = "AJP_REMOTE_PORT";
+    public static final String SC_A_SSL_PROTOCOL    = "AJP_SSL_PROTOCOL";
 
     // Terminates list of attributes
     public static final byte SC_A_ARE_DONE      = (byte)0xFF;

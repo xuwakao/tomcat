@@ -27,10 +27,13 @@ import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.WeakHashMap;
 
 import javax.annotation.PostConstruct;
@@ -41,21 +44,17 @@ import javax.naming.Context;
 import javax.naming.NamingException;
 import javax.persistence.PersistenceContext;
 import javax.persistence.PersistenceUnit;
-import javax.servlet.Filter;
-import javax.servlet.Servlet;
 import javax.xml.ws.WebServiceRef;
 
 import org.apache.catalina.ContainerServlet;
 import org.apache.catalina.Globals;
 import org.apache.catalina.security.SecurityUtil;
 import org.apache.catalina.util.Introspection;
+import org.apache.juli.logging.Log;
 import org.apache.tomcat.InstanceManager;
 import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.res.StringManager;
 
-/**
- * @version $Id$
- */
 public class DefaultInstanceManager implements InstanceManager {
 
     // Used when there are no annotations in a class
@@ -74,9 +73,7 @@ public class DefaultInstanceManager implements InstanceManager {
     protected final ClassLoader containerClassLoader;
     protected final boolean privileged;
     protected final boolean ignoreAnnotations;
-    private final Properties restrictedFilters = new Properties();
-    private final Properties restrictedListeners = new Properties();
-    private final Properties restrictedServlets = new Properties();
+    private final Set<String> restrictedClasses;
     private final Map<Class<?>, AnnotationCacheEntry[]> annotationCache =
         new WeakHashMap<>();
     private final Map<String, String> postConstructMethods;
@@ -90,50 +87,18 @@ public class DefaultInstanceManager implements InstanceManager {
         privileged = catalinaContext.getPrivileged();
         this.containerClassLoader = containerClassLoader;
         ignoreAnnotations = catalinaContext.getIgnoreAnnotations();
-        StringManager sm = StringManager.getManager(Constants.Package);
-        try {
-            InputStream is =
-                this.getClass().getClassLoader().getResourceAsStream
-                    ("org/apache/catalina/core/RestrictedServlets.properties");
-            if (is != null) {
-                restrictedServlets.load(is);
-            } else {
-                catalinaContext.getLogger().error(sm.getString(
-                        "defaultInstanceManager.restrictedServletsResource"));
-            }
-        } catch (IOException e) {
-            catalinaContext.getLogger().error(sm.getString(
-                    "defaultInstanceManager.restrictedServletsResource"), e);
-        }
-
-        try {
-            InputStream is =
-                    this.getClass().getClassLoader().getResourceAsStream
-                            ("org/apache/catalina/core/RestrictedListeners.properties");
-            if (is != null) {
-                restrictedListeners.load(is);
-            } else {
-                catalinaContext.getLogger().error(sm.getString(
-                        "defaultInstanceManager.restrictedListenersResources"));
-            }
-        } catch (IOException e) {
-            catalinaContext.getLogger().error(sm.getString(
-                    "defaultInstanceManager.restrictedListenersResources"), e);
-        }
-        try {
-            InputStream is =
-                    this.getClass().getClassLoader().getResourceAsStream
-                            ("org/apache/catalina/core/RestrictedFilters.properties");
-            if (is != null) {
-                restrictedFilters.load(is);
-            } else {
-                catalinaContext.getLogger().error(sm.getString(
-                        "defaultInstanceManager.restrictedFiltersResource"));
-            }
-        } catch (IOException e) {
-            catalinaContext.getLogger().error(sm.getString(
-                    "defaultInstanceManager.restrictedServletsResources"), e);
-        }
+        Log log = catalinaContext.getLogger();
+        Set<String> classNames = new HashSet<>();
+        loadProperties(classNames,
+                "org/apache/catalina/core/RestrictedServlets.properties",
+                "defaultInstanceManager.restrictedServletsResource", log);
+        loadProperties(classNames,
+                "org/apache/catalina/core/RestrictedListeners.properties",
+                "defaultInstanceManager.restrictedListenersResource", log);
+        loadProperties(classNames,
+                "org/apache/catalina/core/RestrictedFilters.properties",
+                "defaultInstanceManager.restrictedFiltersResource", log);
+        restrictedClasses = Collections.unmodifiableSet(classNames);
         this.context = context;
         this.injectionMap = injectionMap;
         this.postConstructMethods = catalinaContext.findPostConstructMethods();
@@ -319,38 +284,38 @@ public class DefaultInstanceManager implements InstanceManager {
                     // JNDI is enabled
                     Field[] fields = Introspection.getDeclaredFields(clazz);
                     for (Field field : fields) {
+                        Resource resourceAnnotation;
+                        EJB ejbAnnotation;
+                        WebServiceRef webServiceRefAnnotation;
+                        PersistenceContext persistenceContextAnnotation;
+                        PersistenceUnit persistenceUnitAnnotation;
                         if (injections != null && injections.containsKey(field.getName())) {
                             annotations.add(new AnnotationCacheEntry(
                                     field.getName(), null,
                                     injections.get(field.getName()),
                                     AnnotationCacheEntryType.FIELD));
-                        } else if (field.isAnnotationPresent(Resource.class)) {
-                            Resource annotation = field.getAnnotation(Resource.class);
-                            annotations.add(new AnnotationCacheEntry(
-                                    field.getName(), null, annotation.name(),
+                        } else if ((resourceAnnotation =
+                                field.getAnnotation(Resource.class)) != null) {
+                            annotations.add(new AnnotationCacheEntry(field.getName(), null,
+                                    resourceAnnotation.name(), AnnotationCacheEntryType.FIELD));
+                        } else if ((ejbAnnotation =
+                                field.getAnnotation(EJB.class)) != null) {
+                            annotations.add(new AnnotationCacheEntry(field.getName(), null,
+                                    ejbAnnotation.name(), AnnotationCacheEntryType.FIELD));
+                        } else if ((webServiceRefAnnotation =
+                                field.getAnnotation(WebServiceRef.class)) != null) {
+                            annotations.add(new AnnotationCacheEntry(field.getName(), null,
+                                    webServiceRefAnnotation.name(),
                                     AnnotationCacheEntryType.FIELD));
-                        } else if (field.isAnnotationPresent(EJB.class)) {
-                            EJB annotation = field.getAnnotation(EJB.class);
-                            annotations.add(new AnnotationCacheEntry(
-                                    field.getName(), null, annotation.name(),
+                        } else if ((persistenceContextAnnotation =
+                                field.getAnnotation(PersistenceContext.class)) != null) {
+                            annotations.add(new AnnotationCacheEntry(field.getName(), null,
+                                    persistenceContextAnnotation.name(),
                                     AnnotationCacheEntryType.FIELD));
-                        } else if (field.isAnnotationPresent(WebServiceRef.class)) {
-                            WebServiceRef annotation =
-                                    field.getAnnotation(WebServiceRef.class);
-                            annotations.add(new AnnotationCacheEntry(
-                                    field.getName(), null, annotation.name(),
-                                    AnnotationCacheEntryType.FIELD));
-                        } else if (field.isAnnotationPresent(PersistenceContext.class)) {
-                            PersistenceContext annotation =
-                                    field.getAnnotation(PersistenceContext.class);
-                            annotations.add(new AnnotationCacheEntry(
-                                    field.getName(), null, annotation.name(),
-                                    AnnotationCacheEntryType.FIELD));
-                        } else if (field.isAnnotationPresent(PersistenceUnit.class)) {
-                            PersistenceUnit annotation =
-                                    field.getAnnotation(PersistenceUnit.class);
-                            annotations.add(new AnnotationCacheEntry(
-                                    field.getName(), null, annotation.name(),
+                        } else if ((persistenceUnitAnnotation =
+                                field.getAnnotation(PersistenceUnit.class)) != null) {
+                            annotations.add(new AnnotationCacheEntry(field.getName(), null,
+                                    persistenceUnitAnnotation.name(),
                                     AnnotationCacheEntryType.FIELD));
                         }
                     }
@@ -377,43 +342,44 @@ public class DefaultInstanceManager implements InstanceManager {
                                 continue;
                             }
                         }
-                        if (method.isAnnotationPresent(Resource.class)) {
-                            Resource annotation = method.getAnnotation(Resource.class);
+                        Resource resourceAnnotation;
+                        EJB ejbAnnotation;
+                        WebServiceRef webServiceRefAnnotation;
+                        PersistenceContext persistenceContextAnnotation;
+                        PersistenceUnit persistenceUnitAnnotation;
+                        if ((resourceAnnotation =
+                                method.getAnnotation(Resource.class)) != null) {
                             annotations.add(new AnnotationCacheEntry(
                                     method.getName(),
                                     method.getParameterTypes(),
-                                    annotation.name(),
+                                    resourceAnnotation.name(),
                                     AnnotationCacheEntryType.SETTER));
-                        } else if (method.isAnnotationPresent(EJB.class)) {
-                            EJB annotation = method.getAnnotation(EJB.class);
+                        } else if ((ejbAnnotation =
+                                method.getAnnotation(EJB.class)) != null) {
                             annotations.add(new AnnotationCacheEntry(
                                     method.getName(),
                                     method.getParameterTypes(),
-                                    annotation.name(),
+                                    ejbAnnotation.name(),
                                     AnnotationCacheEntryType.SETTER));
-                        } else if (method.isAnnotationPresent(WebServiceRef.class)) {
-                            WebServiceRef annotation =
-                                    method.getAnnotation(WebServiceRef.class);
+                        } else if ((webServiceRefAnnotation =
+                                method.getAnnotation(WebServiceRef.class)) != null) {
                             annotations.add(new AnnotationCacheEntry(
                                     method.getName(),
                                     method.getParameterTypes(),
-                                    annotation.name(),
+                                    webServiceRefAnnotation.name(),
                                     AnnotationCacheEntryType.SETTER));
-                        } else if (method.isAnnotationPresent(PersistenceContext.class)) {
-                            PersistenceContext annotation =
-                                    method.getAnnotation(PersistenceContext.class);
+                        } else if ((persistenceContextAnnotation =
+                                method.getAnnotation(PersistenceContext.class)) != null) {
                             annotations.add(new AnnotationCacheEntry(
                                     method.getName(),
                                     method.getParameterTypes(),
-                                    annotation.name(),
+                                    persistenceContextAnnotation.name(),
                                     AnnotationCacheEntryType.SETTER));
-                        } else if (method.isAnnotationPresent(PersistenceUnit.class)) {
-                            PersistenceUnit annotation =
-                                    method.getAnnotation(PersistenceUnit.class);
+                        } else if ((persistenceUnitAnnotation = method.getAnnotation(PersistenceUnit.class)) != null) {
                             annotations.add(new AnnotationCacheEntry(
                                     method.getName(),
                                     method.getParameterTypes(),
-                                    annotation.name(),
+                                    persistenceUnitAnnotation.name(),
                                     AnnotationCacheEntryType.SETTER));
                         }
                     }
@@ -502,6 +468,8 @@ public class DefaultInstanceManager implements InstanceManager {
 
     /**
      * Makes cache size available to unit tests.
+     *
+     * @return the cache size
      */
     protected int getAnnotationCacheSize() {
         synchronized (annotationCache) {
@@ -556,27 +524,17 @@ public class DefaultInstanceManager implements InstanceManager {
         if (privileged) {
             return;
         }
-        if (Filter.class.isAssignableFrom(clazz)) {
-            checkAccess(clazz, restrictedFilters);
-        } else if (Servlet.class.isAssignableFrom(clazz)) {
-            if (ContainerServlet.class.isAssignableFrom(clazz)) {
-                throw new SecurityException("Restricted (ContainerServlet) " +
-                        clazz);
-            }
-            checkAccess(clazz, restrictedServlets);
-        } else {
-            checkAccess(clazz, restrictedListeners);
+        if (ContainerServlet.class.isAssignableFrom(clazz)) {
+            throw new SecurityException(sm.getString(
+                    "defaultInstanceManager.restrictedContainerServlet", clazz));
         }
-    }
-
-    private void checkAccess(Class<?> clazz, Properties restricted) {
         while (clazz != null) {
-            if ("restricted".equals(restricted.getProperty(clazz.getName()))) {
-                throw new SecurityException("Restricted " + clazz);
+            if (restrictedClasses.contains(clazz.getName())) {
+                throw new SecurityException(sm.getString(
+                        "defaultInstanceManager.restrictedClass", clazz));
             }
             clazz = clazz.getSuperclass();
         }
-
     }
 
     /**
@@ -653,6 +611,33 @@ public class DefaultInstanceManager implements InstanceManager {
             method.setAccessible(true);
             method.invoke(instance, lookedupResource);
             method.setAccessible(accessibility);
+        }
+    }
+
+    private static void loadProperties(Set<String> classNames, String resourceName,
+            String messageKey, Log log) {
+        Properties properties = new Properties();
+        ClassLoader cl = DefaultInstanceManager.class.getClassLoader();
+        try (InputStream is = cl.getResourceAsStream(resourceName)) {
+            if (is == null) {
+                log.error(sm.getString(messageKey, resourceName));
+            } else {
+                properties.load(is);
+            }
+        } catch (IOException ioe) {
+            log.error(sm.getString(messageKey, resourceName), ioe);
+        }
+        if (properties.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<Object, Object> e : properties.entrySet()) {
+            if ("restricted".equals(e.getValue())) {
+                classNames.add(e.getKey().toString());
+            } else {
+                log.warn(sm.getString(
+                        "defaultInstanceManager.restrictedWrongValue",
+                        resourceName, e.getKey(), e.getValue()));
+            }
         }
     }
 
@@ -745,16 +730,15 @@ public class DefaultInstanceManager implements InstanceManager {
             if (method.getName().equals(methodNameFromXml)) {
                 if (!Introspection.isValidLifecycleCallback(method)) {
                     throw new IllegalArgumentException(
-                        "Invalid " + annotation.getName() + " annotation");
+                            "Invalid " + annotation.getName() + " annotation");
                 }
                 result = method;
             }
         } else {
             if (method.isAnnotationPresent(annotation)) {
-                if (currentMethod != null ||
-                    !Introspection.isValidLifecycleCallback(method)) {
+                if (currentMethod != null || !Introspection.isValidLifecycleCallback(method)) {
                     throw new IllegalArgumentException(
-                        "Invalid " + annotation.getName() + " annotation");
+                            "Invalid " + annotation.getName() + " annotation");
                 }
                 result = method;
             }

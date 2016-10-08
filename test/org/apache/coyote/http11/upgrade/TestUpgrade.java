@@ -23,6 +23,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.io.Writer;
 import java.net.Socket;
 
@@ -46,7 +47,6 @@ import static org.apache.catalina.startup.SimpleHttpClient.CRLF;
 import org.apache.catalina.Context;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
-import org.apache.catalina.util.IOTools;
 
 public class TestUpgrade extends TomcatBaseTest {
 
@@ -54,12 +54,16 @@ public class TestUpgrade extends TomcatBaseTest {
 
     @Test
     public void testSimpleUpgradeBlocking() throws Exception {
-        doUpgrade(EchoBlocking.class);
+        UpgradeConnection uc = doUpgrade(EchoBlocking.class);
+        uc.shutdownInput();
+        uc.shutdownOutput();
     }
 
     @Test
     public void testSimpleUpgradeNonBlocking() throws Exception {
-        doUpgrade(EchoNonBlocking.class);
+        UpgradeConnection uc = doUpgrade(EchoNonBlocking.class);
+        uc.shutdownInput();
+        uc.shutdownOutput();
     }
 
     @Test
@@ -72,12 +76,59 @@ public class TestUpgrade extends TomcatBaseTest {
         doTestMessages(EchoNonBlocking.class);
     }
 
+    @Test
+    public void testSetNullReadListener() throws Exception {
+        doTestCheckClosed(SetNullReadListener.class);
+    }
+
+    @Test
+    public void testSetNullWriteListener() throws Exception {
+        doTestCheckClosed(SetNullWriteListener.class);
+    }
+
+    @Test
+    public void testSetReadListenerTwice() throws Exception {
+        doTestCheckClosed(SetReadListenerTwice.class);
+    }
+
+    @Test
+    public void testSetWriteListenerTwice() throws Exception {
+        doTestCheckClosed(SetWriteListenerTwice.class);
+    }
+
+    @Test
+    public void testFirstCallToOnWritePossible() throws Exception {
+        doTestFixedResponse(FixedResponseNonBlocking.class);
+    }
+
+    private void doTestCheckClosed(
+            Class<? extends HttpUpgradeHandler> upgradeHandlerClass)
+                    throws Exception {
+        UpgradeConnection conn = doUpgrade(upgradeHandlerClass);
+
+        Reader r = conn.getReader();
+        int c = r.read();
+
+        Assert.assertEquals(-1, c);
+    }
+
+    private void doTestFixedResponse(
+            Class<? extends HttpUpgradeHandler> upgradeHandlerClass)
+                    throws Exception {
+        UpgradeConnection conn = doUpgrade(upgradeHandlerClass);
+
+        Reader r = conn.getReader();
+        int c = r.read();
+
+        Assert.assertEquals(FixedResponseNonBlocking.FIXED_RESPONSE, c);
+    }
+
     private void doTestMessages (
             Class<? extends HttpUpgradeHandler> upgradeHandlerClass)
             throws Exception {
-        UpgradeConnection conn = doUpgrade(upgradeHandlerClass);
-        PrintWriter pw = new PrintWriter(conn.getWriter());
-        BufferedReader reader = conn.getReader();
+        UpgradeConnection uc = doUpgrade(upgradeHandlerClass);
+        PrintWriter pw = new PrintWriter(uc.getWriter());
+        BufferedReader reader = uc.getReader();
 
         pw.println(MESSAGE);
         pw.flush();
@@ -87,12 +138,16 @@ public class TestUpgrade extends TomcatBaseTest {
         pw.println(MESSAGE);
         pw.flush();
 
+        uc.shutdownOutput();
+
         // Note: BufferedReader.readLine() strips new lines
         //       ServletInputStream.readLine() does not strip new lines
         String response = reader.readLine();
         Assert.assertEquals(MESSAGE, response);
         response = reader.readLine();
         Assert.assertEquals(MESSAGE, response);
+
+        uc.shutdownInput();
     }
 
 
@@ -101,13 +156,12 @@ public class TestUpgrade extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-                tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         UpgradeServlet servlet = new UpgradeServlet(upgradeHandlerClass);
         Tomcat.addServlet(ctx, "servlet", servlet);
-        ctx.addServletMapping("/", "servlet");
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -116,33 +170,28 @@ public class TestUpgrade extends TomcatBaseTest {
         Socket socket =
                 SocketFactory.getDefault().createSocket("localhost", getPort());
 
-        socket.setSoTimeout(10000);
+        socket.setSoTimeout(5000);
 
-        InputStream is = socket.getInputStream();
-        OutputStream os = socket.getOutputStream();
+        UpgradeConnection uc = new UpgradeConnection(socket);
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-        Writer writer = new OutputStreamWriter(os);
+        uc.getWriter().write("GET / HTTP/1.1" + CRLF);
+        uc.getWriter().write("Host: whatever" + CRLF);
+        uc.getWriter().write(CRLF);
+        uc.getWriter().flush();
 
-        writer.write("GET / HTTP/1.1" + CRLF);
-        writer.write("Host: whatever" + CRLF);
-        writer.write(CRLF);
-        writer.flush();
-
-        String status = reader.readLine();
+        String status = uc.getReader().readLine();
 
         Assert.assertNotNull(status);
-        Assert.assertEquals("HTTP/1.1 101 Switching Protocols",
-                status.substring(0, 32));
+        Assert.assertEquals("101", getStatusCode(status));
 
         // Skip the remaining response headers
-        String line = reader.readLine();
+        String line = uc.getReader().readLine();
         while (line != null && line.length() > 0) {
             // Skip
-            line = reader.readLine();
+            line = uc.getReader().readLine();
         }
 
-        return new UpgradeConnection(writer, reader);
+        return uc;
     }
 
     private static class UpgradeServlet extends HttpServlet {
@@ -164,10 +213,24 @@ public class TestUpgrade extends TomcatBaseTest {
     }
 
     private static class UpgradeConnection {
+        private final Socket socket;
         private final Writer writer;
         private final BufferedReader reader;
 
-        public UpgradeConnection(Writer writer, BufferedReader reader) {
+        public UpgradeConnection(Socket socket) {
+            this.socket = socket;
+            InputStream is;
+            OutputStream os;
+            try {
+                is = socket.getInputStream();
+                os = socket.getOutputStream();
+            } catch (IOException ioe) {
+                throw new IllegalArgumentException(ioe);
+            }
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+            Writer writer = new OutputStreamWriter(os);
+
             this.writer = writer;
             this.reader = reader;
         }
@@ -179,6 +242,15 @@ public class TestUpgrade extends TomcatBaseTest {
         public BufferedReader getReader() {
             return reader;
         }
+
+        public void shutdownOutput() throws IOException {
+            writer.flush();
+            socket.shutdownOutput();
+        }
+
+        public void shutdownInput() throws IOException {
+            socket.shutdownInput();
+        }
     }
 
 
@@ -188,8 +260,12 @@ public class TestUpgrade extends TomcatBaseTest {
 
             try (ServletInputStream sis = connection.getInputStream();
                  ServletOutputStream sos = connection.getOutputStream()){
-
-                IOTools.flow(sis, sos);
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = sis.read(buffer)) >= 0) {
+                    sos.write(buffer, 0, read);
+                    sos.flush();
+                }
             } catch (IOException ioe) {
                 throw new IllegalStateException(ioe);
             }
@@ -204,6 +280,173 @@ public class TestUpgrade extends TomcatBaseTest {
 
     public static class EchoNonBlocking implements HttpUpgradeHandler {
 
+        @Override
+        public void init(WebConnection connection) {
+            ServletInputStream sis;
+            ServletOutputStream sos;
+
+            try {
+                sis = connection.getInputStream();
+                sos = connection.getOutputStream();
+            } catch (IOException ioe) {
+                throw new IllegalStateException(ioe);
+            }
+
+            EchoListener echoListener = new EchoListener(sis, sos);
+            sis.setReadListener(echoListener);
+            sos.setWriteListener(echoListener);
+        }
+
+        @Override
+        public void destroy() {
+            // NO-OP
+        }
+
+
+        private class EchoListener implements ReadListener, WriteListener {
+
+            private final ServletInputStream sis;
+            private final ServletOutputStream sos;
+            private final byte[] buffer = new byte[8192];
+
+            public EchoListener(ServletInputStream sis, ServletOutputStream sos) {
+                this.sis = sis;
+                this.sos = sos;
+            }
+
+            @Override
+            public void onWritePossible() throws IOException {
+                if (sis.isFinished()) {
+                    sis.close();
+                    sos.close();
+                }
+                while (sis.isReady()) {
+                    int read = sis.read(buffer);
+                    if (read > 0) {
+                        sos.write(buffer, 0, read);
+                        if (!sos.isReady()) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onDataAvailable() throws IOException {
+                if (sos.isReady()) {
+                    onWritePossible();
+                }
+            }
+
+            @Override
+            public void onAllDataRead() throws IOException {
+                if (sos.isReady()) {
+                    onWritePossible();
+                }
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                throwable.printStackTrace();
+            }
+        }
+    }
+
+
+    public static class SetNullReadListener implements HttpUpgradeHandler {
+
+        @Override
+        public void init(WebConnection connection) {
+            ServletInputStream sis;
+            try {
+                sis = connection.getInputStream();
+            } catch (IOException ioe) {
+                throw new IllegalStateException(ioe);
+            }
+            sis.setReadListener(null);
+        }
+
+        @Override
+        public void destroy() {
+            // NO-OP
+        }
+    }
+
+
+    public static class SetNullWriteListener implements HttpUpgradeHandler {
+
+        @Override
+        public void init(WebConnection connection) {
+            ServletOutputStream sos;
+            try {
+                sos = connection.getOutputStream();
+            } catch (IOException ioe) {
+                throw new IllegalStateException(ioe);
+            }
+            sos.setWriteListener(null);
+        }
+
+        @Override
+        public void destroy() {
+            // NO-OP
+        }
+    }
+
+
+    public static class SetReadListenerTwice implements HttpUpgradeHandler {
+
+        @Override
+        public void init(WebConnection connection) {
+            ServletInputStream sis;
+            ServletOutputStream sos;
+            try {
+                sis = connection.getInputStream();
+                sos = connection.getOutputStream();
+            } catch (IOException ioe) {
+                throw new IllegalStateException(ioe);
+            }
+            sos.setWriteListener(new NoOpWriteListener());
+            ReadListener rl = new NoOpReadListener();
+            sis.setReadListener(rl);
+            sis.setReadListener(rl);
+        }
+
+        @Override
+        public void destroy() {
+            // NO-OP
+        }
+    }
+
+
+    public static class SetWriteListenerTwice implements HttpUpgradeHandler {
+
+        @Override
+        public void init(WebConnection connection) {
+            ServletInputStream sis;
+            ServletOutputStream sos;
+            try {
+                sis = connection.getInputStream();
+                sos = connection.getOutputStream();
+            } catch (IOException ioe) {
+                throw new IllegalStateException(ioe);
+            }
+            sis.setReadListener(new NoOpReadListener());
+            WriteListener wl = new NoOpWriteListener();
+            sos.setWriteListener(wl);
+            sos.setWriteListener(wl);
+        }
+
+        @Override
+        public void destroy() {
+            // NO-OP
+        }
+    }
+
+
+    public static class FixedResponseNonBlocking implements HttpUpgradeHandler {
+
+        public static final char FIXED_RESPONSE = 'F';
+
         private ServletInputStream sis;
         private ServletOutputStream sos;
 
@@ -217,8 +460,8 @@ public class TestUpgrade extends TomcatBaseTest {
                 throw new IllegalStateException(ioe);
             }
 
-            sis.setReadListener(new EchoReadListener());
-            sos.setWriteListener(new EchoWriteListener());
+            sis.setReadListener(new NoOpReadListener());
+            sos.setWriteListener(new FixedResponseWriteListener());
         }
 
         @Override
@@ -226,51 +469,49 @@ public class TestUpgrade extends TomcatBaseTest {
             // NO-OP
         }
 
-        private class EchoReadListener implements ReadListener {
-
-            private byte[] buffer = new byte[8096];
-
-            @Override
-            public void onDataAvailable() {
-                try {
-                    while (sis.isReady()) {
-                        int read = sis.read(buffer);
-                        if (read > 0) {
-                            if (sos.isReady()) {
-                                sos.write(buffer, 0, read);
-                            } else {
-                                throw new IOException("Unable to echo data. " +
-                                        "canWrite() returned false");
-                            }
-                        }
-                    }
-                } catch (IOException ioe) {
-                    throw new RuntimeException(ioe);
-                }
-            }
-
-            @Override
-            public void onAllDataRead() {
-                // NO-OP for HTTP Upgrade
-            }
-
-            @Override
-            public void onError(Throwable throwable) {
-                // NO-OP
-            }
-        }
-
-        private class EchoWriteListener implements WriteListener {
-
+        private class FixedResponseWriteListener extends NoOpWriteListener {
             @Override
             public void onWritePossible() {
-                // NO-OP
+                try {
+                    sos.write(FIXED_RESPONSE);
+                    sos.flush();
+                } catch (IOException ioe) {
+                    throw new IllegalStateException(ioe);
+                }
             }
+        }
+    }
 
-            @Override
-            public void onError(Throwable throwable) {
-                // NO-OP
-            }
+
+    private static class NoOpReadListener implements ReadListener {
+
+        @Override
+        public void onDataAvailable() {
+            // NO-OP
+        }
+
+        @Override
+        public void onAllDataRead() {
+            // Always NO-OP for HTTP Upgrade
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+            // NO-OP
+        }
+    }
+
+
+    private static class NoOpWriteListener implements WriteListener {
+
+        @Override
+        public void onWritePossible() {
+            // NO-OP
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+            // NO-OP
         }
     }
 }

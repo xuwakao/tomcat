@@ -43,7 +43,6 @@ import org.apache.tomcat.util.http.RequestUtil;
  *
  * @author Dan Sandberg
  * @author David Becker
- * @version $Id$
  */
 public class SSIServletExternalResolver implements SSIExternalResolver {
     protected final String VARIABLE_NAMES[] = {"AUTH_TYPE", "CONTENT_LENGTH",
@@ -171,9 +170,9 @@ public class SSIServletExternalResolver implements SSIExternalResolver {
             }
         } else if(nameParts[0].equals("CONTENT")) {
             if (nameParts[1].equals("LENGTH")) {
-                int contentLength = req.getContentLength();
+                long contentLength = req.getContentLengthLong();
                 if (contentLength >= 0) {
-                    retVal = Integer.toString(contentLength);
+                    retVal = Long.toString(contentLength);
                 }
             } else if (nameParts[1].equals("TYPE")) {
                 retVal = req.getContentType();
@@ -505,7 +504,7 @@ public class SSIServletExternalResolver implements SSIExternalResolver {
         long fileSize = -1;
         try {
             URLConnection urlConnection = getURLConnection(path, virtual);
-            fileSize = urlConnection.getContentLength();
+            fileSize = urlConnection.getContentLengthLong();
         } catch (IOException e) {
             // Ignore this. It will always fail for non-file based includes
         }
@@ -551,8 +550,7 @@ public class SSIServletExternalResolver implements SSIExternalResolver {
             // a problem
             // if a truly empty file
             //were included, but not sure how else to tell.
-            if (retVal.equals("") && !req.getMethod().equalsIgnoreCase(
-                    org.apache.coyote.http11.Constants.HEAD)) {
+            if (retVal.equals("") && !req.getMethod().equalsIgnoreCase("HEAD")) {
                 throw new IOException("Couldn't find file: " + path);
             }
             return retVal;

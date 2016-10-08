@@ -38,7 +38,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpUpgradeHandler;
+import javax.servlet.http.Mapping;
 import javax.servlet.http.Part;
+import javax.servlet.http.PushBuilder;
 
 import org.apache.catalina.Globals;
 import org.apache.catalina.security.SecurityUtil;
@@ -50,10 +52,7 @@ import org.apache.tomcat.util.res.StringManager;
  *
  * @author Craig R. McClanahan
  * @author Remy Maucherat
- * @author Jean-Francois Arcand
- * @version $Id$
  */
-
 @SuppressWarnings("deprecation")
 public class RequestFacade implements HttpServletRequest {
 
@@ -245,8 +244,7 @@ public class RequestFacade implements HttpServletRequest {
     /**
      * The string manager for this package.
      */
-    protected static final StringManager sm =
-        StringManager.getManager(Constants.Package);
+    protected static final StringManager sm = StringManager.getManager(RequestFacade.class);
 
 
     // --------------------------------------------------------- Public Methods
@@ -740,6 +738,18 @@ public class RequestFacade implements HttpServletRequest {
 
 
     @Override
+    public Mapping getMapping() {
+
+        if (request == null) {
+            throw new IllegalStateException(
+                            sm.getString("requestFacade.nullRequest"));
+        }
+
+        return request.getMapping();
+    }
+
+
+    @Override
     public String getMethod() {
 
         if (request == null) {
@@ -1115,5 +1125,16 @@ public class RequestFacade implements HttpServletRequest {
     public <T extends HttpUpgradeHandler> T upgrade(
             Class<T> httpUpgradeHandlerClass) throws java.io.IOException, ServletException {
         return request.upgrade(httpUpgradeHandlerClass);
+    }
+
+
+    /**
+     * {@inheritDoc}
+     *
+     * @since Servlet 4.0
+     */
+    @Override
+    public PushBuilder getPushBuilder() {
+        return request.getPushBuilder();
     }
 }

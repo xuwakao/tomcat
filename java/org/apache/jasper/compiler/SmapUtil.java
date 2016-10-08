@@ -32,6 +32,8 @@ import java.util.Map;
 
 import org.apache.jasper.JasperException;
 import org.apache.jasper.JspCompilationContext;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 /**
  * Contains static utilities for generating SMAP data based on the
@@ -60,6 +62,7 @@ public class SmapUtil {
      * @param ctxt Current compilation context
      * @param pageNodes The current JSP page
      * @return a SMAP for the page
+     * @throws IOException Error writing SMAP
      */
     public static String[] generateSmap(
         JspCompilationContext ctxt,
@@ -180,8 +183,7 @@ public class SmapUtil {
     // Installation logic (from Robert Field, JSR-045 spec lead)
     private static class SDEInstaller {
 
-        private final org.apache.juli.logging.Log log=
-            org.apache.juli.logging.LogFactory.getLog( SDEInstaller.class );
+        private final Log log = LogFactory.getLog(SDEInstaller.class);
 
         static final String nameSDE = "SourceDebugExtension";
 
@@ -223,9 +225,9 @@ public class SmapUtil {
             addSDE();
 
             // write result
-            FileOutputStream outStream = new FileOutputStream(outClassFile);
-            outStream.write(gen, 0, genPos);
-            outStream.close();
+            try (FileOutputStream outStream = new FileOutputStream(outClassFile);) {
+                outStream.write(gen, 0, genPos);
+            }
         }
 
         static byte[] readWhole(File input) throws IOException {
@@ -395,18 +397,25 @@ public class SmapUtil {
                 int tag = readU1();
                 writeU1(tag);
                 switch (tag) {
-                    case 7 : // Class
-                    case 8 : // String
+                    case 7 :  // Class
+                    case 8 :  // String
+                    case 16 : // MethodType
                         if (log.isDebugEnabled())
                             log.debug(i + " copying 2 bytes");
                         copy(2);
                         break;
-                    case 9 : // Field
+                    case 15 : // MethodHandle
+                        if (log.isDebugEnabled())
+                            log.debug(i + " copying 3 bytes");
+                        copy(3);
+                        break;
+                    case 9 :  // Field
                     case 10 : // Method
                     case 11 : // InterfaceMethod
-                    case 3 : // Integer
-                    case 4 : // Float
+                    case 3 :  // Integer
+                    case 4 :  // Float
                     case 12 : // NameAndType
+                    case 18 : // InvokeDynamic
                         if (log.isDebugEnabled())
                             log.debug(i + " copying 4 bytes");
                         copy(4);

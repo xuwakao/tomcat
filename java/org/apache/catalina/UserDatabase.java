@@ -29,10 +29,8 @@ import java.util.Iterator;
  * referenced by a {@link Realm} for authentication and access control.</p>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  * @since 4.1
  */
-
 public interface UserDatabase {
 
 
@@ -40,25 +38,25 @@ public interface UserDatabase {
 
 
     /**
-     * Return the set of {@link Group}s defined in this user database.
+     * @return the set of {@link Group}s defined in this user database.
      */
     public Iterator<Group> getGroups();
 
 
     /**
-     * Return the unique global identifier of this user database.
+     * @return the unique global identifier of this user database.
      */
     public String getId();
 
 
     /**
-     * Return the set of {@link Role}s defined in this user database.
+     * @return the set of {@link Role}s defined in this user database.
      */
     public Iterator<Role> getRoles();
 
 
     /**
-     * Return the set of {@link User}s defined in this user database.
+     * @return the set of {@link User}s defined in this user database.
      */
     public Iterator<User> getUsers();
 
@@ -79,6 +77,7 @@ public interface UserDatabase {
      *
      * @param groupname The group name of the new group (must be unique)
      * @param description The description of this group
+     * @return The new group
      */
     public Group createGroup(String groupname, String description);
 
@@ -88,6 +87,7 @@ public interface UserDatabase {
      *
      * @param rolename The role name of the new role (must be unique)
      * @param description The description of this role
+     * @return The new role
      */
     public Role createRole(String rolename, String description);
 
@@ -98,13 +98,14 @@ public interface UserDatabase {
      * @param username The logon username of the new user (must be unique)
      * @param password The logon password of the new user
      * @param fullName The full name of the new user
+     * @return The new user
      */
     public User createUser(String username, String password,
                            String fullName);
 
 
     /**
-     * Return the {@link Group} with the specified group name, if any;
+     * @return the {@link Group} with the specified group name, if any;
      * otherwise return <code>null</code>.
      *
      * @param groupname Name of the group to return
@@ -113,7 +114,7 @@ public interface UserDatabase {
 
 
     /**
-     * Return the {@link Role} with the specified role name, if any;
+     * @return the {@link Role} with the specified role name, if any;
      * otherwise return <code>null</code>.
      *
      * @param rolename Name of the role to return
@@ -122,7 +123,7 @@ public interface UserDatabase {
 
 
     /**
-     * Return the {@link User} with the specified user name, if any;
+     * @return the {@link User} with the specified user name, if any;
      * otherwise return <code>null</code>.
      *
      * @param username Name of the user to return

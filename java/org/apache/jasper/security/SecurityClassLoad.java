@@ -18,18 +18,18 @@
 
 package org.apache.jasper.security;
 
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 /**
  * Static class used to preload java classes when using the
  * Java SecurityManager so that the defineClassInPackage
  * RuntimePermission does not trigger an AccessControlException.
- *
- * @author Jean-Francois Arcand
  */
 
 public final class SecurityClassLoad {
 
-    private static final org.apache.juli.logging.Log log=
-        org.apache.juli.logging.LogFactory.getLog( SecurityClassLoad.class );
+    private static final Log log = LogFactory.getLog(SecurityClassLoad.class);
 
     public static void securityClassLoad(ClassLoader loader){
 
@@ -46,8 +46,6 @@ public final class SecurityClassLoad {
 
             loader.loadClass( basePackage +
                 "runtime.JspRuntimeLibrary");
-            loader.loadClass( basePackage +
-                "runtime.JspRuntimeLibrary$PrivilegedIntrospectHelper");
 
             loader.loadClass( basePackage +
                 "runtime.ServletResponseWrapperInclude");
@@ -58,14 +56,6 @@ public final class SecurityClassLoad {
 
             loader.loadClass( basePackage +
                 "runtime.ProtectedFunctionMapper");
-            loader.loadClass( basePackage +
-                "runtime.ProtectedFunctionMapper$1");
-            loader.loadClass( basePackage +
-                "runtime.ProtectedFunctionMapper$2");
-            loader.loadClass( basePackage +
-                "runtime.ProtectedFunctionMapper$3");
-            loader.loadClass( basePackage +
-                "runtime.ProtectedFunctionMapper$4");
 
             loader.loadClass( basePackage +
                 "runtime.PageContextImpl");
@@ -93,8 +83,6 @@ public final class SecurityClassLoad {
                 "runtime.PageContextImpl$11");
             loader.loadClass( basePackage +
                 "runtime.PageContextImpl$12");
-            loader.loadClass( basePackage +
-                "runtime.PageContextImpl$13");
 
             loader.loadClass( basePackage +
                 "runtime.JspContextWrapper");

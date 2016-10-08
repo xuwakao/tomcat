@@ -25,15 +25,15 @@ import java.lang.annotation.Target;
 
 /**
  * Declare this annotation on a {@link javax.servlet.Servlet} implementation
- * class to enforce security constraints on HTTP protocol requests.<br />
+ * class to enforce security constraints on HTTP protocol requests.<br>
  * The container applies constraints to the URL patterns mapped to each Servlet
- * which declares this annotation.<br />
- * <br />
+ * which declares this annotation.<br>
+ * <br>
  *
  * @since Servlet 3.0
  */
 @Inherited
-@Target({ElementType.TYPE})
+@Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface ServletSecurity {

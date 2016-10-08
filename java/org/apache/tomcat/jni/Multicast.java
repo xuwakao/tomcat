@@ -20,9 +20,7 @@ package org.apache.tomcat.jni;
 /** Multicast
  *
  * @author Mladen Turk
- * @version $Id$
  */
-
 public class Multicast {
 
     /**
@@ -33,6 +31,7 @@ public class Multicast {
      *              default multicast interface will be used. (OS Dependent)
      * @param source Source Address to accept transmissions from (non-NULL
      *               implies Source-Specific Multicast)
+     * @return the operation status
      */
     public static native int join(long sock, long join,
                                   long iface, long source);
@@ -46,6 +45,7 @@ public class Multicast {
      *              default multicast interface will be used. (OS Dependent)
      * @param source Source Address to accept transmissions from (non-NULL
      *               implies Source-Specific Multicast)
+     * @return the operation status
      */
     public static native int leave(long sock, long addr,
                                    long iface, long source);
@@ -54,9 +54,10 @@ public class Multicast {
      * Set the Multicast Time to Live (ttl) for a multicast transmission.
      * @param sock The socket to set the multicast ttl
      * @param ttl Time to live to Assign. 0-255, default=1
-     * <br /><b>Remark :</b> If the TTL is 0, packets will only be seen
+     * <br><b>Remark :</b> If the TTL is 0, packets will only be seen
      * by sockets on the local machine,
      * and only when multicast loopback is enabled.
+     * @return the operation status
      */
     public static native int hops(long sock, int ttl);
 
@@ -64,6 +65,7 @@ public class Multicast {
      * Toggle IP Multicast Loopback
      * @param sock The socket to set multicast loopback
      * @param opt false=disable, true=enable
+     * @return the operation status
      */
     public static native int loopback(long sock, boolean opt);
 
@@ -72,6 +74,7 @@ public class Multicast {
      * Set the Interface to be used for outgoing Multicast Transmissions.
      * @param sock The socket to set the multicast interface on
      * @param iface Address of the interface to use for Multicast
+     * @return the operation status
      */
     public static native int ointerface(long sock, long iface);
 

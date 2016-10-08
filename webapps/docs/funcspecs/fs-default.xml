@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -25,7 +25,6 @@
   <properties>
     <author email="craigmcc@apache.org">Craig McClanahan</author>
     <title>Default Servlet</title>
-    <revision>$Id$</revision>
   </properties>
 
 <body>
@@ -53,7 +52,7 @@
     partially define the correct behavior of the default servlet:</p>
     <ul>
     <li><a href="http://jcp.org/aboutJava/communityprocess/final/jsr340/index.html">
-        Servlet Specification</a> (Version 3.1)</li>
+        Servlet Specification</a> (Version 4.0)</li>
     <li><a href="http://www.rfc-editor.org/rfc/rfc2046.txt">Multipurpose
         Internet Mail Extensions (MIME) Part Two: Media Types</a></li>
     <li><a href="http://www.rfc-editor.org/rfc/rfc2616.txt">Hypertext
@@ -249,7 +248,7 @@
 
 <section name="Testable Assertions">
 
-  <p>In addition the the assertions implied by the functionality requirements
+  <p>In addition to the assertions implied by the functionality requirements
   listed above, the following additional assertions shall be tested to
   validate the behavior of the default servlet:</p>
   <ul>

@@ -33,8 +33,6 @@ import org.apache.tomcat.util.http.fileupload.util.mime.MimeUtility;
  * <p>
  *  <code>param1 = value; param2 = "anything goes; really"; param3</code>
  * </p>
- *
- * @version $Id$
  */
 public class ParameterParser {
 
@@ -78,8 +76,8 @@ public class ParameterParser {
     /**
      * Are there any characters left to parse?
      *
-     * @return <tt>true</tt> if there are unparsed characters,
-     *         <tt>false</tt> otherwise.
+     * @return {@code true} if there are unparsed characters,
+     *         {@code false} otherwise.
      */
     private boolean hasChar() {
         return this.pos < this.len;
@@ -90,8 +88,8 @@ public class ParameterParser {
      * leading and trailing blanks as well as enclosing quotation marks,
      * when necessary.
      *
-     * @param quoted <tt>true</tt> if quotation marks are expected,
-     *               <tt>false</tt> otherwise.
+     * @param quoted {@code true} if quotation marks are expected,
+     *               {@code false} otherwise.
      * @return the token
      */
     private String getToken(boolean quoted) {
@@ -124,13 +122,13 @@ public class ParameterParser {
      * @param ch the character to test for presense in the array of characters
      * @param charray the array of characters to test against
      *
-     * @return <tt>true</tt> if the character is present in the array of
-     *   characters, <tt>false</tt> otherwise.
+     * @return {@code true} if the character is present in the array of
+     *   characters, {@code false} otherwise.
      */
     private boolean isOneOf(char ch, final char[] charray) {
         boolean result = false;
-        for (int i = 0; i < charray.length; i++) {
-            if (ch == charray[i]) {
+        for (char element : charray) {
+            if (ch == element) {
                 result = true;
                 break;
             }
@@ -195,12 +193,12 @@ public class ParameterParser {
     }
 
     /**
-     * Returns <tt>true</tt> if parameter names are to be converted to lower
+     * Returns {@code true} if parameter names are to be converted to lower
      * case when name/value pairs are parsed.
      *
-     * @return <tt>true</tt> if parameter names are to be
+     * @return {@code true} if parameter names are to be
      * converted to lower case when name/value pairs are parsed.
-     * Otherwise returns <tt>false</tt>
+     * Otherwise returns {@code false}
      */
     public boolean isLowerCaseNames() {
         return this.lowerCaseNames;
@@ -210,9 +208,9 @@ public class ParameterParser {
      * Sets the flag if parameter names are to be converted to lower case when
      * name/value pairs are parsed.
      *
-     * @param b <tt>true</tt> if parameter names are to be
+     * @param b {@code true} if parameter names are to be
      * converted to lower case when name/value pairs are parsed.
-     * <tt>false</tt> otherwise.
+     * {@code false} otherwise.
      */
     public void setLowerCaseNames(boolean b) {
         this.lowerCaseNames = b;
@@ -235,11 +233,11 @@ public class ParameterParser {
         char separator = separators[0];
         if (str != null) {
             int idx = str.length();
-            for (int i = 0;  i < separators.length;  i++) {
-                int tmp = str.indexOf(separators[i]);
+            for (char separator2 : separators) {
+                int tmp = str.indexOf(separator2);
                 if (tmp != -1 && tmp < idx) {
                     idx = tmp;
-                    separator = separators[i];
+                    separator = separator2;
                 }
             }
         }
@@ -266,24 +264,24 @@ public class ParameterParser {
      * Extracts a map of name/value pairs from the given array of
      * characters. Names are expected to be unique.
      *
-     * @param chars the array of characters that contains a sequence of
+     * @param charArray the array of characters that contains a sequence of
      * name/value pairs
      * @param separator the name/value pairs separator
      *
      * @return a map of name/value pairs
      */
-    public Map<String,String> parse(final char[] chars, char separator) {
-        if (chars == null) {
+    public Map<String,String> parse(final char[] charArray, char separator) {
+        if (charArray == null) {
             return new HashMap<>();
         }
-        return parse(chars, 0, chars.length, separator);
+        return parse(charArray, 0, charArray.length, separator);
     }
 
     /**
      * Extracts a map of name/value pairs from the given array of
      * characters. Names are expected to be unique.
      *
-     * @param chars the array of characters that contains a sequence of
+     * @param charArray the array of characters that contains a sequence of
      * name/value pairs
      * @param offset - the initial offset.
      * @param length - the length.
@@ -292,16 +290,16 @@ public class ParameterParser {
      * @return a map of name/value pairs
      */
     public Map<String,String> parse(
-        final char[] chars,
+        final char[] charArray,
         int offset,
         int length,
         char separator) {
 
-        if (chars == null) {
+        if (charArray == null) {
             return new HashMap<>();
         }
         HashMap<String,String> params = new HashMap<>();
-        this.chars = chars;
+        this.chars = charArray;
         this.pos = offset;
         this.len = length;
 
@@ -311,7 +309,7 @@ public class ParameterParser {
             paramName = parseToken(new char[] {
                     '=', separator });
             paramValue = null;
-            if (hasChar() && (chars[pos] == '=')) {
+            if (hasChar() && (charArray[pos] == '=')) {
                 pos++; // skip '='
                 paramValue = parseQuotedToken(new char[] {
                         separator });
@@ -324,7 +322,7 @@ public class ParameterParser {
                     }
                 }
             }
-            if (hasChar() && (chars[pos] == separator)) {
+            if (hasChar() && (charArray[pos] == separator)) {
                 pos++; // skip separator
             }
             if ((paramName != null) && (paramName.length() > 0)) {

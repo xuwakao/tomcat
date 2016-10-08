@@ -37,6 +37,7 @@ import javax.servlet.ServletException;
 import org.apache.catalina.Context;
 import org.apache.catalina.Globals;
 import org.apache.catalina.security.SecurityUtil;
+import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.InstanceManager;
 import org.apache.tomcat.util.ExceptionUtils;
@@ -53,18 +54,15 @@ import org.apache.tomcat.util.res.StringManager;
  * is first started.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public final class ApplicationFilterConfig implements FilterConfig, Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    protected static final StringManager sm =
+    static final StringManager sm =
         StringManager.getManager(Constants.Package);
 
-    private static final org.apache.juli.logging.Log log =
-        LogFactory.getLog(ApplicationFilterConfig.class);
+    private static final Log log = LogFactory.getLog(ApplicationFilterConfig.class);
 
     /**
      * Empty String collection to serve as the basis for empty enumerations.
@@ -155,7 +153,7 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
     }
 
     /**
-     * Return the class of the filter we are configuring.
+     * @return The class of the filter we are configuring.
      */
     public String getFilterClass() {
         return filterDef.getFilterClass();
@@ -302,8 +300,7 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
 
         unregisterJMX();
 
-        if (this.filter != null)
-        {
+        if (this.filter != null) {
             try {
                 if (Globals.IS_SECURITY_ENABLED) {
                     try {
@@ -328,7 +325,9 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
                     Throwable t = ExceptionUtils
                             .unwrapInvocationTargetException(e);
                     ExceptionUtils.handleThrowable(t);
-                    context.getLogger().error("ApplicationFilterConfig.preDestroy", t);
+                    context.getLogger().error(
+                            sm.getString("applicationFilterConfig.preDestroy",
+                                    filterDef.getFilterName(), filterDef.getFilterClass()), t);
                 }
             }
         }
@@ -373,10 +372,10 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
         }
         if (context instanceof StandardContext) {
             StandardContext standardContext = (StandardContext) context;
-            onameStr = domain + ":j2eeType=Filter,name=" + filterName +
-                 ",WebModule=" + webMod + ",J2EEApplication=" +
-                 standardContext.getJ2EEApplication() + ",J2EEServer=" +
-                 standardContext.getJ2EEServer();
+            onameStr = domain + ":j2eeType=Filter,WebModule=" + webMod +
+                    ",name=" + filterName + ",J2EEApplication=" +
+                    standardContext.getJ2EEApplication() + ",J2EEServer=" +
+                    standardContext.getJ2EEServer();
         } else {
             onameStr = domain + ":j2eeType=Filter,name=" + filterName +
                  ",WebModule=" + webMod;

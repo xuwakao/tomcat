@@ -14,10 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 package org.apache.catalina;
-
 
 /**
  * A <b>ContainerServlet</b> is a servlet that has access to Catalina
@@ -27,17 +24,13 @@ package org.apache.catalina;
  * this servlet is put into service.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public interface ContainerServlet {
 
-
-    // ------------------------------------------------------------- Properties
-
-
     /**
-     * Return the Wrapper with which this Servlet is associated.
+     * Obtain the Wrapper with which this Servlet is associated.
+     *
+     * @return The Wrapper with which this Servlet is associated.
      */
     public Wrapper getWrapper();
 
@@ -48,6 +41,4 @@ public interface ContainerServlet {
      * @param wrapper The new associated Wrapper
      */
     public void setWrapper(Wrapper wrapper);
-
-
 }

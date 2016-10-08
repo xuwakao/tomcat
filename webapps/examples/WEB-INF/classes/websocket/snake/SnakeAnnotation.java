@@ -17,11 +17,13 @@
 package websocket.snake;
 
 import java.awt.Color;
+import java.io.EOFException;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.websocket.OnClose;
+import javax.websocket.OnError;
 import javax.websocket.OnMessage;
 import javax.websocket.OnOpen;
 import javax.websocket.Session;
@@ -79,13 +81,13 @@ public class SnakeAnnotation {
         for (Iterator<Snake> iterator = SnakeTimer.getSnakes().iterator();
                 iterator.hasNext();) {
             Snake snake = iterator.next();
-            sb.append(String.format("{id: %d, color: '%s'}",
+            sb.append(String.format("{\"id\": %d, \"color\": \"%s\"}",
                     Integer.valueOf(snake.getId()), snake.getHexColor()));
             if (iterator.hasNext()) {
                 sb.append(',');
             }
         }
-        SnakeTimer.broadcast(String.format("{'type': 'join','data':[%s]}",
+        SnakeTimer.broadcast(String.format("{\"type\": \"join\",\"data\":[%s]}",
                 sb.toString()));
     }
 
@@ -107,7 +109,27 @@ public class SnakeAnnotation {
     @OnClose
     public void onClose() {
         SnakeTimer.removeSnake(snake);
-        SnakeTimer.broadcast(String.format("{'type': 'leave', 'id': %d}",
+        SnakeTimer.broadcast(String.format("{\"type\": \"leave\", \"id\": %d}",
                 Integer.valueOf(id)));
+    }
+
+
+    @OnError
+    public void onError(Throwable t) throws Throwable {
+        // Most likely cause is a user closing their browser. Check to see if
+        // the root cause is EOF and if it is ignore it.
+        // Protect against infinite loops.
+        int count = 0;
+        Throwable root = t;
+        while (root.getCause() != null && count < 20) {
+            root = root.getCause();
+            count ++;
+        }
+        if (root instanceof EOFException) {
+            // Assume this is triggered by the user closing their browser and
+            // ignore it.
+        } else {
+            throw t;
+        }
     }
 }

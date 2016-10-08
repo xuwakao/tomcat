@@ -27,7 +27,6 @@ import javax.management.MBeanNotificationInfo;
  * descriptor.</p>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
 public class NotificationInfo extends FeatureInfo {
 
@@ -42,7 +41,7 @@ public class NotificationInfo extends FeatureInfo {
      */
     transient MBeanNotificationInfo info = null;
     protected String notifTypes[] = new String[0];
-    protected ReadWriteLock notifTypesLock = new ReentrantReadWriteLock();
+    protected final ReadWriteLock notifTypesLock = new ReentrantReadWriteLock();
 
     // ------------------------------------------------------------- Properties
 
@@ -72,12 +71,12 @@ public class NotificationInfo extends FeatureInfo {
 
 
     /**
-     * The set of notification types for this MBean.
+     * @return the set of notification types for this MBean.
      */
     public String[] getNotifTypes() {
         Lock readLock = notifTypesLock.readLock();
+        readLock.lock();
         try {
-            readLock.lock();
             return this.notifTypes;
         } finally {
             readLock.unlock();
@@ -96,8 +95,8 @@ public class NotificationInfo extends FeatureInfo {
     public void addNotifType(String notifType) {
 
         Lock writeLock = notifTypesLock.writeLock();
+        writeLock.lock();
         try {
-            writeLock.lock();
 
             String results[] = new String[notifTypes.length + 1];
             System.arraycopy(notifTypes, 0, results, 0, notifTypes.length);
@@ -113,6 +112,7 @@ public class NotificationInfo extends FeatureInfo {
     /**
      * Create and return a <code>ModelMBeanNotificationInfo</code> object that
      * corresponds to the attribute described by this instance.
+     * @return the notification info
      */
     public MBeanNotificationInfo createNotificationInfo() {
 
@@ -144,8 +144,8 @@ public class NotificationInfo extends FeatureInfo {
         sb.append(description);
         sb.append(", notifTypes=");
         Lock readLock = notifTypesLock.readLock();
+        readLock.lock();
         try {
-            readLock.lock();
             sb.append(notifTypes.length);
         } finally {
             readLock.unlock();

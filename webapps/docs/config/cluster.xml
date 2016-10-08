@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -123,11 +123,11 @@
       <code>Channel.SEND_OPTIONS_SYNCHRONIZED_ACK = 0x0004</code><br/>
       <code>Channel.SEND_OPTIONS_ASYNCHRONOUS = 0x0008</code><br/>
       <code>Channel.SEND_OPTIONS_USE_ACK = 0x0002</code><br/>
-      So to use ACK and ASYNC messaging, the flag would be <code>10 (8+2) or 0x000B</code><br/>
+      So to use ACK and ASYNC messaging, the flag would be <code>10</code> (8+2)
+      <br/>
       Note that if you use ASYNC messaging it is possible for update messages
       for a session to be processed by the receiving nodes in a different order
-      to the order in which they were sent.
-      </p>
+      to the order in which they were sent.</p>
     </attribute>
     <attribute name="channelStartOptions" required="false">
       <p>Sets the start and stop flags for the &lt;Channel&gt; object used by the cluster.
@@ -144,22 +144,14 @@
     </attribute>
 
     <attribute name="heartbeatBackgroundEnabled" required="false">
-      <p>Enable this flag don't forget to disable the channel heartbeat thread.
+      <p>Flag whether invoke channel heartbeat at container background thread. Default value is false.
+         Enable this flag don't forget to disable the channel heartbeat thread.
       </p>
     </attribute>
 
-    <attribute name="doClusterLog" required="false">
-      <p><b>Deprecated since 6.0.0</b></p>
-      <p>Possible values are <code>true</code> or <code>false</code><br/>
-         Value is inherited from Tomcat 5.5 and has no official meaning.
-         to configure logging, use the standard tomcat logging configuration.
-      </p>
-    </attribute>
-    <attribute name="clusterLogName" required="false">
-      <p><b>Deprecated since 6.0.0</b></p>
-      <p>
-        Value is inherited from Tomcat 5.5 and has no official meaning.
-         to configure logging, use the standard tomcat logging configuration.
+    <attribute name="notifyLifecycleListenerOnFailure" required="false">
+      <p>Flag whether notify LifecycleListeners if all ClusterListener couldn't accept channel message.
+         Default value is false.
       </p>
     </attribute>
   </attributes>

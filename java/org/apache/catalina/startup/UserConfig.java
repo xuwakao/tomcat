@@ -32,6 +32,8 @@ import org.apache.catalina.Host;
 import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleEvent;
 import org.apache.catalina.LifecycleListener;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.res.StringManager;
 
 
@@ -43,15 +45,12 @@ import org.apache.tomcat.util.res.StringManager;
  * xxxxx is the username of the owning user for that web application
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public final class UserConfig
     implements LifecycleListener {
 
 
-    private static final org.apache.juli.logging.Log log=
-        org.apache.juli.logging.LogFactory.getLog( UserConfig.class );
+    private static final Log log = LogFactory.getLog(UserConfig.class);
 
 
     // ----------------------------------------------------- Instance Variables
@@ -103,18 +102,18 @@ public final class UserConfig
     /**
      * A regular expression defining user who deployment is allowed.
      */
-    protected Pattern allow = null;
+    Pattern allow = null;
 
     /**
      * A regular expression defining user who deployment is denied.
      */
-    protected Pattern deny = null;
+    Pattern deny = null;
 
     // ------------------------------------------------------------- Properties
 
 
     /**
-     * Return the Context configuration class name.
+     * @return the Context configuration class name.
      */
     public String getConfigClass() {
 
@@ -136,7 +135,7 @@ public final class UserConfig
 
 
     /**
-     * Return the Context implementation class name.
+     * @return the Context implementation class name.
      */
     public String getContextClass() {
 
@@ -158,7 +157,7 @@ public final class UserConfig
 
 
     /**
-     * Return the directory name for user web applications.
+     * @return the directory name for user web applications.
      */
     public String getDirectoryName() {
 
@@ -180,7 +179,7 @@ public final class UserConfig
 
 
     /**
-     * Return the base directory containing user home directories.
+     * @return the base directory containing user home directories.
      */
     public String getHomeBase() {
 
@@ -202,7 +201,7 @@ public final class UserConfig
 
 
     /**
-     * Return the user database class name for this component.
+     * @return the user database class name for this component.
      */
     public String getUserClass() {
 
@@ -213,6 +212,7 @@ public final class UserConfig
 
     /**
      * Set the user database class name for this component.
+     * @param userClass The user database class name
      */
     public void setUserClass(String userClass) {
 
@@ -221,7 +221,7 @@ public final class UserConfig
     }
 
     /**
-     * Return the regular expression used to test for user who deployment is allowed.
+     * @return the regular expression used to test for user who deployment is allowed.
      */
     public String getAllow() {
         if (allow == null) return null;
@@ -244,7 +244,7 @@ public final class UserConfig
 
 
     /**
-     * Return the regular expression used to test for user who deployment is denied.
+     * @return the regular expression used to test for user who deployment is denied.
      */
     public String getDeny() {
         if (deny == null) return null;
@@ -354,11 +354,7 @@ public final class UserConfig
         File app = new File(home, directoryName);
         if (!app.exists() || !app.isDirectory())
             return;
-        /*
-        File dd = new File(app, "/WEB-INF/web.xml");
-        if (!dd.exists() || !dd.isFile() || !dd.canRead())
-            return;
-        */
+
         host.getLogger().info(sm.getString("userConfig.deploy", user));
 
         // Deploy the web application for this user

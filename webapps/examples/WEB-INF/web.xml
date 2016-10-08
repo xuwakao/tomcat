@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -18,9 +18,9 @@
 <web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee
-                      http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
-  version="3.1"
-  metadata-complete="false">
+                      http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd"
+  version="4.0"
+  metadata-complete="true">
 
     <description>
       Servlet and JSP Examples.
@@ -29,7 +29,7 @@
 
     <!-- Define example filters -->
     <filter>
-        <filter-name>Timing filter</filter-name>
+        <filter-name>Timing Filter</filter-name>
         <filter-class>filters.ExampleFilter</filter-class>
         <init-param>
             <param-name>attribute</param-name>
@@ -122,10 +122,6 @@
       <servlet-class>ServletToJsp</servlet-class>
     </servlet>
     <servlet>
-        <servlet-name>ChatServlet</servlet-name>
-        <servlet-class>chat.ChatServlet</servlet-class>
-    </servlet>
-    <servlet>
         <servlet-name>CompressionFilterTestServlet</servlet-name>
         <servlet-class>compressionFilters.CompressionFilterTestServlet</servlet-class>
     </servlet>
@@ -154,10 +150,6 @@
         <servlet-class>SessionExample</servlet-class>
     </servlet>
 
-    <servlet-mapping>
-        <servlet-name>ChatServlet</servlet-name>
-        <url-pattern>/servlets/chat/chat</url-pattern>
-    </servlet-mapping>
     <servlet-mapping>
         <servlet-name>CompressionFilterTestServlet</servlet-name>
         <url-pattern>/CompressionTest</url-pattern>
@@ -369,8 +361,8 @@
 
     <!-- Non-blocking IO examples -->
     <servlet>
-      <servlet-class>nonblocking.ByteCounter</servlet-class>
       <servlet-name>bytecounter</servlet-name>
+      <servlet-class>nonblocking.ByteCounter</servlet-class>
       <async-supported>true</async-supported>
     </servlet>
     <servlet-mapping>
@@ -378,13 +370,35 @@
       <url-pattern>/servlets/nonblocking/bytecounter</url-pattern>
     </servlet-mapping>
     <servlet>
-      <servlet-class>nonblocking.NumberWriter</servlet-class>
       <servlet-name>numberwriter</servlet-name>
+      <servlet-class>nonblocking.NumberWriter</servlet-class>
       <async-supported>true</async-supported>
     </servlet>
     <servlet-mapping>
       <servlet-name>numberwriter</servlet-name>
       <url-pattern>/servlets/nonblocking/numberwriter</url-pattern>
     </servlet-mapping>
+
+    <!-- Server Push examples -->
+    <servlet>
+      <servlet-name>simpleimagepush</servlet-name>
+      <servlet-class>http2.SimpleImagePush</servlet-class>
+    </servlet>
+    <servlet-mapping>
+      <servlet-name>simpleimagepush</servlet-name>
+      <url-pattern>/servlets/serverpush/simpleimage</url-pattern>
+    </servlet-mapping>
+
+    <welcome-file-list>
+        <welcome-file>index.html</welcome-file>
+        <welcome-file>index.xhtml</welcome-file>
+        <welcome-file>index.htm</welcome-file>
+        <welcome-file>index.jsp</welcome-file>
+    </welcome-file-list>
+
+    <!-- Websocket examples -->
+    <listener>
+        <listener-class>websocket.drawboard.DrawboardContextListener</listener-class>
+    </listener>
 
 </web-app>

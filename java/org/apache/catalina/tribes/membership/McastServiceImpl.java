@@ -37,6 +37,9 @@ import org.apache.catalina.tribes.MessageListener;
 import org.apache.catalina.tribes.io.ChannelData;
 import org.apache.catalina.tribes.io.XByteBuffer;
 import org.apache.catalina.tribes.util.ExecutorFactory;
+import org.apache.catalina.tribes.util.StringManager;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 /**
  * A <b>membership</b> implementation using simple multicast.
@@ -46,15 +49,14 @@ import org.apache.catalina.tribes.util.ExecutorFactory;
  * This is the low level implementation that handles the multicasting sockets.
  * Need to fix this, could use java.nio and only need one thread to send and receive, or
  * just use a timeout on the receive
- * @author Filip Hanik
- * @version $Id$
  */
-public class McastServiceImpl
-{
-    private static final org.apache.juli.logging.Log log =
-        org.apache.juli.logging.LogFactory.getLog( McastService.class );
+public class McastServiceImpl {
+
+    private static final Log log = LogFactory.getLog(McastService.class);
 
     protected static final int MAX_PACKET_SIZE = 65535;
+
+    protected static final StringManager sm = StringManager.getManager(Constants.Package);
     /**
      * Internal flag used for the listen thread that listens to the multicasting socket.
      */
@@ -153,17 +155,22 @@ public class McastServiceImpl
      */
     protected final boolean localLoopbackDisabled;
 
+    private Channel channel;
+
     /**
-     * Create a new mcast service impl
+     * Create a new mcast service instance.
      * @param member - the local member
      * @param sendFrequency - the time (ms) in between pings sent out
      * @param expireTime - the time (ms) for a member to expire
      * @param port - the mcast port
      * @param bind - the bind address (not sure this is used yet)
      * @param mcastAddress - the mcast address
+     * @param ttl multicast ttl that will be set on the socket
+     * @param soTimeout Socket timeout
      * @param service - the callback service
+     * @param msgservice Message listener
      * @param localLoopbackDisabled - disable loopbackMode
-     * @throws IOException
+     * @throws IOException Init error
      */
     public McastServiceImpl(
         MemberImpl member,
@@ -201,14 +208,13 @@ public class McastServiceImpl
         receivePacket.setAddress(address);
         receivePacket.setPort(port);
         member.setCommand(new byte[0]);
-        member.getData(true, true);
         if ( membership == null ) membership = new Membership(member);
     }
 
     protected void setupSocket() throws IOException {
         if (mcastBindAddress != null) {
             try {
-                log.info("Attempting to bind the multicast socket to "+address+":"+port);
+                log.info(sm.getString("mcastServiceImpl.bind", address, Integer.toString(port)));
                 socket = new MulticastSocket(new InetSocketAddress(address,port));
             } catch (BindException e) {
                 /*
@@ -216,7 +222,7 @@ public class McastServiceImpl
                  * to the multicast address. In this case only bind to the
                  * port.
                  */
-                log.info("Binding to multicast address, failed. Binding to port only.");
+                log.info(sm.getString("mcastServiceImpl.bind.failed"));
                 socket = new MulticastSocket(port);
             }
         } else {
@@ -225,18 +231,20 @@ public class McastServiceImpl
         socket.setLoopbackMode(localLoopbackDisabled); //hint if we want disable loop back(local machine) messages
         if (mcastBindAddress != null) {
             if(log.isInfoEnabled())
-                log.info("Setting multihome multicast interface to:" +mcastBindAddress);
+                log.info(sm.getString("mcastServiceImpl.setInterface", mcastBindAddress));
             socket.setInterface(mcastBindAddress);
         } //end if
         //force a so timeout so that we don't block forever
-        if ( mcastSoTimeout <= 0 ) mcastSoTimeout = (int)sendFrequency;
-        if(log.isInfoEnabled())
-            log.info("Setting cluster mcast soTimeout to "+mcastSoTimeout);
+        if (mcastSoTimeout <= 0) mcastSoTimeout = (int)sendFrequency;
+        if (log.isInfoEnabled()) {
+            log.info(sm.getString("mcastServiceImpl.setSoTimeout",
+                    Integer.toString(mcastSoTimeout)));
+        }
         socket.setSoTimeout(mcastSoTimeout);
 
         if ( mcastTTL >= 0 ) {
             if(log.isInfoEnabled())
-                log.info("Setting cluster mcast TTL to " + mcastTTL);
+                log.info(sm.getString("mcastServiceImpl.setTTL", Integer.toString(mcastTTL)));
             socket.setTimeToLive(mcastTTL);
         }
     }
@@ -251,11 +259,11 @@ public class McastServiceImpl
     public synchronized void start(int level) throws IOException {
         boolean valid = false;
         if ( (level & Channel.MBR_RX_SEQ)==Channel.MBR_RX_SEQ ) {
-            if ( receiver != null ) throw new IllegalStateException("McastService.receive already running.");
+            if ( receiver != null ) throw new IllegalStateException(sm.getString("mcastServiceImpl.receive.running"));
             try {
                 if ( sender == null ) socket.joinGroup(address);
             }catch (IOException iox) {
-                log.error("Unable to join multicast group, make sure your system has multicasting enabled.");
+                log.error(sm.getString("mcastServiceImpl.unable.join"));
                 throw iox;
             }
             doRunReceiver = true;
@@ -265,7 +273,7 @@ public class McastServiceImpl
             valid = true;
         }
         if ( (level & Channel.MBR_TX_SEQ)==Channel.MBR_TX_SEQ ) {
-            if ( sender != null ) throw new IllegalStateException("McastService.send already running.");
+            if ( sender != null ) throw new IllegalStateException(sm.getString("mcastServiceImpl.send.running"));
             if ( receiver == null ) socket.joinGroup(address);
             //make sure at least one packet gets out there
             send(false);
@@ -277,7 +285,7 @@ public class McastServiceImpl
             valid = true;
         }
         if (!valid) {
-            throw new IllegalArgumentException("Invalid start level. Only acceptable levels are Channel.MBR_RX_SEQ and Channel.MBR_TX_SEQ");
+            throw new IllegalArgumentException(sm.getString("mcastServiceImpl.invalid.startLevel"));
         }
         //pause, once or twice
         waitForMembers(level);
@@ -287,14 +295,17 @@ public class McastServiceImpl
     private void waitForMembers(int level) {
         long memberwait = sendFrequency*2;
         if(log.isInfoEnabled())
-            log.info("Sleeping for "+memberwait+" milliseconds to establish cluster membership, start level:"+level);
+            log.info(sm.getString("mcastServiceImpl.waitForMembers.start",
+                    Long.toString(memberwait), Integer.toString(level)));
         try {Thread.sleep(memberwait);}catch (InterruptedException ignore){}
         if(log.isInfoEnabled())
-            log.info("Done sleeping, membership established, start level:"+level);
+            log.info(sm.getString("mcastServiceImpl.waitForMembers.done", Integer.toString(level)));
     }
 
     /**
-     * Stops the service
+     * Stops the service.
+     * @param level Stop status
+     * @return <code>true</code> if the stop is complete
      * @throws IOException if the service fails to disconnect from the sockets
      */
     public synchronized boolean stop(int level) throws IOException {
@@ -314,14 +325,13 @@ public class McastServiceImpl
         }
 
         if (!valid) {
-            throw new IllegalArgumentException("Invalid stop level. Only acceptable levels are Channel.MBR_RX_SEQ and Channel.MBR_TX_SEQ");
+            throw new IllegalArgumentException(sm.getString("mcastServiceImpl.invalid.stopLevel"));
         }
         startLevel = (startLevel & (~level));
         //we're shutting down, send a shutdown message and close the socket
         if ( startLevel == 0 ) {
             //send a stop message
             member.setCommand(Member.SHUTDOWN_PAYLOAD);
-            member.getData(true, true);
             send(false);
             //leave mcast group
             try {socket.leaveGroup(address);}catch ( Exception ignore){}
@@ -333,7 +343,7 @@ public class McastServiceImpl
 
     /**
      * Receive a datagram packet, locking wait
-     * @throws IOException
+     * @throws IOException Received failed
      */
     public void receive() throws IOException {
         boolean checkexpired = true;
@@ -341,7 +351,8 @@ public class McastServiceImpl
 
             socket.receive(receivePacket);
             if(receivePacket.getLength() > MAX_PACKET_SIZE) {
-                log.error("Multicast packet received was too long, dropping package:"+receivePacket.getLength());
+                log.error(sm.getString("mcastServiceImpl.packet.tooLong",
+                        Integer.toString(receivePacket.getLength())));
             } else {
                 byte[] data = new byte[receivePacket.getLength()];
                 System.arraycopy(receivePacket.getData(), receivePacket.getOffset(), data, 0, data.length);
@@ -430,7 +441,7 @@ public class McastServiceImpl
                                 if (t instanceof VirtualMachineError) {
                                     throw (VirtualMachineError) t;
                                 }
-                                log.error("Unable to receive broadcast message.",t);
+                                log.error(sm.getString("mcastServiceImpl.unableReceive.broadcastMessage"),t);
                             }
                         }
                     }finally {
@@ -466,23 +477,24 @@ public class McastServiceImpl
                     };
                     executor.execute(t);
                 } catch (Exception x) {
-                    log.error("Unable to process member disappeared message.", x);
+                    log.error(sm.getString("mcastServiceImpl.memberDisappeared.failed"), x);
                 }
             }
         }
     }
 
     /**
-     * Send a ping
-     * @throws IOException
+     * Send a ping.
+     * @param checkexpired <code>true</code> to check for expiration
+     * @throws IOException Send error
      */
-    public void send(boolean checkexpired) throws IOException{
+    public void send(boolean checkexpired) throws IOException {
         send(checkexpired,null);
     }
 
     private final Object sendLock = new Object();
 
-    public void send(boolean checkexpired, DatagramPacket packet) throws IOException{
+    public void send(boolean checkexpired, DatagramPacket packet) throws IOException {
         checkexpired = (checkexpired && (packet==null));
         //ignore if we haven't started the sender
         //if ( (startLevel&Channel.MBR_TX_SEQ) != Channel.MBR_TX_SEQ ) return;
@@ -521,11 +533,21 @@ public class McastServiceImpl
         return recoverySleepTime;
     }
 
+    public Channel getChannel() {
+        return channel;
+    }
+
+    public void setChannel(Channel channel) {
+        this.channel = channel;
+    }
+
     public class ReceiverThread extends Thread {
         int errorCounter = 0;
         public ReceiverThread() {
             super();
-            setName("Tribes-MembershipReceiver");
+            String channelName = "";
+            if (channel.getName() != null) channelName = "[" + channel.getName() + "]";
+            setName("Tribes-MembershipReceiver" + channelName);
         }
         @Override
         public void run() {
@@ -539,7 +561,7 @@ public class McastServiceImpl
                     if ( log.isDebugEnabled() )
                         log.debug("Invalid member mcast package.",ax);
                 } catch ( Exception x ) {
-                    if (errorCounter==0 && doRunReceiver) log.warn("Error receiving mcast package. Sleeping 500ms",x);
+                    if (errorCounter==0 && doRunReceiver) log.warn(sm.getString("mcastServiceImpl.error.receiving"),x);
                     else if (log.isDebugEnabled()) log.debug("Error receiving mcast package"+(doRunReceiver?". Sleeping 500ms":"."),x);
                     if (doRunReceiver) {
                         try { Thread.sleep(500); } catch ( Exception ignore ){}
@@ -558,7 +580,9 @@ public class McastServiceImpl
         int errorCounter=0;
         public SenderThread(long time) {
             this.time = time;
-            setName("Tribes-MembershipSender");
+            String channelName = "";
+            if (channel.getName() != null) channelName = "[" + channel.getName() + "]";
+            setName("Tribes-MembershipSender" + channelName);
 
         }
         @Override
@@ -568,7 +592,7 @@ public class McastServiceImpl
                     send(true);
                     errorCounter = 0;
                 } catch ( Exception x ) {
-                    if (errorCounter==0) log.warn("Unable to send mcast message.",x);
+                    if (errorCounter==0) log.warn(sm.getString("mcastServiceImpl.send.failed"),x);
                     else log.debug("Unable to send mcast message.",x);
                     if ( (++errorCounter)>=recoveryCounter ) {
                         errorCounter=0;
@@ -595,8 +619,9 @@ public class McastServiceImpl
             }
 
             Thread t = new RecoveryThread(parent);
-
-            t.setName("Tribes-MembershipRecovery");
+            String channelName = "";
+            if (parent.channel.getName() != null) channelName = "[" + parent.channel.getName() + "]";
+            t.setName("Tribes-MembershipRecovery" + channelName);
             t.setDaemon(true);
             t.start();
         }
@@ -612,7 +637,7 @@ public class McastServiceImpl
                 parent.stop(Channel.MBR_RX_SEQ | Channel.MBR_TX_SEQ);
                 return true;
             } catch (Exception x) {
-                log.warn("Recovery thread failed to stop membership service.", x);
+                log.warn(sm.getString("mcastServiceImpl.recovery.stopFailed"), x);
                 return false;
             }
         }
@@ -622,7 +647,7 @@ public class McastServiceImpl
                 parent.start(Channel.MBR_RX_SEQ | Channel.MBR_TX_SEQ);
                 return true;
             } catch (Exception x) {
-                log.warn("Recovery thread failed to start membership service.", x);
+                log.warn(sm.getString("mcastServiceImpl.recovery.startFailed"), x);
                 return false;
             }
         }
@@ -633,16 +658,18 @@ public class McastServiceImpl
             try {
                 while (!success) {
                     if(log.isInfoEnabled())
-                        log.info("Tribes membership, running recovery thread, multicasting is not functional.");
+                        log.info(sm.getString("mcastServiceImpl.recovery"));
                     if (stopService() & startService()) {
                         success = true;
                         if(log.isInfoEnabled())
-                            log.info("Membership recovery was successful.");
+                            log.info(sm.getString("mcastServiceImpl.recovery.successful"));
                     }
                     try {
                         if (!success) {
                             if(log.isInfoEnabled())
-                                log.info("Recovery attempt "+(++attempt)+" failed, trying again in " +parent.recoverySleepTime+ " seconds");
+                                log.info(sm.getString("mcastServiceImpl.recovery.failed",
+                                        Integer.toString(++attempt),
+                                        Long.toString(parent.recoverySleepTime)));
                             Thread.sleep(parent.recoverySleepTime);
                         }
                     }catch (InterruptedException ignore) {

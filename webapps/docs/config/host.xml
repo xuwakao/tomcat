@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -175,6 +175,15 @@
         Deployment</a> for more information.</p>
       </attribute>
 
+      <attribute name="failCtxIfServletStartFails" required="false">
+        <p>Set to <code>true</code> to have each child contexts fail its startup
+        if any of its servlet that has load-on-startup &gt;=0 fails its own
+        startup.</p>
+        <p>Each child context may override this attribute.</p>
+        <p>If not specified, the default value of <code>false</code> is
+        used.</p>
+      </attribute>
+
       <attribute name="name" required="true">
         <p>Usually the network name of this virtual host, as registered in your
         <em>Domain Name Service</em> server. Regardless of the case used to
@@ -183,7 +192,10 @@
         have a name that matches the <code>defaultHost</code> setting for that
         Engine.  See <a href="#Host_Name_Aliases">Host Name Aliases</a> for
         information on how to assign more than one network name to the same
-        virtual host.</p>
+        virtual host. If the name takes the form of <code>*.domainname</code>
+        (e.g. <code>*.apache.org</code>) then it will be treated as a match for
+        any host in that domain unless a host that has an exactly matching name
+        is found.</p>
       </attribute>
 
       <attribute name="startStopThreads" required="false">
@@ -241,8 +253,13 @@
         interacting with the container's configuration. The  administrator will
         then be responsible for providing an external context configuration
         file, and putting it in the location defined by the
-        <strong>xmlBase</strong> attribute. The flag's value defaults to
-        <code>true</code>.</p>
+        <strong>xmlBase</strong> attribute. If this flag is <code>false</code>,
+        a descriptor is located at <code>/META-INF/context.xml</code> and no
+        descriptor is present in <strong>xmlBase</strong> then the context will
+        fail to start in case the descriptor contains necessary configuration
+        for secure deployment (such as a RemoteAddrValve) which should not be
+        ignored. The flag's value defaults to <code>true</code> unless a
+        security manager is enabled when the default is <code>false</code>.</p>
       </attribute>
 
       <attribute name="errorReportValveClass" required="false">
@@ -261,10 +278,15 @@
         placed in the <code>appBase</code> directory as web application
         archive (WAR) files to be unpacked into a corresponding disk directory
         structure, <code>false</code> to run such web applications directly
-        from a WAR file. WAR files located outside of the Host's
-        <strong>appBase</strong> will not be expanded. See
+        from a WAR file. See
         <a href="#Automatic_Application_Deployment">Automatic Application
         Deployment</a> for more information.</p>
+        <p>Note: If Tomcat expands the WAR file then it will add a file
+        (<code>/META-INF/war-tracking</code>) to the unpacked directory
+        structure which it uses to detect changes in the WAR file while Tomcat
+        is not running. Any such change will trigger the deletion of the
+        expanded directory and the deployment of the updated WAR file when
+        Tomcat next starts.</p>
       </attribute>
 
       <attribute name="workDir" required="false">
@@ -338,12 +360,12 @@
 <source><![CDATA[<Host name="localhost" ...>
   ...
   <Valve className="org.apache.catalina.valves.AccessLogValve"
-         prefix="localhost_access_log." suffix=".txt"
+         prefix="localhost_access_log" suffix=".txt"
          pattern="common"/>
   ...
 </Host>]]></source>
 
-    <p>See <a href="valve.html#Access_Log_Valve">Access Log Valve</a>
+    <p>See <a href="valve.html#Access_Logging">Access Logging Valves</a>
     for more information on the configuration attributes that are
     supported.</p>
 
@@ -457,6 +479,10 @@
     involved must be registered in your DNS server to resolve to the
     same computer that is running this instance of Catalina.</p>
 
+    <p>Aliases may also use the wildcard form (<code>*.domainname</code>)
+       permitted for the <strong>name</strong> attribute of a
+       <strong>Host</strong>.</p>
+
   </subsection>
 
 
@@ -515,7 +541,7 @@
   <subsection name="Single Sign On">
 
     <p>In many environments, but particularly in portal environments, it
-    is desireable to have a user challenged to authenticate themselves only
+    is desirable to have a user challenged to authenticate themselves only
     once over a set of web applications deployed on a particular virtual
     host.  This can be accomplished by nesting an element like this inside
     the Host element for this virtual host:</p>
@@ -587,7 +613,7 @@
   ...
   <Listener className="org.apache.catalina.startup.UserConfig"
             directoryName="public_html"
-            homeBase=c:\Homes"
+            homeBase="c:\Homes"
             userClass="org.apache.catalina.startup.HomesUserDatabase"/>
   ...
 </Host>]]></source>

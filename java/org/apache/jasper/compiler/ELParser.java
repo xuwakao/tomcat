@@ -17,6 +17,12 @@
 
 package org.apache.jasper.compiler;
 
+import org.apache.jasper.JasperException;
+import org.apache.jasper.compiler.ELNode.ELText;
+import org.apache.jasper.compiler.ELNode.Function;
+import org.apache.jasper.compiler.ELNode.Root;
+import org.apache.jasper.compiler.ELNode.Text;
+
 /**
  * This class implements a parser for EL expressions.
  *
@@ -32,6 +38,7 @@ public class ELParser {
 
     private Token curToken;  // current token
     private Token prevToken; // previous token
+    private String whiteSpace = "";
 
     private final ELNode.Nodes expr;
 
@@ -89,28 +96,36 @@ public class ELParser {
      *
      * @return An ELNode.Nodes representing the EL expression
      *
-     * TODO: Can this be refactored to use the standard EL implementation?
+     * Note: This cannot be refactored to use the standard EL implementation as
+     *       the EL API does not provide the level of access required to the
+     *       parsed expression.
      */
     private ELNode.Nodes parseEL() {
 
         StringBuilder buf = new StringBuilder();
         ELexpr = new ELNode.Nodes();
+        curToken = null;
+        prevToken = null;
         while (hasNext()) {
             curToken = nextToken();
             if (curToken instanceof Char) {
                 if (curToken.toChar() == '}') {
                     break;
                 }
-                buf.append(curToken.toChar());
+                buf.append(curToken.toString());
             } else {
                 // Output whatever is in buffer
                 if (buf.length() > 0) {
                     ELexpr.add(new ELNode.ELText(buf.toString()));
+                    buf.setLength(0);
                 }
                 if (!parseFunction()) {
                     ELexpr.add(new ELNode.ELText(curToken.toString()));
                 }
             }
+        }
+        if (curToken != null) {
+            buf.append(curToken.getWhiteSpace());
         }
         if (buf.length() > 0) {
             ELexpr.add(new ELNode.ELText(buf.toString()));
@@ -125,21 +140,23 @@ public class ELParser {
      * arguments
      */
     private boolean parseFunction() {
-        if (!(curToken instanceof Id) || isELReserved(curToken.toString()) ||
+        if (!(curToken instanceof Id) || isELReserved(curToken.toTrimmedString()) ||
                 prevToken instanceof Char && prevToken.toChar() == '.') {
             return false;
         }
         String s1 = null; // Function prefix
-        String s2 = curToken.toString(); // Function name
-        int mark = getIndex();
+        String s2 = curToken.toTrimmedString(); // Function name
+        int start = index - curToken.toString().length();
+        Token original = curToken;
         if (hasNext()) {
+            int mark = getIndex() - whiteSpace.length();
             curToken = nextToken();
             if (curToken.toChar() == ':') {
                 if (hasNext()) {
                     Token t2 = nextToken();
                     if (t2 instanceof Id) {
                         s1 = s2;
-                        s2 = t2.toString();
+                        s2 = t2.toTrimmedString();
                         if (hasNext()) {
                             curToken = nextToken();
                         }
@@ -147,11 +164,12 @@ public class ELParser {
                 }
             }
             if (curToken.toChar() == '(') {
-                ELexpr.add(new ELNode.Function(s1, s2));
+                ELexpr.add(new ELNode.Function(s1, s2, expression.substring(start, index - 1)));
                 return true;
             }
+            curToken = original;
+            setIndex(mark);
         }
-        setIndex(mark);
         return false;
     }
 
@@ -178,47 +196,129 @@ public class ELParser {
 
     /**
      * Skip until an EL expression ('${' || '#{') is reached, allowing escape
-     * sequences '\\' and '\$' and '\#'.
+     * sequences '\$' and '\#'.
      *
      * @return The text string up to the EL expression
      */
     private String skipUntilEL() {
-        char prev = 0;
         StringBuilder buf = new StringBuilder();
         while (hasNextChar()) {
             char ch = nextChar();
-            if (prev == '\\') {
-                prev = 0;
-                if (ch == '\\') {
-                    buf.append('\\');
-                    prev = '\\';
-                } else if (ch == '$'
-                        || (!isDeferredSyntaxAllowedAsLiteral && ch == '#')) {
+            if (ch == '\\') {
+                // Is this the start of a "\$" or "\#" escape sequence?
+                char p0 = peek(0);
+                if (p0 == '$' || (p0 == '#' && !isDeferredSyntaxAllowedAsLiteral)) {
+                    buf.append(nextChar());
+                } else {
                     buf.append(ch);
                 }
-                // else error!
-            } else if (prev == '$'
-                    || (!isDeferredSyntaxAllowedAsLiteral && prev == '#')) {
-                if (ch == '{') {
-                    this.type = prev;
-                    prev = 0;
-                    break;
-                }
-                buf.append(prev);
-                prev = 0;
-            }
-            if (ch == '\\' || ch == '$'
-                    || (!isDeferredSyntaxAllowedAsLiteral && ch == '#')) {
-                prev = ch;
+            } else if ((ch == '$' || (ch == '#' && !isDeferredSyntaxAllowedAsLiteral)) &&
+                    peek(0) == '{') {
+                this.type = ch;
+                nextChar();
+                break;
             } else {
                 buf.append(ch);
             }
         }
-        if (prev != 0) {
-            buf.append(prev);
-        }
         return buf.toString();
     }
+
+
+    /**
+     * Escape '$' and '#', inverting the unescaping performed in
+     * {@link #skipUntilEL()} but only for ${ and #{ sequences since escaping
+     * for $ and # is optional.
+     *
+     * @param input Non-EL input to be escaped
+     * @param isDeferredSyntaxAllowedAsLiteral
+     *
+     * @return The escaped version of the input
+     */
+    static String escapeLiteralExpression(String input,
+            boolean isDeferredSyntaxAllowedAsLiteral) {
+        int len = input.length();
+        int lastAppend = 0;
+        StringBuilder output = null;
+        for (int i = 0; i < len; i++) {
+            char ch = input.charAt(i);
+            if (ch =='$' || (!isDeferredSyntaxAllowedAsLiteral && ch == '#')) {
+                if (i + 1 < len && input.charAt(i + 1) == '{') {
+                    if (output == null) {
+                        output = new StringBuilder(len + 20);
+                    }
+                    output.append(input.substring(lastAppend, i));
+                    lastAppend = i + 1;
+                    output.append('\\');
+                    output.append(ch);
+                }
+            }
+        }
+        if (output == null) {
+            return input;
+        } else {
+            output.append(input.substring(lastAppend, len));
+            return output.toString();
+        }
+    }
+
+
+    /**
+     * Escape '\\', '\'' and '\"', inverting the unescaping performed in
+     * {@link #skipUntilEL()}.
+     *
+     * @param input Non-EL input to be escaped
+     * @param isDeferredSyntaxAllowedAsLiteral
+     *
+     * @return The escaped version of the input
+     */
+    private static String escapeELText(String input) {
+        int len = input.length();
+        char quote = 0;
+        int lastAppend = 0;
+        int start = 0;
+        int end = len;
+
+        // Look to see if the value is quoted
+        String trimmed = input.trim();
+        int trimmedLen = trimmed.length();
+        if (trimmedLen > 1) {
+            // Might be quoted
+            quote = trimmed.charAt(0);
+            if (quote == '\'' || quote == '\"') {
+                if (trimmed.charAt(trimmedLen - 1) != quote) {
+                    throw new IllegalArgumentException(Localizer.getMessage(
+                            "org.apache.jasper.compiler.ELParser.invalidQuotesForStringLiteral",
+                            input));
+                }
+                start = input.indexOf(quote) + 1;
+                end = start + trimmedLen - 2;
+            } else {
+                quote = 0;
+            }
+        }
+
+        StringBuilder output = null;
+        for (int i = start; i < end; i++) {
+            char ch = input.charAt(i);
+            if (ch == '\\' || ch == quote) {
+                if (output == null) {
+                    output = new StringBuilder(len + 20);
+                }
+                output.append(input.substring(lastAppend, i));
+                lastAppend = i + 1;
+                output.append('\\');
+                output.append(ch);
+            }
+        }
+        if (output == null) {
+            return input;
+        } else {
+            output.append(input.substring(lastAppend, len));
+            return output.toString();
+        }
+    }
+
 
     /*
      * @return true if there is something left in EL expression buffer other
@@ -229,31 +329,37 @@ public class ELParser {
         return hasNextChar();
     }
 
+    private String getAndResetWhiteSpace() {
+        String result = whiteSpace;
+        whiteSpace = "";
+        return result;
+    }
+
     /*
+     * Implementation note: This method assumes that it is always preceded by a
+     * call to hasNext() in order for whitespace handling to be correct.
+     *
      * @return The next token in the EL expression buffer.
      */
     private Token nextToken() {
         prevToken = curToken;
-        skipSpaces();
         if (hasNextChar()) {
             char ch = nextChar();
             if (Character.isJavaIdentifierStart(ch)) {
-                StringBuilder buf = new StringBuilder();
-                buf.append(ch);
+                int start = index - 1;
                 while (index < expression.length() &&
                         Character.isJavaIdentifierPart(
                                 ch = expression.charAt(index))) {
-                    buf.append(ch);
                     nextChar();
                 }
-                return new Id(buf.toString());
+                return new Id(getAndResetWhiteSpace(), expression.substring(start, index));
             }
 
             if (ch == '\'' || ch == '"') {
                 return parseQuotedChars(ch);
             } else {
                 // For now...
-                return new Char(ch);
+                return new Char(getAndResetWhiteSpace(), ch);
             }
         }
         return null;
@@ -261,7 +367,7 @@ public class ELParser {
 
     /*
      * Parse a string in single or double quotes, allowing for escape sequences
-     * '\\', and ('\"', or "\'")
+     * '\\', '\"' and "\'"
      */
     private Token parseQuotedChars(char quote) {
         StringBuilder buf = new StringBuilder();
@@ -270,10 +376,13 @@ public class ELParser {
             char ch = nextChar();
             if (ch == '\\') {
                 ch = nextChar();
-                if (ch == '\\' || ch == quote) {
+                if (ch == '\\' || ch == '\'' || ch == '\"') {
                     buf.append(ch);
+                } else {
+                    throw new IllegalArgumentException(Localizer.getMessage(
+                            "org.apache.jasper.compiler.ELParser.invalidQuoting",
+                            expression));
                 }
-                // else error!
             } else if (ch == quote) {
                 buf.append(ch);
                 break;
@@ -281,7 +390,7 @@ public class ELParser {
                 buf.append(ch);
             }
         }
-        return new QuotedString(buf.toString());
+        return new QuotedString(getAndResetWhiteSpace(), buf.toString());
     }
 
     /*
@@ -290,11 +399,14 @@ public class ELParser {
      */
 
     private void skipSpaces() {
+        int start = index;
         while (hasNextChar()) {
-            if (expression.charAt(index) > ' ')
+            char c = expression.charAt(index);
+            if (c > ' ')
                 break;
             index++;
         }
+        whiteSpace = expression.substring(start, index);
     }
 
     private boolean hasNextChar() {
@@ -306,6 +418,14 @@ public class ELParser {
             return (char) -1;
         }
         return expression.charAt(index++);
+    }
+
+    private char peek(int advance) {
+        int target = index + advance;
+        if (target >= expression.length()) {
+            return (char) -1;
+        }
+        return expression.charAt(target);
     }
 
     private int getIndex() {
@@ -321,13 +441,27 @@ public class ELParser {
      */
     private static class Token {
 
+        protected final String whiteSpace;
+
+        Token(String whiteSpace) {
+            this.whiteSpace = whiteSpace;
+        }
+
         char toChar() {
             return 0;
         }
 
         @Override
         public String toString() {
+            return whiteSpace;
+        }
+
+        String toTrimmedString() {
             return "";
+        }
+
+        String getWhiteSpace() {
+            return whiteSpace;
         }
     }
 
@@ -337,12 +471,18 @@ public class ELParser {
     private static class Id extends Token {
         String id;
 
-        Id(String id) {
+        Id(String whiteSpace, String id) {
+            super(whiteSpace);
             this.id = id;
         }
 
         @Override
         public String toString() {
+            return whiteSpace + id;
+        }
+
+        @Override
+        String toTrimmedString() {
             return id;
         }
     }
@@ -354,7 +494,8 @@ public class ELParser {
 
         private char ch;
 
-        Char(char ch) {
+        Char(String whiteSpace, char ch) {
+            super(whiteSpace);
             this.ch = ch;
         }
 
@@ -365,7 +506,12 @@ public class ELParser {
 
         @Override
         public String toString() {
-            return (new Character(ch)).toString();
+            return whiteSpace + ch;
+        }
+
+        @Override
+        String toTrimmedString() {
+            return "" + ch;
         }
     }
 
@@ -376,17 +522,62 @@ public class ELParser {
 
         private String value;
 
-        QuotedString(String v) {
+        QuotedString(String whiteSpace, String v) {
+            super(whiteSpace);
             this.value = v;
         }
 
         @Override
         public String toString() {
+            return whiteSpace + value;
+        }
+
+        @Override
+        String toTrimmedString() {
             return value;
         }
     }
 
     public char getType() {
         return type;
+    }
+
+
+    static class TextBuilder extends ELNode.Visitor {
+
+        protected final boolean isDeferredSyntaxAllowedAsLiteral;
+        protected final StringBuilder output = new StringBuilder();
+
+        protected TextBuilder(boolean isDeferredSyntaxAllowedAsLiteral) {
+            this.isDeferredSyntaxAllowedAsLiteral = isDeferredSyntaxAllowedAsLiteral;
+        }
+
+        public String getText() {
+            return output.toString();
+        }
+
+        @Override
+        public void visit(Root n) throws JasperException {
+            output.append(n.getType());
+            output.append('{');
+            n.getExpression().visit(this);
+            output.append('}');
+        }
+
+        @Override
+        public void visit(Function n) throws JasperException {
+            output.append(escapeLiteralExpression(n.getOriginalText(), isDeferredSyntaxAllowedAsLiteral));
+            output.append('(');
+        }
+
+        @Override
+        public void visit(Text n) throws JasperException {
+            output.append(escapeLiteralExpression(n.getText(),isDeferredSyntaxAllowedAsLiteral));
+        }
+
+        @Override
+        public void visit(ELText n) throws JasperException {
+            output.append(escapeELText(n.getText()));
+        }
     }
 }

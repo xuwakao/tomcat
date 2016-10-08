@@ -16,7 +16,8 @@
  */
 package org.apache.catalina.realm;
 
-import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import org.apache.catalina.LifecycleException;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.digester.Digester;
+import org.apache.tomcat.util.file.ConfigFileLoader;
 
 
 /**
@@ -39,9 +41,7 @@ import org.apache.tomcat.util.digester.Digester;
  * synchronization is performed around accesses to the principals collection.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class MemoryRealm  extends RealmBase {
 
     private static final Log log = LogFactory.getLog(MemoryRealm.class);
@@ -77,7 +77,7 @@ public class MemoryRealm  extends RealmBase {
     // ------------------------------------------------------------- Properties
 
     /**
-     * Return the pathname of our XML file containing user definitions.
+     * @return the pathname of our XML file containing user definitions.
      */
     public String getPathname() {
 
@@ -109,34 +109,42 @@ public class MemoryRealm  extends RealmBase {
      * @param username Username of the Principal to look up
      * @param credentials Password or other credentials to use in
      *  authenticating this username
+     * @return the associated principal, or <code>null</code> if there is none.
      */
     @Override
     public Principal authenticate(String username, String credentials) {
 
+        // No user or no credentials
+        // Can't possibly authenticate, don't bother the database then
+        if (username == null || credentials == null) {
+            if (log.isDebugEnabled())
+                log.debug(sm.getString("memoryRealm.authenticateFailure", username));
+            return null;
+        }
+
         GenericPrincipal principal = principals.get(username);
 
-        boolean validated = false;
-        if (principal != null && credentials != null) {
-            if (hasMessageDigest()) {
-                // Hex hashes should be compared case-insensitive
-                validated = (digest(credentials)
-                             .equalsIgnoreCase(principal.getPassword()));
-            } else {
-                validated =
-                    (digest(credentials).equals(principal.getPassword()));
-            }
+        if(principal == null || principal.getPassword() == null) {
+            // User was not found in the database or the password was null
+            // Waste a bit of time as not to reveal that the user does not exist.
+            getCredentialHandler().mutate(credentials);
+
+            if (log.isDebugEnabled())
+                log.debug(sm.getString("memoryRealm.authenticateFailure", username));
+            return null;
         }
+
+        boolean validated = getCredentialHandler().matches(credentials, principal.getPassword());
 
         if (validated) {
             if (log.isDebugEnabled())
                 log.debug(sm.getString("memoryRealm.authenticateSuccess", username));
-            return (principal);
+            return principal;
         } else {
             if (log.isDebugEnabled())
                 log.debug(sm.getString("memoryRealm.authenticateFailure", username));
-            return (null);
+            return null;
         }
-
     }
 
 
@@ -176,7 +184,7 @@ public class MemoryRealm  extends RealmBase {
 
 
     /**
-     * Return a configured <code>Digester</code> to use for processing
+     * @return a configured <code>Digester</code> to use for processing
      * the XML input file, creating a new one if necessary.
      */
     protected synchronized Digester getDigester() {
@@ -199,7 +207,7 @@ public class MemoryRealm  extends RealmBase {
 
 
     /**
-     * Return a short name for this Realm implementation.
+     * @return a short name for this Realm implementation.
      */
     @Override
     protected String getName() {
@@ -210,7 +218,7 @@ public class MemoryRealm  extends RealmBase {
 
 
     /**
-     * Return the password associated with the given principal's user name.
+     * @return the password associated with the given principal's user name.
      */
     @Override
     protected String getPassword(String username) {
@@ -226,7 +234,7 @@ public class MemoryRealm  extends RealmBase {
 
 
     /**
-     * Return the Principal associated with the given user name.
+     * @return the Principal associated with the given user name.
      */
     @Override
     protected Principal getPrincipal(String username) {
@@ -248,31 +256,26 @@ public class MemoryRealm  extends RealmBase {
      */
     @Override
     protected void startInternal() throws LifecycleException {
-
-        // Validate the existence of our database file
-        File file = new File(pathname);
-        if (!file.isAbsolute())
-            file = new File(getContainer().getCatalinaBase(), pathname);
-        if (!file.exists() || !file.canRead())
-            throw new LifecycleException
-                (sm.getString("memoryRealm.loadExist",
-                              file.getAbsolutePath()));
-
-        // Load the contents of the database file
-        if (log.isDebugEnabled())
-            log.debug(sm.getString("memoryRealm.loadPath",
-                             file.getAbsolutePath()));
-        Digester digester = getDigester();
-        try {
-            synchronized (digester) {
-                digester.push(this);
-                digester.parse(file);
+        String pathName = getPathname();
+        try (InputStream is = ConfigFileLoader.getInputStream(pathName)) {
+            // Load the contents of the database file
+            if (log.isDebugEnabled()) {
+                log.debug(sm.getString("memoryRealm.loadPath", pathName));
             }
-        } catch (Exception e) {
-            throw new LifecycleException
-                (sm.getString("memoryRealm.readXml"), e);
-        } finally {
-            digester.reset();
+
+            Digester digester = getDigester();
+            try {
+                synchronized (digester) {
+                    digester.push(this);
+                    digester.parse(is);
+                }
+            } catch (Exception e) {
+                throw new LifecycleException(sm.getString("memoryRealm.readXml"), e);
+            } finally {
+                digester.reset();
+            }
+        } catch (IOException ioe) {
+            throw new LifecycleException(sm.getString("memoryRealm.loadExist", pathName), ioe);
         }
 
         super.startInternal();

@@ -49,7 +49,7 @@ class PageInfo {
     private final HashMap<String, LinkedList<String>> xmlPrefixMapper;
     private final HashMap<String, Mark> nonCustomTagPrefixMap;
     private final String jspFile;
-    private final String defaultLanguage = "java";
+    private static final String defaultLanguage = "java";
     private String language;
     private final String defaultExtends = Constants.JSP_SERVLET_BASE;
     private String xtends;
@@ -57,7 +57,7 @@ class PageInfo {
     private String session;
     private boolean isSession = true;
     private String bufferValue;
-    private int buffer = 8*1024;    // XXX confirm
+    private int buffer = 8*1024;
     private String autoFlush;
     private boolean isAutoFlush = true;
     private String isThreadSafeValue;
@@ -126,8 +126,11 @@ class PageInfo {
     }
 
     /**
-     * Check if the plugin ID has been previously declared.  Make a not
+     * Check if the plugin ID has been previously declared.  Make a note
      * that this Id is now declared.
+     *
+     * @param id The plugin ID to check
+     *
      * @return true if Id has been declared.
      */
     public boolean isPluginDeclared(String id) {
@@ -394,17 +397,8 @@ class PageInfo {
     /*
      * extends
      */
-    public void setExtends(String value, Node.PageDirective n) {
-
+    public void setExtends(String value) {
         xtends = value;
-
-        /*
-         * If page superclass is top level class (i.e. not in a package)
-         * explicitly import it. If this is not done, the compiler will assume
-         * the extended class is in the same pkg as the generated servlet.
-         */
-        if (value.indexOf('.') < 0)
-            n.addImport(value);
     }
 
     /**
@@ -464,8 +458,8 @@ class PageInfo {
             }
             try {
                 @SuppressWarnings("null") // value can't be null here
-                Integer k = new Integer(value.substring(0, value.length()-2));
-                buffer = k.intValue() * 1024;
+                int k = Integer.parseInt(value.substring(0, value.length()-2));
+                buffer = k * 1024;
             } catch (NumberFormatException e) {
                 if (n == null) {
                     err.jspError("jsp.error.page.invalid.buffer");

@@ -23,11 +23,6 @@
     version="2.5">
     <xsd:annotation>
         <xsd:documentation>
-            @(#)web-app_2_5.xsds1.62 05/08/06
-        </xsd:documentation>
-    </xsd:annotation>
-    <xsd:annotation>
-        <xsd:documentation>
             <![CDATA[
       This is the XML Schema for the Servlet 2.5 deployment descriptor.
 The deployment descriptor must be named "WEB-INF/web.xml" in the
@@ -480,7 +475,7 @@ http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd
             </xsd:documentation>
         </xsd:annotation>
         <xsd:restriction base="xsd:token">
-            <xsd:pattern value="[\p{L}-[\p{Cc}\p{Z}]]+" />
+            <xsd:pattern value="[!-~-[\(\)&#60;&#62;@,;:&#34;/\[\]?=\{\}\\\p{Z}]]+"/>
         </xsd:restriction>
 
     </xsd:simpleType>

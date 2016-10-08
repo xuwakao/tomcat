@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -35,8 +36,15 @@ public class TestJspC {
 
     @Before
     public void init() {
+        File tempDir = new File(System.getProperty("tomcat.test.temp",
+                "output/tmp"));
+        outputDir = new File(tempDir, "jspc");
         jspc = new JspC();
-        outputDir = new File("output/jspc");
+    }
+
+    @After
+    public void cleanup() throws IOException {
+        remove(outputDir);
     }
 
     @Test
@@ -87,6 +95,14 @@ public class TestJspC {
         verify(webappOut);
     }
 
+    @Test
+    public void precompileWebapp_4_0() throws IOException {
+        File appDir = new File("test/webapp-4.0");
+        File webappOut = new File(outputDir, appDir.getName());
+        precompile(appDir, webappOut);
+        verify(webappOut);
+    }
+
     private void verify(File webappOut) {
         // for now, just check some expected files exist
         Assert.assertTrue(new File(webappOut, "generated_web.xml").exists());
@@ -101,7 +117,7 @@ public class TestJspC {
         webappOut.mkdirs();
         jspc.setUriroot(appDir.toString());
         jspc.setOutputDir(webappOut.toString());
-        jspc.setValidateXml(false);
+        jspc.setValidateTld(false);
         jspc.setWebXml(new File(webappOut, "generated_web.xml").toString());
         jspc.execute();
     }

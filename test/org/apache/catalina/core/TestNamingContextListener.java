@@ -26,10 +26,10 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
+import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
-import org.apache.tomcat.util.descriptor.web.ApplicationListener;
 import org.apache.tomcat.util.descriptor.web.ContextEnvironment;
 
 public class TestNamingContextListener extends TomcatBaseTest {
@@ -42,16 +42,15 @@ public class TestNamingContextListener extends TomcatBaseTest {
     private static final String BUG54096_NameB = "envB";
     private static final String BUG54096_ValueB = "B";
 
-    /**
+    /*
      * Test JNDI is available to ServletContextListeners.
      */
     @Test
     public void testBug49132() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        org.apache.catalina.Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         // Enable JNDI - it is disabled by default
         tomcat.enableNaming();
@@ -62,8 +61,7 @@ public class TestNamingContextListener extends TomcatBaseTest {
         environment.setValue(BUG49132_VALUE);
         ctx.getNamingResources().addEnvironment(environment);
 
-        ctx.addApplicationListener(new ApplicationListener(
-                Bug49132Listener.class.getName(), false));
+        ctx.addApplicationListener(Bug49132Listener.class.getName());
 
         tomcat.start();
 
@@ -71,11 +69,6 @@ public class TestNamingContextListener extends TomcatBaseTest {
     }
 
     public static final class Bug49132Listener implements ServletContextListener {
-
-        @Override
-        public void contextDestroyed(ServletContextEvent sce) {
-            // NOOP
-        }
 
         @Override
         public void contextInitialized(ServletContextEvent sce) {
@@ -98,9 +91,8 @@ public class TestNamingContextListener extends TomcatBaseTest {
     public void testBug54096() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        org.apache.catalina.Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         // Enable JNDI - it is disabled by default
         tomcat.enableNaming();
@@ -117,8 +109,7 @@ public class TestNamingContextListener extends TomcatBaseTest {
         environmentB.setValue(BUG54096_ValueB);
         ctx.getNamingResources().addEnvironment(environmentB);
 
-        ctx.addApplicationListener(new ApplicationListener(
-                Bug54096Listener.class.getName(), false));
+        ctx.addApplicationListener(Bug54096Listener.class.getName());
 
         tomcat.start();
 
@@ -153,11 +144,6 @@ public class TestNamingContextListener extends TomcatBaseTest {
 
     public static final class Bug54096Listener implements
             ServletContextListener {
-
-        @Override
-        public void contextDestroyed(ServletContextEvent sce) {
-            // NOOP
-        }
 
         @Override
         public void contextInitialized(ServletContextEvent sce) {

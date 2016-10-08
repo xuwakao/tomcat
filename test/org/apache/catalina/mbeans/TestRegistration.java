@@ -25,15 +25,21 @@ import java.util.List;
 import java.util.Set;
 
 import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.junit.Assert;
 import org.junit.Test;
 
+import org.apache.catalina.Context;
+import org.apache.catalina.Realm;
 import org.apache.catalina.core.StandardHost;
+import org.apache.catalina.realm.CombinedRealm;
+import org.apache.catalina.realm.NullRealm;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
 import org.apache.tomcat.util.modeler.Registry;
@@ -92,22 +98,33 @@ public class TestRegistration extends TomcatBaseTest {
         }
     }
 
+    private static String[] requestMBeanNames(String port, String type) {
+        return new String[] {
+            "Tomcat:type=RequestProcessor,worker=" +
+                    ObjectName.quote("http-" + type + "-" + ADDRESS + "-" + port) +
+                    ",name=HttpRequest1",
+        };
+    }
+
     private static String[] contextMBeanNames(String host, String context) {
         return new String[] {
             "Tomcat:j2eeType=WebModule,name=//" + host + context +
                 ",J2EEApplication=none,J2EEServer=none",
-            "Tomcat:type=Loader,context=" + context + ",host=" + host,
-            "Tomcat:type=Manager,context=" + context + ",host=" + host,
-            "Tomcat:type=NamingResources,context=" + context +
-                ",host=" + host,
-            "Tomcat:type=Valve,context=" + context +
-                ",host=" + host + ",name=NonLoginAuthenticator",
-            "Tomcat:type=Valve,context=" + context +
-                ",host=" + host + ",name=StandardContextValve",
-            "Tomcat:type=WebappClassLoader,context=" + context +
-                ",host=" + host,
-            "Tomcat:type=WebResourceRoot,context=" + context +
-                ",host=" + host,
+            "Tomcat:type=Loader,host=" + host + ",context=" + context,
+            "Tomcat:type=Manager,host=" + host + ",context=" + context,
+            "Tomcat:type=NamingResources,host=" + host + ",context=" + context,
+            "Tomcat:type=Valve,host=" + host + ",context=" + context +
+                    ",name=NonLoginAuthenticator",
+            "Tomcat:type=Valve,host=" + host + ",context=" + context +
+                    ",name=StandardContextValve",
+            "Tomcat:type=ParallelWebappClassLoader,host=" + host + ",context=" + context,
+            "Tomcat:type=WebResourceRoot,host=" + host + ",context=" + context,
+            "Tomcat:type=WebResourceRoot,host=" + host + ",context=" + context +
+                    ",name=Cache",
+            "Tomcat:type=Realm,realmPath=/realm0,host=" + host +
+            ",context=" + context,
+            "Tomcat:type=Realm,realmPath=/realm0/realm0,host=" + host +
+            ",context=" + context
         };
     }
 
@@ -124,7 +141,7 @@ public class TestRegistration extends TomcatBaseTest {
         };
     }
 
-    /**
+    /*
      * Test verifying that Tomcat correctly de-registers the MBeans it has
      * registered.
      * @author Marc Guillemot
@@ -146,8 +163,16 @@ public class TestRegistration extends TomcatBaseTest {
         if (!contextDir.mkdirs() && !contextDir.isDirectory()) {
             fail("Failed to create: [" + contextDir.toString() + "]");
         }
-        tomcat.addContext(contextName, contextDir.getAbsolutePath());
+        Context ctx = tomcat.addContext(contextName, contextDir.getAbsolutePath());
+
+        CombinedRealm combinedRealm = new CombinedRealm();
+        Realm nullRealm = new NullRealm();
+        combinedRealm.addRealm(nullRealm);
+        ctx.setRealm(combinedRealm);
+
         tomcat.start();
+
+        getUrl("http://localhost:" + getPort());
 
         // Verify there are no Catalina MBeans
         onames = mbeanServer.queryNames(new ObjectName("Catalina:*"), null);
@@ -162,21 +187,22 @@ public class TestRegistration extends TomcatBaseTest {
         }
 
         // Create the list of expected MBean names
-        String protocol=
-            getTomcatInstance().getConnector().getProtocolHandlerClassName();
-        if (protocol.indexOf("Nio") > 0) {
-            protocol = "nio";
+        String protocol = tomcat.getConnector().getProtocolHandlerClassName();
+        if (protocol.indexOf("Nio2") > 0) {
+            protocol = "nio2";
         } else if (protocol.indexOf("Apr") > 0) {
             protocol = "apr";
         } else {
-            protocol = "bio";
+            protocol = "nio";
         }
-        String index = getTomcatInstance().getConnector().getProperty("nameIndex").toString();
+        String index = tomcat.getConnector().getProperty("nameIndex").toString();
         ArrayList<String> expected = new ArrayList<>(Arrays.asList(basicMBeanNames()));
         expected.addAll(Arrays.asList(hostMBeanNames("localhost")));
         expected.addAll(Arrays.asList(contextMBeanNames("localhost", contextName)));
         expected.addAll(Arrays.asList(connectorMBeanNames("auto-" + index, protocol)));
         expected.addAll(Arrays.asList(optionalMBeanNames("localhost")));
+        expected.addAll(Arrays.asList(requestMBeanNames(
+                "auto-" + index + "-" + getPort(), protocol)));
 
         // Did we find all expected MBeans?
         ArrayList<String> missing = new ArrayList<>(expected);
@@ -219,4 +245,15 @@ public class TestRegistration extends TomcatBaseTest {
         assertEquals("Remaining: " + onames, 0, onames.size());
     }
 
+    /*
+     * Confirm that, as far as ObjectName is concerned, the order of the key
+     * properties is not significant.
+     */
+    @Test
+    public void testNames() throws MalformedObjectNameException {
+        ObjectName on1 = new ObjectName("test:foo=a,bar=b");
+        ObjectName on2 = new ObjectName("test:bar=b,foo=a");
+
+        Assert.assertTrue(on1.equals(on2));
+    }
 }

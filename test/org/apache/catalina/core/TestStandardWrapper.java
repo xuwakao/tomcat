@@ -153,7 +153,8 @@ public class TestStandardWrapper extends TomcatBaseTest {
         Tomcat tomcat = getTomcatInstance();
 
         File appDir = new File("test/webapp-fragments");
-        tomcat.addWebapp(null, "", appDir.getAbsolutePath());
+        Context ctx = tomcat.addWebapp(null, "", appDir.getAbsolutePath());
+        skipTldsForResourceJars(ctx);
 
         tomcat.start();
 
@@ -169,19 +170,12 @@ public class TestStandardWrapper extends TomcatBaseTest {
 
     @Test
     public void testSecurityAnnotationsMetaDataPriority() throws Exception {
-
-        // Setup Tomcat instance
-        Tomcat tomcat = getTomcatInstance();
-
-        File appDir = new File("test/webapp");
-        tomcat.addWebapp(null, "", appDir.getAbsolutePath());
-
-        tomcat.start();
+        getTomcatInstanceTestWebapp(false, true);
 
         ByteChunk bc = new ByteChunk();
         int rc;
         rc = getUrl("http://localhost:" + getPort() +
-                "/testStandardWrapper/securityAnnotationsMetaDataPriority",
+                "/test/testStandardWrapper/securityAnnotationsMetaDataPriority",
                 bc, null, null);
 
         assertEquals("OK", bc.toString());
@@ -250,9 +244,8 @@ public class TestStandardWrapper extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Servlet s = new DenyAllServlet();
         ServletContainerInitializer sci = new SCI(s, useCreateServlet);
@@ -280,14 +273,14 @@ public class TestStandardWrapper extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
+
         ctx.setDenyUncoveredHttpMethods(denyUncovered);
 
         Wrapper wrapper = Tomcat.addServlet(ctx, "servlet", servletClassName);
         wrapper.setAsyncSupported(true);
-        ctx.addServletMapping("/", "servlet");
+        ctx.addServletMappingDecoded("/", "servlet");
 
         if (useRole) {
             TesterMapRealm realm = new TesterMapRealm();
@@ -418,7 +411,7 @@ public class TestStandardWrapper extends TomcatBaseTest {
     public static final int BUG51445_THREAD_COUNT = 5;
 
     public static CountDownLatch latch = null;
-    public static AtomicInteger counter = new AtomicInteger(0);
+    public static final AtomicInteger counter = new AtomicInteger(0);
 
     public static void initLatch() {
         latch = new CountDownLatch(BUG51445_THREAD_COUNT);
@@ -431,12 +424,11 @@ public class TestStandardWrapper extends TomcatBaseTest {
 
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        StandardContext ctx = (StandardContext)
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "Bug51445", new Bug51445Servlet());
-        ctx.addServletMapping("/", "Bug51445");
+        ctx.addServletMappingDecoded("/", "Bug51445");
 
         tomcat.start();
 
@@ -475,15 +467,14 @@ public class TestStandardWrapper extends TomcatBaseTest {
 
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        StandardContext ctx = (StandardContext)
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         StandardWrapper wrapper = new StandardWrapper();
         wrapper.setServletName("Bug51445");
         wrapper.setServletClass(Bug51445Servlet.class.getName());
         ctx.addChild(wrapper);
-        ctx.addServletMapping("/", "Bug51445");
+        ctx.addServletMappingDecoded("/", "Bug51445");
 
         tomcat.start();
 

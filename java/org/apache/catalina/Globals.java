@@ -14,18 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 package org.apache.catalina;
-
 
 /**
  * Global constants that are applicable to multiple packages within Catalina.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public final class Globals {
 
     /**
@@ -69,8 +64,8 @@ public final class Globals {
 
 
     /**
-     * The JNDI directory context which is associated with the context. This
-     * context can be used to manipulate static files.
+     * The WebResourceRoot which is associated with the context. This can be
+     * used to manipulate static files.
      */
     public static final String RESOURCES_ATTR =
         "org.apache.catalina.resources";
@@ -141,41 +136,6 @@ public final class Globals {
 
     /**
      * The request attribute that is set to the value of {@code Boolean.TRUE}
-     * if connector processing this request supports Comet API.
-     * Duplicated here for neater code in the catalina packages.
-     */
-    public static final String COMET_SUPPORTED_ATTR =
-        org.apache.coyote.Constants.COMET_SUPPORTED_ATTR;
-
-
-    /**
-     * The request attribute that is set to the value of {@code Boolean.TRUE}
-     * if connector processing this request supports setting
-     * per-connection request timeout through Comet API.
-     *
-     * @see org.apache.catalina.comet.CometEvent#setTimeout(int)
-     *
-     * Duplicated here for neater code in the catalina packages.
-     */
-    public static final String COMET_TIMEOUT_SUPPORTED_ATTR =
-            org.apache.coyote.Constants.COMET_TIMEOUT_SUPPORTED_ATTR;
-
-
-    /**
-     * The request attribute that can be set to a value of type
-     * {@code java.lang.Integer} to specify per-connection request
-     * timeout for Comet API. The value is in milliseconds.
-     *
-     * @see org.apache.catalina.comet.CometEvent#setTimeout(int)
-     *
-     * Duplicated here for neater code in the catalina packages.
-     */
-    public static final String COMET_TIMEOUT_ATTR =
-        org.apache.coyote.Constants.COMET_TIMEOUT_ATTR;
-
-
-    /**
-     * The request attribute that is set to the value of {@code Boolean.TRUE}
      * if connector processing this request supports use of sendfile.
      *
      * Duplicated here for neater code in the catalina packages.
@@ -223,8 +183,18 @@ public final class Globals {
 
 
     /**
+     * The request attribute set by the RemoteIpFilter, RemoteIpValve (and may
+     * be set by other similar components) that identifies for the connector the
+     * remote IP address claimed to be associated with this request when a
+     * request is received via one or more proxies. It is typically provided via
+     * the X-Forwarded-For HTTP header.
      *
+     * Duplicated here for neater code in the catalina packages.
      */
+    public static final String REMOTE_ADDR_ATTRIBUTE =
+            org.apache.coyote.Constants.REMOTE_ADDR_ATTRIBUTE;
+
+
     public static final String ASYNC_SUPPORTED_ATTR =
         "org.apache.catalina.ASYNC_SUPPORTED";
 
@@ -241,11 +211,18 @@ public final class Globals {
 
 
     /**
+     * The reason that the parameter parsing failed.
+     */
+    public static final String PARAMETER_PARSE_FAILED_REASON_ATTR =
+            "org.apache.catalina.parameter_parse_failed_reason";
+
+
+    /**
      * The master flag which controls strict servlet specification
      * compliance.
      */
     public static final boolean STRICT_SERVLET_COMPLIANCE =
-        Boolean.valueOf(System.getProperty("org.apache.catalina.STRICT_SERVLET_COMPLIANCE", "false")).booleanValue();
+        Boolean.parseBoolean(System.getProperty("org.apache.catalina.STRICT_SERVLET_COMPLIANCE", "false"));
 
 
     /**
@@ -273,4 +250,33 @@ public final class Globals {
      * the tomcat instance installation path
      */
     public static final String CATALINA_BASE_PROP = "catalina.base";
+
+
+    /**
+     * Name of the ServletContext init-param that determines if the JSP engine
+     * should validate *.tld files when parsing them.
+     * <p>
+     * This must be kept in sync with org.apache.jasper.Constants
+     */
+    public static final String JASPER_XML_VALIDATION_TLD_INIT_PARAM =
+            "org.apache.jasper.XML_VALIDATE_TLD";
+
+
+    /**
+     * Name of the ServletContext init-param that determines if the JSP engine
+     * will block external entities from being used in *.tld, *.jspx, *.tagx and
+     * tagplugin.xml files.
+     * <p>
+     * This must be kept in sync with org.apache.jasper.Constants
+     */
+    public static final String JASPER_XML_BLOCK_EXTERNAL_INIT_PARAM =
+            "org.apache.jasper.XML_BLOCK_EXTERNAL";
+
+    /**
+     * Name of the ServletContext attribute under which we store the context
+     * Realm's CredentialHandler (if both the Realm and the CredentialHandler
+     * exist).
+     */
+    public static final String CREDENTIAL_HANDLER
+            = "org.apache.catalina.CredentialHandler";
 }

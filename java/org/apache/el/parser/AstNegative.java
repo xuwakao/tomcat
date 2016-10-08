@@ -28,7 +28,6 @@ import org.apache.el.lang.EvaluationContext;
 
 /**
  * @author Jacob Hookom [jacob@hookom.net]
- * @version $Id$
  */
 public final class AstNegative extends SimpleNode {
     public AstNegative(int id) {
@@ -79,7 +78,7 @@ public final class AstNegative extends SimpleNode {
         if (obj instanceof Byte) {
             return Byte.valueOf((byte) -((Byte) obj).byteValue());
         }
-        Long num = (Long) coerceToNumber(obj, Long.class);
+        Long num = (Long) coerceToNumber(ctx, obj, Long.class);
         return Long.valueOf(-num.longValue());
     }
 }

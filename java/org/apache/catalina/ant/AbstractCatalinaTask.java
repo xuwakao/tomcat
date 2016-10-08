@@ -39,10 +39,8 @@ import org.apache.tools.ant.Project;
  * undeploying applications.  These tasks require Ant 1.4 or later.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  * @since 4.1
  */
-
 public abstract class AbstractCatalinaTask extends BaseRedirectorHelperTask {
 
 
@@ -113,6 +111,28 @@ public abstract class AbstractCatalinaTask extends BaseRedirectorHelperTask {
         this.username = username;
     }
 
+    /**
+     * If set to true - ignore the constraint of the first line of the response
+     * message that must be "OK -".
+     * <p>
+     * When this attribute is set to {@code false} (the default), the first line
+     * of server response is expected to start with "OK -". If it does not
+     * then the task is considered as failed and the first line is treated
+     * as an error message.
+     * <p>
+     * When this attribute is set to {@code true}, the first line of the
+     * response is treated like any other, regardless of its text.
+     */
+    protected boolean ignoreResponseConstraint = false;
+
+    public boolean isIgnoreResponseConstraint() {
+        return ignoreResponseConstraint;
+    }
+
+    public void setIgnoreResponseConstraint(boolean ignoreResponseConstraint) {
+        this.ignoreResponseConstraint = ignoreResponseConstraint;
+    }
+
 
     // --------------------------------------------------------- Public Methods
 
@@ -165,7 +185,7 @@ public abstract class AbstractCatalinaTask extends BaseRedirectorHelperTask {
      * @exception BuildException if an error occurs
      */
     public void execute(String command, InputStream istream,
-                        String contentType, int contentLength)
+                        String contentType, long contentLength)
         throws BuildException {
 
         URLConnection conn = null;
@@ -211,19 +231,23 @@ public abstract class AbstractCatalinaTask extends BaseRedirectorHelperTask {
 
             // Send the request data (if any)
             if (istream != null) {
-                BufferedOutputStream ostream =
-                    new BufferedOutputStream(hconn.getOutputStream(), 1024);
-                byte buffer[] = new byte[1024];
-                while (true) {
-                    int n = istream.read(buffer);
-                    if (n < 0) {
-                        break;
+                try (BufferedOutputStream ostream =
+                        new BufferedOutputStream(hconn.getOutputStream(), 1024);) {
+                    byte buffer[] = new byte[1024];
+                    while (true) {
+                        int n = istream.read(buffer);
+                        if (n < 0) {
+                            break;
+                        }
+                        ostream.write(buffer, 0, n);
                     }
-                    ostream.write(buffer, 0, n);
+                    ostream.flush();
+                } finally {
+                    try {
+                        istream.close();
+                    } catch (Exception e) {
+                    }
                 }
-                ostream.flush();
-                ostream.close();
-                istream.close();
             }
 
             // Process the response message
@@ -243,7 +267,7 @@ public abstract class AbstractCatalinaTask extends BaseRedirectorHelperTask {
                     if (buff.length() > 0) {
                         String line = buff.toString();
                         buff.setLength(0);
-                        if (first) {
+                        if (!ignoreResponseConstraint && first) {
                             if (!line.startsWith("OK -")) {
                                 error = line;
                                 msgPriority = Project.MSG_ERR;

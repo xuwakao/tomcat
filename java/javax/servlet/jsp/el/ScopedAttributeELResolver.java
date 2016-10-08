@@ -21,9 +21,12 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
+import javax.el.ELClass;
 import javax.el.ELContext;
 import javax.el.ELResolver;
+import javax.el.ImportHandler;
 import javax.servlet.jsp.JspContext;
 import javax.servlet.jsp.PageContext;
 
@@ -33,35 +36,82 @@ import javax.servlet.jsp.PageContext;
 */
 public class ScopedAttributeELResolver extends ELResolver {
 
-    public ScopedAttributeELResolver() {
-        super();
+    // Indicates if a performance short-cut is available
+    private static final Class<?> AST_IDENTIFIER_KEY;
+
+    static {
+        Class<?> key = null;
+        try {
+            key = Class.forName("org.apache.el.parser.AstIdentifier");
+        } catch (Exception e) {
+            // Ignore: Expected if not running on Tomcat. Not a problem since
+            //         this just allows a short-cut.
+        }
+        AST_IDENTIFIER_KEY = key;
     }
 
     @Override
     public Object getValue(ELContext context, Object base, Object property) {
-        if (context == null) {
-            throw new NullPointerException();
-        }
+        Objects.requireNonNull(context);
+
+        Object result = null;
 
         if (base == null) {
             context.setPropertyResolved(base, property);
             if (property != null) {
                 String key = property.toString();
-                PageContext page = (PageContext) context
-                        .getContext(JspContext.class);
-                return page.findAttribute(key);
+                PageContext page = (PageContext) context.getContext(JspContext.class);
+                result = page.findAttribute(key);
+
+                if (result == null) {
+                    boolean resolveClass = true;
+                    // Performance short-cut available when running on Tomcat
+                    if (AST_IDENTIFIER_KEY != null) {
+                        // Tomcat will set this key to Boolean.TRUE if the
+                        // identifier is a stand-alone identifier (i.e.
+                        // identifier) rather than part of an AstValue (i.e.
+                        // identifier.something). Imports do not need to be
+                        // checked if this is a stand-alone identifier
+                        Boolean value = (Boolean) context.getContext(AST_IDENTIFIER_KEY);
+                        if (value != null && value.booleanValue()) {
+                            resolveClass = false;
+                        }
+                    }
+                    // This might be the name of an imported class
+                    ImportHandler importHandler = context.getImportHandler();
+                    if (importHandler != null) {
+                        Class<?> clazz = null;
+                        if (resolveClass) {
+                            clazz = importHandler.resolveClass(key);
+                        }
+                        if (clazz != null) {
+                            result = new ELClass(clazz);
+                        }
+                        if (result == null) {
+                            // This might be the name of an imported static field
+                            clazz = importHandler.resolveStatic(key);
+                            if (clazz != null) {
+                                try {
+                                    result = clazz.getField(key).get(null);
+                                } catch (IllegalArgumentException | IllegalAccessException |
+                                        NoSuchFieldException | SecurityException e) {
+                                    // Most (all?) of these should have been
+                                    // prevented by the checks when the import
+                                    // was defined.
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        return null;
+        return result;
     }
 
     @Override
-    public Class<Object> getType(ELContext context, Object base,
-            Object property) {
-        if (context == null) {
-            throw new NullPointerException();
-        }
+    public Class<Object> getType(ELContext context, Object base, Object property) {
+        Objects.requireNonNull(context);
 
         if (base == null) {
             context.setPropertyResolved(base, property);
@@ -72,18 +122,14 @@ public class ScopedAttributeELResolver extends ELResolver {
     }
 
     @Override
-    public void setValue(ELContext context, Object base, Object property,
-            Object value) {
-        if (context == null) {
-            throw new NullPointerException();
-        }
+    public void setValue(ELContext context, Object base, Object property, Object value) {
+        Objects.requireNonNull(context);
 
         if (base == null) {
             context.setPropertyResolved(base, property);
             if (property != null) {
                 String key = property.toString();
-                PageContext page = (PageContext) context
-                        .getContext(JspContext.class);
+                PageContext page = (PageContext) context.getContext(JspContext.class);
                 int scope = page.getAttributesScope(key);
                 if (scope != 0) {
                     page.setAttribute(key, value, scope);
@@ -96,9 +142,7 @@ public class ScopedAttributeELResolver extends ELResolver {
 
     @Override
     public boolean isReadOnly(ELContext context, Object base, Object property) {
-        if (context == null) {
-            throw new NullPointerException();
-        }
+        Objects.requireNonNull(context);
 
         if (base == null) {
             context.setPropertyResolved(base, property);
@@ -108,8 +152,7 @@ public class ScopedAttributeELResolver extends ELResolver {
     }
 
     @Override
-    public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context,
-            Object base) {
+    public Iterator<FeatureDescriptor> getFeatureDescriptors(ELContext context, Object base) {
 
         PageContext ctxt = (PageContext) context.getContext(JspContext.class);
         List<FeatureDescriptor> list = new ArrayList<>();

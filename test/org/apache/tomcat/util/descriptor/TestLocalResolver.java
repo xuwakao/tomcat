@@ -16,6 +16,7 @@
  */
 package org.apache.tomcat.util.descriptor;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,45 +35,44 @@ public class TestLocalResolver {
     private final Map<String, String> publicIds = new HashMap<>();
     private final Map<String, String> systemIds = new HashMap<>();
 
-    private LocalResolver resolver =
-            new LocalResolver(ServletContext.class, publicIds, systemIds);
+    private LocalResolver resolver = new LocalResolver(publicIds, systemIds, true);
     private String WEB_22_LOCAL;
     private String WEB_31_LOCAL;
     private String WEBCOMMON_31_LOCAL;
 
     @Before
     public void init() {
-        publicIds.put(XmlIdentifiers.WEB_22_PUBLIC,
-                "/javax/servlet/resources/web-app_2_2.dtd");
-        systemIds.put(XmlIdentifiers.WEB_31_XSD,
-                "/javax/servlet/resources/web-app_3_1.xsd");
-        WEB_22_LOCAL = getClass().getResource(
-                "/javax/servlet/resources/web-app_2_2.dtd").toExternalForm();
-        WEB_31_LOCAL = getClass().getResource(
-                "/javax/servlet/resources/web-app_3_1.xsd").toExternalForm();
-        WEBCOMMON_31_LOCAL = getClass().getResource(
-                "/javax/servlet/resources/web-common_3_1.xsd").toExternalForm();
+        WEB_22_LOCAL = urlFor("resources/web-app_2_2.dtd");
+        WEB_31_LOCAL = urlFor("resources/web-app_3_1.xsd");
+        WEBCOMMON_31_LOCAL = urlFor("resources/web-common_3_1.xsd");
+        publicIds.put(XmlIdentifiers.WEB_22_PUBLIC, WEB_22_LOCAL);
+        systemIds.put(XmlIdentifiers.WEB_31_XSD, WEB_31_LOCAL);
+        systemIds.put(WEBCOMMON_31_LOCAL, WEBCOMMON_31_LOCAL);
     }
 
-    @Test
-    public void unknownNullIdIsNull() throws IOException, SAXException {
+    public String urlFor(String id) {
+        return ServletContext.class.getResource(id).toExternalForm();
+    }
+
+    @Test(expected = FileNotFoundException.class)
+    public void unknownNullId() throws IOException, SAXException {
         Assert.assertNull(resolver.resolveEntity(null, null));
     }
 
-    @Test
-    public void unknownPublicIdIsNull() throws IOException, SAXException {
+    @Test(expected = FileNotFoundException.class)
+    public void unknownPublicId() throws IOException, SAXException {
         Assert.assertNull(resolver.resolveEntity("unknown", null));
     }
 
-    @Test
-    public void unknownSystemIdIsReturned() throws IOException, SAXException {
+    @Test(expected = FileNotFoundException.class)
+    public void unknownSystemId() throws IOException, SAXException {
         InputSource source = resolver.resolveEntity(null, "unknown");
         Assert.assertEquals(null, source.getPublicId());
         Assert.assertEquals("unknown", source.getSystemId());
     }
 
-    @Test
-    public void unknownSystemIdIsResolvedAgainstBaseURI()
+    @Test(expected = FileNotFoundException.class)
+    public void unknownRelativeSystemId()
             throws IOException, SAXException {
         InputSource source = resolver.resolveEntity(
                 null, null, "http://example.com/home.html", "unknown");

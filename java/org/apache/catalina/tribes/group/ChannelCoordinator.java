@@ -26,21 +26,22 @@ import org.apache.catalina.tribes.MembershipService;
 import org.apache.catalina.tribes.MessageListener;
 import org.apache.catalina.tribes.UniqueId;
 import org.apache.catalina.tribes.membership.McastService;
+import org.apache.catalina.tribes.membership.StaticMember;
 import org.apache.catalina.tribes.transport.ReplicationTransmitter;
 import org.apache.catalina.tribes.transport.SenderState;
 import org.apache.catalina.tribes.transport.nio.NioReceiver;
 import org.apache.catalina.tribes.util.Arrays;
 import org.apache.catalina.tribes.util.Logs;
+import org.apache.catalina.tribes.util.StringManager;
 
 
 /**
  * The channel coordinator object coordinates the membership service,
  * the sender and the receiver.
  * This is the last interceptor in the chain.
- * @author Filip Hanik
- * @version $Id$
  */
 public class ChannelCoordinator extends ChannelInterceptorBase implements MessageListener {
+    protected static final StringManager sm = StringManager.getManager(ChannelCoordinator.class);
     private ChannelReceiver clusterReceiver;
     private ChannelSender clusterSender;
     private MembershipService membershipService;
@@ -142,28 +143,42 @@ public class ChannelCoordinator extends ChannelInterceptorBase implements Messag
             if (svc == 0 ) return;//nothing to start
 
             if (svc == (svc & startLevel)) {
-                throw new ChannelException("Channel already started for level:"+svc);
+                throw new ChannelException(sm.getString("channelCoordinator.alreadyStarted",
+                        Integer.toString(svc)));
             }
 
             //must start the receiver first so that we can coordinate the port it
             //listens to with the local membership settings
             if ( Channel.SND_RX_SEQ==(svc & Channel.SND_RX_SEQ) ) {
                 clusterReceiver.setMessageListener(this);
+                clusterReceiver.setChannel(getChannel());
                 clusterReceiver.start();
                 //synchronize, big time FIXME
-                membershipService.setLocalMemberProperties(getClusterReceiver().getHost(),
-                                                           getClusterReceiver().getPort(),
-                                                           getClusterReceiver().getSecurePort(),
-                                                           getClusterReceiver().getUdpPort());
+                Member localMember = getChannel().getLocalMember(false);
+                if (localMember instanceof StaticMember) {
+                    // static member
+                    StaticMember staticMember = (StaticMember)localMember;
+                    staticMember.setHost(getClusterReceiver().getHost());
+                    staticMember.setPort(getClusterReceiver().getPort());
+                    staticMember.setSecurePort(getClusterReceiver().getSecurePort());
+                } else {
+                    // multicast member
+                    membershipService.setLocalMemberProperties(getClusterReceiver().getHost(),
+                            getClusterReceiver().getPort(),
+                            getClusterReceiver().getSecurePort(),
+                            getClusterReceiver().getUdpPort());
+                }
                 valid = true;
             }
             if ( Channel.SND_TX_SEQ==(svc & Channel.SND_TX_SEQ) ) {
+                clusterSender.setChannel(getChannel());
                 clusterSender.start();
                 valid = true;
             }
 
             if ( Channel.MBR_RX_SEQ==(svc & Channel.MBR_RX_SEQ) ) {
                 membershipService.setMembershipListener(this);
+                membershipService.setChannel(getChannel());
                 if (membershipService instanceof McastService) {
                     ((McastService)membershipService).setMessageListener(this);
                 }
@@ -171,13 +186,13 @@ public class ChannelCoordinator extends ChannelInterceptorBase implements Messag
                 valid = true;
             }
             if ( Channel.MBR_TX_SEQ==(svc & Channel.MBR_TX_SEQ) ) {
+                membershipService.setChannel(getChannel());
                 membershipService.start(MembershipService.MBR_TX);
                 valid = true;
             }
 
             if (!valid) {
-                throw new IllegalArgumentException("Invalid start level, valid levels are:" +
-                        "SND_RX_SEQ,SND_TX_SEQ,MBR_TX_SEQ,MBR_RX_SEQ");
+                throw new IllegalArgumentException(sm.getString("channelCoordinator.invalid.startLevel"));
             }
             startLevel = (startLevel | svc);
         }catch ( ChannelException cx ) {
@@ -228,18 +243,14 @@ public class ChannelCoordinator extends ChannelInterceptorBase implements Messag
                 membershipService.stop(MembershipService.MBR_TX);
             }
             if ( !valid) {
-                throw new IllegalArgumentException("Invalid start level, valid levels are:" +
-                        "SND_RX_SEQ,SND_TX_SEQ,MBR_TX_SEQ,MBR_RX_SEQ");
+                throw new IllegalArgumentException(sm.getString("channelCoordinator.invalid.startLevel"));
             }
 
             startLevel = (startLevel & (~svc));
-
-        }catch ( Exception x ) {
+            setChannel(null);
+        } catch (Exception x) {
             throw new ChannelException(x);
-        } finally {
-
         }
-
     }
 
     @Override

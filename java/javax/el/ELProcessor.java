@@ -18,11 +18,27 @@ package javax.el;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @since EL 3.0
  */
 public class ELProcessor {
+
+    private static final Set<String> PRIMITIVES = new HashSet<>();
+    static {
+        PRIMITIVES.add("boolean");
+        PRIMITIVES.add("byte");
+        PRIMITIVES.add("char");
+        PRIMITIVES.add("double");
+        PRIMITIVES.add("float");
+        PRIMITIVES.add("int");
+        PRIMITIVES.add("long");
+        PRIMITIVES.add("short");
+    }
+
+    private static final String[] EMPTY_STRING_ARRAY = new String[0];
 
     private final ELManager manager = new ELManager();
     private final ELContext context = manager.getELContext();
@@ -90,6 +106,10 @@ public class ELProcessor {
         MethodSignature sig =
                 new MethodSignature(context, methodName, className);
 
+        if (function.length() == 0) {
+            function = sig.getName();
+        }
+
         Method methods[] = clazz.getMethods();
         for (Method method : methods) {
             if (!Modifier.isStatic(method.getModifiers())) {
@@ -97,6 +117,15 @@ public class ELProcessor {
             }
             if (method.getName().equals(sig.getName())) {
                 if (sig.getParamTypeNames() == null) {
+                    // Only a name provided, no signature so map the first
+                    // method declared
+                    manager.mapFunction(prefix, function, method);
+                    return;
+                }
+                if (sig.getParamTypeNames().length != method.getParameterTypes().length) {
+                    continue;
+                }
+                if (sig.getParamTypeNames().length == 0) {
                     manager.mapFunction(prefix, function, method);
                     return;
                 } else {
@@ -105,7 +134,17 @@ public class ELProcessor {
                     if (types.length == typeNames.length) {
                         boolean match = true;
                         for (int i = 0; i < types.length; i++) {
-                            if (!types[i].getName().equals(typeNames[i])) {
+                            if (i == types.length -1 && method.isVarArgs()) {
+                                String typeName = typeNames[i];
+                                if (typeName.endsWith("...")) {
+                                    typeName = typeName.substring(0, typeName.length() - 3);
+                                    if (!typeName.equals(types[i].getName())) {
+                                        match = false;
+                                    }
+                                } else {
+                                    match = false;
+                                }
+                            } else if (!types[i].getName().equals(typeNames[i])) {
                                 match = false;
                                 break;
                             }
@@ -125,6 +164,12 @@ public class ELProcessor {
 
 
     /**
+     * Map a method to a function name.
+     *
+     * @param prefix    Function prefix
+     * @param function  Function name
+     * @param method    Method
+     *
      * @throws NullPointerException
      *              If any of the arguments are null
      * @throws NoSuchMethodException
@@ -174,7 +219,22 @@ public class ELProcessor {
                 name = methodName.trim();
                 parameterTypeNames = null;
             } else {
-                name = methodName.substring(0, paramIndex -1).trim();
+                String returnTypeAndName = methodName.substring(0, paramIndex).trim();
+                // Assume that the return type and the name are separated by
+                // whitespace. Given the use of trim() above, there should only
+                // be one sequence of whitespace characters.
+                int wsPos = -1;
+                for (int i = 0; i < returnTypeAndName.length(); i++) {
+                    if (Character.isWhitespace(returnTypeAndName.charAt(i))) {
+                        wsPos = i;
+                        break;
+                    }
+                }
+                if (wsPos == -1) {
+                    throw new NoSuchMethodException();
+                }
+                name = returnTypeAndName.substring(wsPos).trim();
+
                 String paramString = methodName.substring(paramIndex).trim();
                 // We know the params start with '(', check they end with ')'
                 if (!paramString.endsWith(")")) {
@@ -183,26 +243,101 @@ public class ELProcessor {
                             paramString, methodName, className));
                 }
                 // Trim '(' and ')'
-                paramString =
-                        paramString.substring(1, paramString.length() - 1);
-                parameterTypeNames = paramString.split(",");
-                ImportHandler importHandler = context.getImportHandler();
-                for (int i = 0; i < parameterTypeNames.length; i++) {
-                    parameterTypeNames[i] = parameterTypeNames[i].trim();
-                    if (!parameterTypeNames[i].contains(".")) {
-                        Class<?> clazz = importHandler.resolveClass(
-                                parameterTypeNames[i]);
-                        if (clazz == null) {
-                            throw new NoSuchMethodException(Util.message(
-                                    context,
-                                    "elProcessor.defineFunctionInvalidParameterTypeName",
-                                    parameterTypeNames[i], methodName,
-                                    className));
+                paramString = paramString.substring(1, paramString.length() - 1).trim();
+                if (paramString.length() == 0) {
+                    parameterTypeNames = EMPTY_STRING_ARRAY;
+                } else {
+                    parameterTypeNames = paramString.split(",");
+                    ImportHandler importHandler = context.getImportHandler();
+                    for (int i = 0; i < parameterTypeNames.length; i++) {
+                        String parameterTypeName = parameterTypeNames[i].trim();
+                        int dimension = 0;
+                        int bracketPos = parameterTypeName.indexOf('[');
+                        if (bracketPos > -1) {
+                            String parameterTypeNameOnly =
+                                    parameterTypeName.substring(0, bracketPos).trim();
+                            while (bracketPos > -1) {
+                                dimension++;
+                                bracketPos = parameterTypeName.indexOf('[', bracketPos+ 1);
+                            }
+                            parameterTypeName = parameterTypeNameOnly;
                         }
-                        parameterTypeNames[i] = clazz.getName();
+                        boolean varArgs = false;
+                        if (parameterTypeName.endsWith("...")) {
+                            varArgs = true;
+                            dimension = 1;
+                            parameterTypeName = parameterTypeName.substring(
+                                    0, parameterTypeName.length() -3).trim();
+                        }
+                        boolean isPrimitive = PRIMITIVES.contains(parameterTypeName);
+                        if (isPrimitive && dimension > 0) {
+                            // When in an array, class name changes for primitive
+                            switch(parameterTypeName)
+                            {
+                                case "boolean":
+                                    parameterTypeName = "Z";
+                                    break;
+                                case "byte":
+                                    parameterTypeName = "B";
+                                    break;
+                                case "char":
+                                    parameterTypeName = "C";
+                                    break;
+                                case "double":
+                                    parameterTypeName = "D";
+                                    break;
+                                case "float":
+                                    parameterTypeName = "F";
+                                    break;
+                                case "int":
+                                    parameterTypeName = "I";
+                                    break;
+                                case "long":
+                                    parameterTypeName = "J";
+                                    break;
+                                case "short":
+                                    parameterTypeName = "S";
+                                    break;
+                                default:
+                                    // Should never happen
+                                    break;
+                            }
+                        } else  if (!isPrimitive &&
+                                !parameterTypeName.contains(".")) {
+                            Class<?> clazz = importHandler.resolveClass(
+                                    parameterTypeName);
+                            if (clazz == null) {
+                                throw new NoSuchMethodException(Util.message(
+                                        context,
+                                        "elProcessor.defineFunctionInvalidParameterTypeName",
+                                        parameterTypeNames[i], methodName,
+                                        className));
+                            }
+                            parameterTypeName = clazz.getName();
+                        }
+                        if (dimension > 0) {
+                            // Convert to array form of class name
+                            StringBuilder sb = new StringBuilder();
+                            for (int j = 0; j < dimension; j++) {
+                                sb.append('[');
+                            }
+                            if (!isPrimitive) {
+                                sb.append('L');
+                            }
+                            sb.append(parameterTypeName);
+                            if (!isPrimitive) {
+                                sb.append(';');
+                            }
+                            parameterTypeName = sb.toString();
+                        }
+                        if (varArgs) {
+                            parameterTypeName += "...";
+                        }
+                        parameterTypeNames[i] = parameterTypeName;
                     }
                 }
             }
+
         }
 
         public String getName() {

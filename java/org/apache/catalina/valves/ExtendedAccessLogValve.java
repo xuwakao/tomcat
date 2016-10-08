@@ -16,7 +16,6 @@
  */
 package org.apache.catalina.valves;
 
-
 import java.io.CharArrayWriter;
 import java.io.IOException;
 import java.io.StringReader;
@@ -40,8 +39,6 @@ import org.apache.catalina.util.ServerInfo;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.ExceptionUtils;
-
-
 
 /**
  * An implementation of the W3c Extended Log File Format. See
@@ -125,13 +122,8 @@ import org.apache.tomcat.util.ExceptionUtils;
  * control characters.
  * </p>
  *
- *
- * @author Tim Funk
  * @author Peter Rossbach
- *
- * @version $Id$
  */
-
 public class ExtendedAccessLogValve extends AccessLogValve {
 
     private static final Log log = LogFactory.getLog(ExtendedAccessLogValve.class);
@@ -149,16 +141,16 @@ public class ExtendedAccessLogValve extends AccessLogValve {
     // -------------------------------------------------------- Private Methods
 
     /**
-     *  Wrap the incoming value into quotes and escape any inner
-     *  quotes with double quotes.
+     * Wrap the incoming value with double quotes (") and escape any double
+     * quotes appearing in the value using two double quotes ("").
      *
-     *  @param value - The value to wrap quotes around
-     *  @return '-' if empty of null. Otherwise, toString() will
+     *  @param value - The value to wrap
+     *  @return '-' if null. Otherwise, toString() will
      *     be called on the object and the value will be wrapped
      *     in quotes and any quotes will be escaped with 2
      *     sets of quotes.
      */
-    private String wrap(Object value) {
+    static String wrap(Object value) {
         String svalue;
         // Does the value contain a " ? If so must encode it
         if (value == null || "-".equals(value)) {
@@ -167,32 +159,29 @@ public class ExtendedAccessLogValve extends AccessLogValve {
 
         try {
             svalue = value.toString();
-            if ("".equals(svalue)) {
-                return "-";
-            }
         } catch (Throwable e) {
             ExceptionUtils.handleThrowable(e);
             /* Log error */
             return "-";
         }
 
-        /* Wrap all quotes in double quotes. */
+        /* Wrap all values in double quotes. */
         StringBuilder buffer = new StringBuilder(svalue.length() + 2);
-        buffer.append('\'');
+        buffer.append('\"');
         int i = 0;
         while (i < svalue.length()) {
-            int j = svalue.indexOf('\'', i);
+            int j = svalue.indexOf('\"', i);
             if (j == -1) {
                 buffer.append(svalue.substring(i));
                 i = svalue.length();
             } else {
                 buffer.append(svalue.substring(i, j + 1));
                 buffer.append('"');
-                i = j + 2;
+                i = j + 1;
             }
         }
 
-        buffer.append('\'');
+        buffer.append('\"');
         return buffer.toString();
     }
 
@@ -269,7 +258,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
         }
     }
 
-    protected class RequestHeaderElement implements AccessLogElement {
+    protected static class RequestHeaderElement implements AccessLogElement {
         private final String header;
 
         public RequestHeaderElement(String header) {
@@ -282,7 +271,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
         }
     }
 
-    protected class ResponseHeaderElement implements AccessLogElement {
+    protected static class ResponseHeaderElement implements AccessLogElement {
         private final String header;
 
         public ResponseHeaderElement(String header) {
@@ -296,7 +285,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
         }
     }
 
-    protected class ServletContextElement implements AccessLogElement {
+    protected static class ServletContextElement implements AccessLogElement {
         private final String attribute;
 
         public ServletContextElement(String attribute) {
@@ -310,7 +299,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
         }
     }
 
-    protected class CookieElement implements AccessLogElement {
+    protected static class CookieElement implements AccessLogElement {
         private final String name;
 
         public CookieElement(String name) {
@@ -331,7 +320,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
     /**
      * write a specific response header - x-O(xxx)
      */
-    protected class ResponseAllHeaderElement implements AccessLogElement {
+    protected static class ResponseAllHeaderElement implements AccessLogElement {
         private final String header;
 
         public ResponseAllHeaderElement(String header) {
@@ -347,7 +336,9 @@ public class ExtendedAccessLogValve extends AccessLogValve {
                     StringBuilder buffer = new StringBuilder();
                     boolean first = true;
                     while (iter.hasNext()) {
-                        if (!first) {
+                        if (first) {
+                            first = false;
+                        } else {
                             buffer.append(",");
                         }
                         buffer.append(iter.next());
@@ -360,7 +351,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
         }
     }
 
-    protected class RequestAttributeElement implements AccessLogElement {
+    protected static class RequestAttributeElement implements AccessLogElement {
         private final String attribute;
 
         public RequestAttributeElement(String attribute) {
@@ -374,7 +365,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
         }
     }
 
-    protected class SessionAttributeElement implements AccessLogElement {
+    protected static class SessionAttributeElement implements AccessLogElement {
         private final String attribute;
 
         public SessionAttributeElement(String attribute) {
@@ -393,7 +384,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
         }
     }
 
-    protected class RequestParameterElement implements AccessLogElement {
+    protected static class RequestParameterElement implements AccessLogElement {
         private final String parameter;
 
         public RequestParameterElement(String parameter) {
@@ -822,7 +813,7 @@ public class ExtendedAccessLogValve extends AccessLogValve {
                 @Override
                 public void addElement(CharArrayWriter buf, Date date,
                         Request request, Response response, long time) {
-                    buf.append(wrap("" + request.getContentLength()));
+                    buf.append(wrap("" + request.getContentLengthLong()));
                 }
             };
         } else if ("characterEncoding".equals(parameter)) {

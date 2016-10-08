@@ -39,11 +39,10 @@ import org.apache.catalina.startup.TesterMapRealm;
 import org.apache.catalina.startup.TesterServlet;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
-import org.apache.tomcat.util.descriptor.web.ApplicationListener;
 import org.apache.tomcat.util.descriptor.web.LoginConfig;
 import org.apache.tomcat.util.descriptor.web.SecurityCollection;
 import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
-import org.apache.tomcat.websocket.server.WsListener;
+import org.apache.tomcat.websocket.server.WsContextListener;
 
 /*
  * Test FORM authentication for sessions that do and do not use cookies.
@@ -96,9 +95,8 @@ public class TestFormAuthenticator extends TomcatBaseTest {
     protected static final boolean SERVER_FREEZE_SESSID = !SERVER_CHANGE_SESSID;
 
     // minimum session timeout
-    private static final int TIMEOUT_MINS = 1;
-    private static final long TIMEOUT_DELAY_MSECS =
-                            (((TIMEOUT_MINS * 60) + 10) * 1000);
+    private static final int SHORT_SESSION_TIMEOUT_SECS = 1;
+    private static final long TIMEOUT_DELAY_MSECS = ((SHORT_SESSION_TIMEOUT_SECS + 10) * 1000);
 
     private FormAuthClient client;
 
@@ -239,6 +237,10 @@ public class TestFormAuthenticator extends TomcatBaseTest {
         String protectedUri = doTest("GET", "GET", NO_100_CONTINUE,
                 CLIENT_NO_COOKIES, SERVER_USE_COOKIES,
                 SERVER_FREEZE_SESSID);
+
+        // Force session to expire one second from now
+        Context context = (Context) getTomcatInstance().getHost().findChildren()[0];
+        forceSessionMaxInactiveInterval(context, SHORT_SESSION_TIMEOUT_SECS);
 
         // wait long enough for my session to expire
         Thread.sleep(TIMEOUT_DELAY_MSECS);
@@ -643,13 +645,12 @@ public class TestFormAuthenticator extends TomcatBaseTest {
             this.clientShouldUseHttp11 = clientShouldUseHttp11;
 
             Tomcat tomcat = getTomcatInstance();
-            File appDir = new File(getBuildDirectory(), "webapps/examples");
+            File appDir = new File(System.getProperty("tomcat.test.basedir"), "webapps/examples");
             Context ctx = tomcat.addWebapp(null, "/examples",
                     appDir.getAbsolutePath());
             setUseCookies(clientShouldUseCookies);
             ctx.setCookies(serverShouldUseCookies);
-            ctx.addApplicationListener(new ApplicationListener(
-                    WsListener.class.getName(), false));
+            ctx.addApplicationListener(WsContextListener.class.getName());
 
             TesterMapRealm realm = new TesterMapRealm();
             realm.addUser("tomcat", "tomcat");
@@ -657,9 +658,6 @@ public class TestFormAuthenticator extends TomcatBaseTest {
             ctx.setRealm(realm);
 
             tomcat.start();
-
-            // perhaps this does not work until tomcat has started?
-            ctx.setSessionTimeout(TIMEOUT_MINS);
 
             // Valve pipeline is only established after tomcat starts
             Valve[] valves = ctx.getPipeline().getValves();
@@ -702,19 +700,19 @@ public class TestFormAuthenticator extends TomcatBaseTest {
                     "", System.getProperty("java.io.tmpdir"));
             Tomcat.addServlet(ctx, "SelectedMethods",
                     new SelectedMethodsServlet());
-            ctx.addServletMapping("/test", "SelectedMethods");
+            ctx.addServletMappingDecoded("/test", "SelectedMethods");
             // Login servlet just needs to respond "OK". Client will handle
             // creating a valid response. No need for a form.
             Tomcat.addServlet(ctx, "Login",
                     new TesterServlet());
-            ctx.addServletMapping("/login", "Login");
+            ctx.addServletMappingDecoded("/login", "Login");
 
             // Configure the security constraints
             SecurityConstraint constraint = new SecurityConstraint();
             SecurityCollection collection = new SecurityCollection();
             collection.setName("Protect PUT");
             collection.addMethod("PUT");
-            collection.addPattern("/test");
+            collection.addPatternDecoded("/test");
             constraint.addCollection(collection);
             constraint.addAuthRole("tomcat");
             ctx.addConstraint(constraint);
@@ -735,9 +733,6 @@ public class TestFormAuthenticator extends TomcatBaseTest {
             ctx.setRealm(realm);
 
             tomcat.start();
-
-            // perhaps this does not work until tomcat has started?
-            ctx.setSessionTimeout(TIMEOUT_MINS);
 
             // Valve pipeline is only established after tomcat starts
             Valve[] valves = ctx.getPipeline().getValves();

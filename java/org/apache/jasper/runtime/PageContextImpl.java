@@ -26,10 +26,12 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Set;
 
 import javax.el.ELContext;
 import javax.el.ELException;
 import javax.el.ExpressionFactory;
+import javax.el.ImportHandler;
 import javax.el.ValueExpression;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.Servlet;
@@ -47,8 +49,10 @@ import javax.servlet.jsp.JspWriter;
 import javax.servlet.jsp.PageContext;
 import javax.servlet.jsp.tagext.BodyContent;
 
+import org.apache.jasper.Constants;
 import org.apache.jasper.compiler.Localizer;
 import org.apache.jasper.el.ELContextImpl;
+import org.apache.jasper.runtime.JspContextWrapper.ELContextWrapper;
 import org.apache.jasper.security.SecurityUtil;
 
 /**
@@ -137,6 +141,9 @@ public class PageContextImpl extends PageContext {
 
         // initialize the initial out ...
         depth = -1;
+        if (bufferSize == JspWriter.DEFAULT_BUFFER) {
+            bufferSize = Constants.DEFAULT_BUFFER_SIZE;
+        }
         if (this.baseOut == null) {
             this.baseOut = new JspWriterImpl(response, bufferSize, autoFlush);
         } else {
@@ -595,7 +602,8 @@ public class PageContextImpl extends PageContext {
     }
 
     /**
-     * Returns the exception associated with this page context, if any. <p/>
+     * Returns the exception associated with this page context, if any.
+     * <p>
      * Added wrapping for Throwables to avoid ClassCastException: see Bugzilla
      * 31171 for details.
      *
@@ -849,7 +857,7 @@ public class PageContextImpl extends PageContext {
              */
             request.setAttribute(PageContext.EXCEPTION, t);
             request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE,
-                    new Integer(HttpServletResponse.SC_INTERNAL_SERVER_ERROR));
+                    Integer.valueOf(HttpServletResponse.SC_INTERNAL_SERVER_ERROR));
             request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI,
                     ((HttpServletRequest) request).getRequestURI());
             request.setAttribute(RequestDispatcher.ERROR_SERVLET_NAME,
@@ -902,69 +910,6 @@ public class PageContextImpl extends PageContext {
         }
     }
 
-    protected static String XmlEscape(String s) {
-        if (s == null) {
-            return null;
-        }
-        int len = s.length();
-
-        /*
-         * Look for any "bad" characters, Escape "bad" character was found
-         */
-        // ASCII " 34 & 38 ' 39 < 60 > 62
-        for (int i = 0; i < len; i++) {
-            char c = s.charAt(i);
-            if (c >= '\"' && c <= '>' &&
-                    (c == '<' || c == '>' || c == '\'' || c == '&' || c == '"')) {
-                // need to escape them and then quote the whole string
-                StringBuilder sb = new StringBuilder((int) (len * 1.2));
-                sb.append(s, 0, i);
-                int pos = i + 1;
-                for (int j = i; j < len; j++) {
-                    c = s.charAt(j);
-                    if (c >= '\"' && c <= '>') {
-                        if (c == '<') {
-                            if (j > pos) {
-                                sb.append(s, pos, j);
-                            }
-                            sb.append("&lt;");
-                            pos = j + 1;
-                        } else if (c == '>') {
-                            if (j > pos) {
-                                sb.append(s, pos, j);
-                            }
-                            sb.append("&gt;");
-                            pos = j + 1;
-                        } else if (c == '\'') {
-                            if (j > pos) {
-                                sb.append(s, pos, j);
-                            }
-                            sb.append("&#039;"); // &apos;
-                            pos = j + 1;
-                        } else if (c == '&') {
-                            if (j > pos) {
-                                sb.append(s, pos, j);
-                            }
-                            sb.append("&amp;");
-                            pos = j + 1;
-                        } else if (c == '"') {
-                            if (j > pos) {
-                                sb.append(s, pos, j);
-                            }
-                            sb.append("&#034;"); // &quot;
-                            pos = j + 1;
-                        }
-                    }
-                }
-                if (pos < len) {
-                    sb.append(s, pos, len);
-                }
-                return sb.toString();
-            }
-        }
-        return s;
-    }
-
     /**
      * Proprietary method to evaluate EL expressions. XXX - This method should
      * go away once the EL interpreter moves out of JSTL and into its own
@@ -980,53 +925,45 @@ public class PageContextImpl extends PageContext {
      * @param functionMap
      *            Maps prefix and name to Method
      * @return The result of the evaluation
+     * @throws ELException If an error occurs during the evaluation
      */
     public static Object proprietaryEvaluate(final String expression,
             final Class<?> expectedType, final PageContext pageContext,
-            final ProtectedFunctionMapper functionMap, final boolean escape)
+            final ProtectedFunctionMapper functionMap)
             throws ELException {
-        Object retValue;
         final ExpressionFactory exprFactory = jspf.getJspApplicationContext(pageContext.getServletContext()).getExpressionFactory();
-        if (SecurityUtil.isPackageProtectionEnabled()) {
-            try {
-                retValue = AccessController
-                        .doPrivileged(new PrivilegedExceptionAction<Object>() {
-
-                            @Override
-                            public Object run() throws Exception {
-                                ELContextImpl ctx = (ELContextImpl) pageContext.getELContext();
-                                ctx.setFunctionMapper(functionMap);
-                                ValueExpression ve = exprFactory.createValueExpression(ctx, expression, expectedType);
-                                return ve.getValue(ctx);
-                            }
-                        });
-            } catch (PrivilegedActionException ex) {
-                Exception realEx = ex.getException();
-                if (realEx instanceof ELException) {
-                    throw (ELException) realEx;
-                } else {
-                    throw new ELException(realEx);
-                }
-            }
+        ELContext ctx = pageContext.getELContext();
+        ELContextImpl ctxImpl;
+        if (ctx instanceof ELContextWrapper) {
+            ctxImpl = (ELContextImpl) ((ELContextWrapper) ctx).getWrappedELContext();
         } else {
-            ELContextImpl ctx = (ELContextImpl) pageContext.getELContext();
-            ctx.setFunctionMapper(functionMap);
-            ValueExpression ve = exprFactory.createValueExpression(ctx, expression, expectedType);
-            retValue = ve.getValue(ctx);
+            ctxImpl = (ELContextImpl) ctx;
         }
-        if (escape && retValue != null) {
-            retValue = XmlEscape(retValue.toString());
-        }
-
-        return retValue;
+        ctxImpl.setFunctionMapper(functionMap);
+        ValueExpression ve = exprFactory.createValueExpression(ctx, expression, expectedType);
+        return ve.getValue(ctx);
     }
 
     @Override
     public ELContext getELContext() {
-        if (this.elContext == null) {
-            this.elContext = this.applicationContext.createELContext(this);
+        if (elContext == null) {
+            elContext = applicationContext.createELContext(this);
+            if (servlet instanceof JspSourceImports) {
+                ImportHandler ih = elContext.getImportHandler();
+                Set<String> packageImports = ((JspSourceImports) servlet).getPackageImports();
+                if (packageImports != null) {
+                    for (String packageImport : packageImports) {
+                        ih.importPackage(packageImport);
+                    }
+                }
+                Set<String> classImports = ((JspSourceImports) servlet).getClassImports();
+                if (classImports != null) {
+                    for (String classImport : classImports) {
+                        ih.importClass(classImport);
+                    }
+                }
+            }
         }
         return this.elContext;
     }
-
 }

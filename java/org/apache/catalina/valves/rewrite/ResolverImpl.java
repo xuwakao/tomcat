@@ -142,7 +142,12 @@ public class ResolverImpl extends Resolver {
 
     @Override
     public String resolveHttp(String key) {
-        return request.getHeader(key);
+        String header = request.getHeader(key);
+        if (header == null) {
+            return "";
+        } else {
+            return header;
+        }
     }
 
     @Override
@@ -171,5 +176,10 @@ public class ResolverImpl extends Resolver {
         } else {
             return value;
         }
+    }
+
+    @Override
+    public String getUriEncoding() {
+        return request.getConnector().getURIEncoding();
     }
 }

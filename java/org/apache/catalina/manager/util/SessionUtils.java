@@ -71,8 +71,8 @@ public class SessionUtils {
      * Try to get user locale from the session, if possible.
      * IMPLEMENTATION NOTE: this method has explicit support for Tapestry 3, Struts 1.x and Spring
      * JSF check the browser meta tag "accept languages" to choose what language to display.
-     * @param in_session
-     * @return String
+     * @param in_session The session
+     * @return the locale
      */
     public static Locale guessLocaleFromSession(final Session in_session) {
         return guessLocaleFromSession(in_session.getSession());
@@ -87,17 +87,17 @@ public class SessionUtils {
             // First search "known locations"
             for (int i = 0; i < LOCALE_TEST_ATTRIBUTES.length; ++i) {
                 Object obj = in_session.getAttribute(LOCALE_TEST_ATTRIBUTES[i]);
-                if (null != obj && obj instanceof Locale) {
+                if (obj instanceof Locale) {
                     locale = (Locale) obj;
                     break;
                 }
                 obj = in_session.getAttribute(LOCALE_TEST_ATTRIBUTES[i].toLowerCase(Locale.ENGLISH));
-                if (null != obj && obj instanceof Locale) {
+                if (obj instanceof Locale) {
                     locale = (Locale) obj;
                     break;
                 }
                 obj = in_session.getAttribute(LOCALE_TEST_ATTRIBUTES[i].toUpperCase(Locale.ENGLISH));
-                if (null != obj && obj instanceof Locale) {
+                if (obj instanceof Locale) {
                     locale = (Locale) obj;
                     break;
                 }
@@ -122,12 +122,10 @@ public class SessionUtils {
                 if (null != probableEngine) {
                     try {
                         Method readMethod = probableEngine.getClass().getMethod("getLocale", (Class<?>[])null);//$NON-NLS-1$
-                        if (null != readMethod) {
-                            // Call the property getter and return the value
-                            Object possibleLocale = readMethod.invoke(probableEngine, (Object[]) null);
-                            if (null != possibleLocale && possibleLocale instanceof Locale) {
-                                locale = (Locale) possibleLocale;
-                            }
+                        // Call the property getter and return the value
+                        Object possibleLocale = readMethod.invoke(probableEngine, (Object[]) null);
+                        if (possibleLocale instanceof Locale) {
+                            locale = (Locale) possibleLocale;
                         }
                     } catch (Exception e) {
                         Throwable t = ExceptionUtils
@@ -148,7 +146,7 @@ public class SessionUtils {
             for (Enumeration<String> enumeration = in_session.getAttributeNames(); enumeration.hasMoreElements();) {
                 String name = enumeration.nextElement();
                 Object obj = in_session.getAttribute(name);
-                if (null != obj && obj instanceof Locale) {
+                if (obj instanceof Locale) {
                     localeArray.add(obj);
                 }
             }
@@ -165,8 +163,8 @@ public class SessionUtils {
 
     /**
      * Try to get user from the session, if possible.
-     * @param in_session
-     * @return Object
+     * @param in_session The session
+     * @return the user
      */
     public static Object guessUserFromSession(final Session in_session) {
         if (null == in_session) {
@@ -210,7 +208,7 @@ public class SessionUtils {
             for (Enumeration<String> enumeration = httpSession.getAttributeNames(); enumeration.hasMoreElements();) {
                 String name = enumeration.nextElement();
                 Object obj = httpSession.getAttribute(name);
-                if (null != obj && (obj instanceof Principal || obj instanceof Subject)) {
+                if (obj instanceof Principal || obj instanceof Subject) {
                     principalArray.add(obj);
                 }
             }

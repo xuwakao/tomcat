@@ -41,6 +41,7 @@ import org.apache.tomcat.util.ExceptionUtils;
  * AccessLogValve.
  * To use, copy into the server/classes directory of the Tomcat installation
  * and configure in server.xml as:
+ * </p>
  * <pre>
  *      &lt;Valve className="org.apache.catalina.valves.JDBCAccessLogValve"
  *          driverName="<i>your_jdbc_driver</i>"
@@ -48,7 +49,6 @@ import org.apache.tomcat.util.ExceptionUtils;
  *          pattern="combined" resolveHosts="false"
  *      /&gt;
  * </pre>
- * </p>
  * <p>
  * Many parameters can be configured, such as the database connection (with
  * <code>driverName</code> and <code>connectionURL</code>),
@@ -165,23 +165,23 @@ public final class JDBCAccessLogValve extends ValveBase implements AccessLog {
     * Use long contentLength as you have more 4 GB output.
     * @since 6.0.15
     */
-    protected boolean useLongContentLength = false ;
+    boolean useLongContentLength = false;
 
    /**
      * The connection username to use when trying to connect to the database.
      */
-    protected String connectionName = null;
+    String connectionName = null;
 
 
     /**
      * The connection URL to use when trying to connect to the database.
      */
-    protected String connectionPassword = null;
+    String connectionPassword = null;
 
    /**
      * Instance of the JDBC Driver class we use as a connection factory.
      */
-    protected Driver driver = null;
+    Driver driver = null;
 
 
     private String driverName;
@@ -210,7 +210,7 @@ public final class JDBCAccessLogValve extends ValveBase implements AccessLog {
     /**
      * @see #setRequestAttributesEnabled(boolean)
      */
-    protected boolean requestAttributesEnabled = true;
+    boolean requestAttributesEnabled = true;
 
 
     // ------------------------------------------------------------- Properties
@@ -232,8 +232,7 @@ public final class JDBCAccessLogValve extends ValveBase implements AccessLog {
     }
 
     /**
-     * Return the username to use to connect to the database.
-     *
+     * @return the username to use to connect to the database.
      */
     public String getConnectionName() {
         return connectionName;
@@ -257,9 +256,8 @@ public final class JDBCAccessLogValve extends ValveBase implements AccessLog {
         this.driverName = driverName;
     }
 
-   /**
-     * Return the password to use to connect to the database.
-     *
+    /**
+     * @return the password to use to connect to the database.
      */
     public String getConnectionPassword() {
         return connectionPassword;
@@ -356,11 +354,11 @@ public final class JDBCAccessLogValve extends ValveBase implements AccessLog {
     }
 
 
-  /**
-   * Sets the name of the field containing the HTTP response status code.
-   *
-   * @param statusField The name of the HTTP response status code field.
-   */
+    /**
+     * Sets the name of the field containing the HTTP response status code.
+     *
+     * @param statusField The name of the HTTP response status code field.
+     */
     public void setStatusField(String statusField) {
         this.statusField = statusField;
     }
@@ -416,14 +414,15 @@ public final class JDBCAccessLogValve extends ValveBase implements AccessLog {
      * is desired or not.
      */
     public void setResolveHosts(String resolveHosts) {
-        this.resolveHosts = Boolean.valueOf(resolveHosts).booleanValue();
+        this.resolveHosts = Boolean.parseBoolean(resolveHosts);
     }
 
     /**
-     * get useLongContentLength
+     * @return <code>true</code> if content length should be considered a long
+     *  rather than an int, defaults to <code>false</code>
      */
-    public  boolean getUseLongContentLength() {
-        return this.useLongContentLength ;
+    public boolean getUseLongContentLength() {
+        return this.useLongContentLength;
     }
 
     /**
@@ -626,7 +625,7 @@ public final class JDBCAccessLogValve extends ValveBase implements AccessLog {
         try {
             conn.close();
         } catch (SQLException e) {
-            container.getLogger().error(sm.getString("jdbcAccessLogValeve.close"), e); // Just log it here
+            container.getLogger().error(sm.getString("jdbcAccessLogValve.close"), e); // Just log it here
         } finally {
            this.conn = null;
         }

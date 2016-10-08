@@ -32,7 +32,6 @@ import org.apache.el.util.MessageFactory;
  * @see javax.el.ExpressionFactory
  *
  * @author Jacob Hookom [jacob@hookom.net]
- * @version $Id$
  */
 public class ExpressionFactoryImpl extends ExpressionFactory {
 
@@ -45,7 +44,7 @@ public class ExpressionFactoryImpl extends ExpressionFactory {
 
     @Override
     public Object coerceToType(Object obj, Class<?> type) {
-        return ELSupport.coerceToType(obj, type);
+        return ELSupport.coerceToType(null, obj, type);
     }
 
     @Override

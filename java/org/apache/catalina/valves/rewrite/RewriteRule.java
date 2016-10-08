@@ -37,6 +37,7 @@ public class RewriteRule {
             substitution = new Substitution();
             substitution.setSub(substitutionString);
             substitution.parse(maps);
+            substitution.setEscapeBackReferences(isEscapeBackReferences());
         }
         // Parse the pattern
         int flags = 0;
@@ -76,8 +77,9 @@ public class RewriteRule {
 
     /**
      * Evaluate the rule based on the context
-     *
-     * @return null if no rewrite took place
+     * @param url The char sequence
+     * @param resolver Property resolver
+     * @return <code>null</code> if no rewrite took place
      */
     public CharSequence evaluate(CharSequence url, Resolver resolver) {
         Pattern pattern = this.pattern.get();
@@ -149,6 +151,8 @@ public class RewriteRule {
         return "RewriteRule " + patternString + " " + substitutionString;
     }
 
+
+    private boolean escapeBackReferences = false;
 
     /**
      *  This flag chains the current rule with the next rule (which itself
@@ -324,6 +328,13 @@ public class RewriteRule {
      */
     protected boolean type = false;
     protected String typeValue = null;
+
+    public boolean isEscapeBackReferences() {
+        return escapeBackReferences;
+    }
+    public void setEscapeBackReferences(boolean escapeBackReferences) {
+        this.escapeBackReferences = escapeBackReferences;
+    }
     public boolean isChain() {
         return chain;
     }

@@ -21,17 +21,12 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * @author not attributable
+ * A very simple thread pool class.  The pool size is set at
+ * construction time and remains fixed.  Threads are cycled
+ * through a FIFO idle queue.
  * @version 1.0
  */
-
-public class RxTaskPool
-{
-    /**
-     * A very simple thread pool class.  The pool size is set at
-     * construction time and remains fixed.  Threads are cycled
-     * through a FIFO idle queue.
-     */
+public class RxTaskPool {
 
     final List<AbstractRxTask> idle = new LinkedList<>();
     final List<AbstractRxTask> used = new LinkedList<>();
@@ -64,6 +59,7 @@ public class RxTaskPool
 
     /**
      * Find an idle worker thread, if any.  Could return null.
+     * @return a worker
      */
     public AbstractRxTask getRxTask()
     {
@@ -100,6 +96,7 @@ public class RxTaskPool
     /**
      * Called by the worker thread to return itself to the
      * idle pool.
+     * @param worker The worker
      */
     public void returnWorker (AbstractRxTask worker) {
         if ( running ) {

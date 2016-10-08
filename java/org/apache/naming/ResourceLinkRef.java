@@ -24,7 +24,6 @@ import javax.naming.StringRefAddr;
  * Represents a reference address to a resource.
  *
  * @author Remy Maucherat
- * @version $Id$
  */
 public class ResourceLinkRef extends Reference {
 
@@ -49,6 +48,9 @@ public class ResourceLinkRef extends Reference {
      *
      * @param resourceClass Resource class
      * @param globalName Global name
+     * @param factory The possibly null class name of the object's factory.
+     * @param factoryLocation The possibly null location from which to load the
+     *                        factory (e.g. URL)
      */
     public ResourceLinkRef(String resourceClass, String globalName,
                            String factory, String factoryLocation) {

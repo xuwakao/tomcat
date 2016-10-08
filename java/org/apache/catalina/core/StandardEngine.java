@@ -46,13 +46,11 @@ import org.apache.juli.logging.LogFactory;
 /**
  * Standard implementation of the <b>Engine</b> interface.  Each
  * child container must be a Host implementation to process the specific
- * fully qualified host name of that virtual host. <br/>
+ * fully qualified host name of that virtual host. <br>
  * You can set the jvmRoute direct or with the System.property <b>jvmRoute</b>.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class StandardEngine extends ContainerBase implements Engine {
 
     private static final Log log = LogFactory.getLog(StandardEngine.class);
@@ -373,6 +371,22 @@ public class StandardEngine extends ContainerBase implements Engine {
         }
         // Fall-back
         return super.getCatalinaBase();
+    }
+
+
+    @Override
+    public File getCatalinaHome() {
+        if (service != null) {
+            Server s = service.getServer();
+            if (s != null) {
+                File base = s.getCatalinaHome();
+                if (base != null) {
+                    return base;
+                }
+            }
+        }
+        // Fall-back
+        return super.getCatalinaHome();
     }
 
 

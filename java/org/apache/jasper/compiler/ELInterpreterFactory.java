@@ -43,6 +43,9 @@ public class ELInterpreterFactory {
 
     /**
      * Obtain the correct EL Interpreter for the given web application.
+     * @param context The Servlet context
+     * @return the EL interpreter
+     * @throws Exception If an error occurs creating the interpreter
      */
     public static ELInterpreter getELInterpreter(ServletContext context)
             throws Exception {
@@ -96,9 +99,9 @@ public class ELInterpreterFactory {
         @Override
         public String interpreterCall(JspCompilationContext context,
                 boolean isTagFile, String expression,
-                Class<?> expectedType, String fnmapvar, boolean xmlEscape) {
+                Class<?> expectedType, String fnmapvar) {
             return JspUtil.interpreterCall(isTagFile, expression, expectedType,
-                    fnmapvar, xmlEscape);
+                    fnmapvar);
         }
     }
 }

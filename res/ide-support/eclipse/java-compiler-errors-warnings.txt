@@ -18,7 +18,7 @@
 # Java -> Compiler -> Errors/Warnings
 =======================================
 
-The following settings are for Juno Service Release 1 (Eclipse 4.2.1)
+The following settings are for Mars (Eclipse 4.5)
 W = Warning
 I = Ignore
 E = Error
@@ -63,6 +63,7 @@ Unnecessary code
    ([x] on all additional check boxes)
    except the following:
 
+   - Value of exception parameter is...   - I
    - Unnecessary else                     - I
 
 Generic types
@@ -86,6 +87,23 @@ Eclipse IDE is documented here:
  3.6: http://help.eclipse.org/helios/topic/org.eclipse.jdt.doc.isv/guide/jdt_api_compile.htm
  3.7: http://help.eclipse.org/indigo/topic/org.eclipse.jdt.doc.user/tasks/task-suppress_warnings.htm
  4.2: http://help.eclipse.org/juno/topic/org.eclipse.jdt.doc.user/tasks/task-suppress_warnings.htm
+
+
+# Java -> Compiler -> Javadoc
+=============================
+
+Enable 'Process Javadoc comments'
+  - Malformed Javadoc comments          - W
+    - Only consider members visible as  - Public
+    [X] Validate tag arguments
+        [ ] Report non-visible references
+        [X] Report deprecated references
+    - Missing tag descriptions          - Validate all standard tags
+  - Missing Javadoc tags                - W
+    - Only consider members visible as  - Public
+    [X] - Ignore in overriding and implementing methods
+    [ ] - Ignore method type parameters
+  - Missing Javadoc comments            - I
 
 
 # Java -> Code Style -> Organize Imports

@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -34,7 +34,7 @@
                 writeable="false"/>
 
      <attribute name="filterInitParameterMap"
-                description="Return the initiaization parameters associated with this filter"
+                description="Return the initialization parameters associated with this filter"
                 type="java.util.Map"
                 writeable="false" />
 
@@ -65,18 +65,9 @@
          type="org.apache.catalina.core.StandardContext"
          className="org.apache.catalina.mbeans.ContextMBean">
 
-    <attribute name="allowLinking"
-               description="Allow symlinking to outside the webapp root directory, if the webapp is an exploded directory"
-               is="true"
-               type="boolean"/>
-
     <attribute name="altDDName"
                description="The alternate deployment descriptor name."
                type="java.lang.String" />
-
-    <attribute name="antiJARLocking"
-               description="Take care to not lock jar files"
-               type="boolean" />
 
     <attribute name="antiResourceLocking"
                description="Take care to not lock resources"
@@ -87,29 +78,12 @@
                type="java.lang.String"
                writeable="false"/>
 
-    <attribute name="cacheMaxSize"
-               description="Maximum cache size in KB"
-               type="int"/>
-
-    <attribute name="cacheObjectMaxSize"
-               description="Maximum cached object size in KB"
-               type="int"/>
-
-    <attribute name="cacheTTL"
-               description="Time interval in ms between cache refeshes"
-               type="int"/>
-
-    <attribute name="cachingAllowed"
-               description="Should we cache static resources for this webapp"
-               is="true"
-               type="boolean"/>
-
     <attribute name="children"
                description="Object names of all children"
                type="[Ljavax.management.ObjectName;"/>
 
-    <attribute name="clearReferencesStatic"
-               description="Should Tomcat attempt to null out any static or final fields from loaded classes when a web application is stopped as a work around for apparent garbage collection bugs and application coding errors?"
+    <attribute name="clearReferencesRmiTargets"
+               description="Should Tomcat look for memory leaks in RMI Targets and clear them if found as a work around for application coding errors?"
                type="boolean"/>
 
     <attribute name="clearReferencesStopThreads"
@@ -149,11 +123,6 @@
                description=""
                type="boolean"/>
 
-    <attribute name="deploymentDescriptor"
-               description="String deployment descriptor "
-               type="java.lang.String"
-               writeable="false" />
-
     <attribute name="displayName"
                description="The display name of this web application"
                type="java.lang.String"/>
@@ -177,7 +146,7 @@
 
     <attribute name="instanceManager"
                description="Object that creates and destroys servlets, filters, and listeners. Include dependency injection and postConstruct/preDestory handling"
-               type="org.apache.catalina.instanceManagement.InstanceManager" />
+               type="org.apache.tomcat.InstanceManager" />
 
     <attribute name="javaVMs"
                description="The Java virtual machines on which this module is running"
@@ -193,7 +162,7 @@
 
     <attribute name="logger"
                description="Associated logger."
-               type="org.apache.commons.logging.Log" />
+               type="org.apache.juli.logging.Log" />
 
     <attribute name="managedResource"
                description="The managed resource this MBean is associated with"
@@ -202,6 +171,14 @@
     <attribute name="manager"
                description="Associated manager."
                type="org.apache.catalina.Manager" />
+
+    <attribute name="mapperContextRootRedirectEnabled"
+               description="Should the Mapper be used for context root redirects"
+               type="boolean" />
+
+    <attribute name="mapperDirectoryRedirectEnabled"
+               description="Should the Mapper be used for directory redirects"
+               type="boolean" />
 
     <attribute name="namingContextListener"
                description="Associated naming context listener."
@@ -288,7 +265,7 @@
                type="java.lang.String"/>
 
     <attribute name="servlets"
-               description="JSR77 list of servlets"
+               description="Deprecated. JSR77 list of servlets"
                type="[Ljava.lang.String;"
                writeable="false"/>
 
@@ -317,12 +294,6 @@
                description="Time (in milliseconds) it took to start this context"
                type="long"/>
 
-    <attribute name="stateManageable"
-               description="State management support for this managed object"
-               is="true"
-               type="boolean"
-               writeable="false" />
-
     <attribute name="stateName"
                description="The name of the LifecycleState that this component is currently in"
                type="java.lang.String"
@@ -332,16 +303,12 @@
                description="Flag to set to cause the system.out and system.err to be redirected to the logger when executing a servlet"
                type="boolean"/>
 
-    <attribute name="tldNamespaceAware"
-               description="Should TLD XML namespace validation be turned on?"
-               type="boolean"/>
-
     <attribute name="tldScanTime"
                description="Time spend scanning jars for TLDs for this context"
                type="long"/>
 
     <attribute name="tldValidation"
-               description="Should TLD XML validation be turned on?"
+               description="Should the parsing of *.tld files be performed by a validating parser?"
                type="boolean"/>
 
     <attribute name="unloadDelay"
@@ -361,6 +328,10 @@
                is="true"
                type="boolean"/>
 
+    <attribute name="useRelativeRedirects"
+               description="When generating location headers for 302 responses, should a relative URI be used?"
+               type="boolean"/>
+
     <attribute name="webappVersion"
                description="The version of this web application - used in parallel deployment to differentiate different versions of the same web application"
                type="java.lang.String"
@@ -376,11 +347,11 @@
                type="java.lang.String"/>
 
     <attribute name="xmlValidation"
-               description="Should XML validation be turned on?"
+               description="Should the parsing of web.xml and web-fragment.xml files be performed by a validating parser?"
                type="boolean"/>
 
     <attribute name="xmlNamespaceAware"
-               description="Should XML namespace validation be turned on?"
+               description="Should the parsing of web.xml and web-fragment.xml files be performed by a namespace aware parser?"
                type="boolean"/>
 
     <operation name="addApplicationListener"
@@ -410,15 +381,6 @@
                  type="java.lang.String"/>
       <parameter name="name"
                  description="Name of the child to be added"
-                 type="java.lang.String"/>
-    </operation>
-
-    <operation name="addInstanceListener"
-               description="Add the classname of an InstanceListener to be added to each Wrapper appended to this Context."
-               impact="ACTION"
-               returnType="void">
-      <parameter name="listener"
-                 description="Java class name of an InstanceListener class"
                  type="java.lang.String"/>
     </operation>
 
@@ -635,12 +597,6 @@
                returnType="[Ljava.lang.String;">
     </operation>
 
-    <operation name="findInstanceListeners"
-               description="Return the set of InstanceListener classes that will be added to newly created Wrappers automatically."
-               impact="INFO"
-               returnType="[Ljava.lang.String;">
-    </operation>
-
     <operation name="findLifecycleListenerNames"
                description="Return the set of lifecycle listener class names configured for this application."
                impact="INFO"
@@ -783,7 +739,7 @@
     </operation>
 
     <operation name="reload"
-               description="Reload the webapplication"
+               description="Reload the web application"
                impact="ACTION"
                returnType="void">
     </operation>
@@ -812,15 +768,6 @@
                returnType="void">
       <parameter name="name"
                  description="Name of the existing child Container to be removed"
-                 type="java.lang.String"/>
-    </operation>
-
-    <operation name="removeInstanceListener"
-               description="Remove the application parameter with the specified name from the set for this application."
-               impact="ACTION"
-               returnType="void">
-      <parameter name="listener"
-                 description="Class name of an InstanceListener class to be removed"
                  type="java.lang.String"/>
     </operation>
 
@@ -1371,6 +1318,16 @@
                type="java.lang.String"
                writeable="false"/>
 
+    <attribute name="serverBuilt"
+               description="Tomcat server built timestamp"
+               type="java.lang.String"
+               writeable="false"/>
+
+    <attribute name="serverNumber"
+               description="Tomcat server's version number"
+               type="java.lang.String"
+               writeable="false"/>
+
     <attribute name="serviceNames"
                description="Object names of all services we know about"
                type="[Ljavax.management.ObjectName;"
@@ -1652,15 +1609,9 @@
 
     <attribute name="singleThreadModel"
                description="Does this servlet implement the SingleThreadModel interface?"
-               type="boolean"
+               type="java.lang.Boolean"
                is="true"
                writeable="false" />
-
-    <attribute name="stateManageable"
-               description="State management support for this managed object"
-               is="true"
-               type="boolean"
-               writeable="false"/>
 
     <attribute name="stateName"
                description="The name of the LifecycleState that this component is currently in"
@@ -1721,9 +1672,9 @@
     <operation name="findInitParameter"
                description="Add a mapping associated with the Wrapper."
                impact="ACTION"
-               returnType="void">
-      <parameter name="mapping"
-                 description="The new wrapper mapping"
+               returnType="java.lang.String">
+      <parameter name="name"
+                 description="The name of the  initialization parameter"
                  type="java.lang.String"/>
     </operation>
 
@@ -1792,7 +1743,7 @@
                impact="ACTION"
                returnType="void">
       <parameter name="name"
-                 description="Security role used within this servlet to be removeds"
+                 description="Security role used within this servlet to be removed"
                  type="java.lang.String"/>
     </operation>
 

@@ -45,9 +45,7 @@ import org.apache.tomcat.util.res.StringManager;
  *
  * @author Craig R. McClanahan
  * @author Andrew R. Jaquith
- * @version $Id$
  */
-
 public class JAASCallbackHandler implements CallbackHandler {
 
     // ------------------------------------------------------------ Constructor
@@ -93,7 +91,7 @@ public class JAASCallbackHandler implements CallbackHandler {
         this.username = username;
 
         if (realm.hasMessageDigest()) {
-            this.password = realm.digest(password);
+            this.password = realm.getCredentialHandler().mutate(password);
         }
         else {
             this.password = password;
@@ -112,8 +110,7 @@ public class JAASCallbackHandler implements CallbackHandler {
     /**
      * The string manager for this package.
      */
-    protected static final StringManager sm =
-        StringManager.getManager(Constants.Package);
+    protected static final StringManager sm = StringManager.getManager(JAASCallbackHandler.class);
 
     /**
      * The password to be authenticated with.
@@ -217,6 +214,8 @@ public class JAASCallbackHandler implements CallbackHandler {
                     cb.setText(md5a2);
                 } else if (cb.getPrompt().equals("authMethod")) {
                     cb.setText(authMethod);
+                } else if (cb.getPrompt().equals("catalinaBase")) {
+                    cb.setText(realm.getContainer().getCatalinaBase().getAbsolutePath());
                 } else {
                     throw new UnsupportedCallbackException(callbacks[i]);
                 }

@@ -41,9 +41,8 @@ public class TestWebappClassLoaderExecutorMemoryLeak extends TomcatBaseTest {
     public void testTimerThreadLeak() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx = tomcat.addContext("",
-                System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         if (ctx instanceof StandardContext) {
             ((StandardContext) ctx).setClearReferencesStopThreads(true);
@@ -51,7 +50,7 @@ public class TestWebappClassLoaderExecutorMemoryLeak extends TomcatBaseTest {
 
         ExecutorServlet executorServlet = new ExecutorServlet();
         Tomcat.addServlet(ctx, "taskServlet", executorServlet);
-        ctx.addServletMapping("/", "taskServlet");
+        ctx.addServletMappingDecoded("/", "taskServlet");
 
         tomcat.start();
 
@@ -61,14 +60,19 @@ public class TestWebappClassLoaderExecutorMemoryLeak extends TomcatBaseTest {
         // Stop the context
         ctx.stop();
 
-        // If the thread still exists, we have a thread/memory leak
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException ie) {
-            // ignore
+        // Should be shutdown once the stop() method above exists
+        Assert.assertTrue(executorServlet.tpe.isShutdown());
+
+        // The time taken to shutdown the executor can vary between systems. Try
+        // to avoid false test failures due to timing issues. Give the executor
+        // upto 10 seconds to close down.
+        int count = 0;
+        while (count < 100 && !executorServlet.tpe.isTerminated()) {
+            count++;
+            Thread.sleep(100);
         }
 
-        Assert.assertTrue(executorServlet.tpe.isShutdown());
+        // If the executor has not terminated, there is a thread/memory leak
         Assert.assertTrue(executorServlet.tpe.isTerminated());
     }
 

@@ -45,10 +45,8 @@ import org.apache.tomcat.util.modeler.Registry;
  * management.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  * @since 4.1
  */
-
 public class GlobalResourcesLifecycleListener
     implements LifecycleListener {
     private static final Log log = LogFactory.getLog(GlobalResourcesLifecycleListener.class);
@@ -179,9 +177,11 @@ public class GlobalResourcesLifecycleListener
             log.debug("Creating UserDatabase MBeans for resource " + name);
             log.debug("Database=" + database);
         }
-        if (MBeanUtils.createMBean(database) == null) {
-            throw new IllegalArgumentException
-                ("Cannot create UserDatabase MBean for resource " + name);
+        try {
+            MBeanUtils.createMBean(database);
+        } catch(Exception e) {
+            throw new IllegalArgumentException(
+                    "Cannot create UserDatabase MBean for resource " + name, e);
         }
 
         // Create the MBeans for each defined Role
@@ -191,9 +191,11 @@ public class GlobalResourcesLifecycleListener
             if (log.isDebugEnabled()) {
                 log.debug("  Creating Role MBean for role " + role);
             }
-            if (MBeanUtils.createMBean(role) == null) {
-                throw new IllegalArgumentException
-                    ("Cannot create Role MBean for role " + role);
+            try {
+                MBeanUtils.createMBean(role);
+            } catch (Exception e) {
+                throw new IllegalArgumentException(
+                        "Cannot create Role MBean for role " + role, e);
             }
         }
 
@@ -204,9 +206,11 @@ public class GlobalResourcesLifecycleListener
             if (log.isDebugEnabled()) {
                 log.debug("  Creating Group MBean for group " + group);
             }
-            if (MBeanUtils.createMBean(group) == null) {
-                throw new IllegalArgumentException
-                    ("Cannot create Group MBean for group " + group);
+            try {
+                MBeanUtils.createMBean(group);
+            } catch (Exception e) {
+                throw new IllegalArgumentException(
+                        "Cannot create Group MBean for group " + group, e);
             }
         }
 
@@ -217,9 +221,11 @@ public class GlobalResourcesLifecycleListener
             if (log.isDebugEnabled()) {
                 log.debug("  Creating User MBean for user " + user);
             }
-            if (MBeanUtils.createMBean(user) == null) {
-                throw new IllegalArgumentException
-                    ("Cannot create User MBean for user " + user);
+            try {
+                MBeanUtils.createMBean(user);
+            } catch (Exception e) {
+                throw new IllegalArgumentException(
+                        "Cannot create User MBean for user " + user, e);
             }
         }
 

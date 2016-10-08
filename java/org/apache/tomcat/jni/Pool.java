@@ -22,9 +22,7 @@ import java.nio.ByteBuffer;
 /** Pool
  *
  * @author Mladen Turk
- * @version $Id$
  */
-
 public class Pool {
 
     /**
@@ -139,7 +137,7 @@ public class Pool {
      * @param data The user data associated with the pool.
      * @param key The key to use for association
      * @param pool The current pool
-     * <br /><b>Warning :</b>
+     * <br><b>Warning :</b>
      * The data to be attached to the pool should have a life span
      * at least as long as the pool it is being attached to.
      * Object attached to the pool will be globally referenced
@@ -152,6 +150,7 @@ public class Pool {
      * Return the data associated with the current pool.
      * @param key The key for the data to retrieve
      * @param pool The current pool.
+     * @return the data
      */
      public static native Object dataGet(long pool, String key);
 

@@ -17,126 +17,60 @@
  */
 package org.apache.tomcat.util.bcel.classfile;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.tomcat.util.bcel.Constants;
-import org.apache.tomcat.util.bcel.util.BCELComparator;
-
 /**
  * Represents a Java class, i.e., the data structures, constant pool,
  * fields, methods and commands contained in a Java .class file.
- * See <a href="ftp://java.sun.com/docs/specs/">JVM specification</a> for details.
+ * See <a href="http://docs.oracle.com/javase/specs/">JVM specification</a> for details.
  * The intent of this class is to represent a parsed or otherwise existing
  * class file.  Those interested in programatically generating classes
  * should see the <a href="../generic/ClassGen.html">ClassGen</a> class.
-
- * @version $Id$
- * @author  <A HREF="mailto:m.dahm@gmx.de">M. Dahm</A>
  */
-public class JavaClass extends AccessFlags
-        implements Cloneable, Comparable<JavaClass> {
+public class JavaClass {
 
-    private static final long serialVersionUID = 7029227708237523236L;
-    private String class_name;
-    private String superclass_name;
-    private String[] interface_names;
-    private Attribute[] attributes; // attributes defined in the class
-    private AnnotationEntry[] annotations;   // annotations defined on the class
-
-
-    //  Annotations are collected from certain attributes, don't do it more than necessary!
-    private boolean annotationsOutOfDate = true;
-
-    private static BCELComparator _cmp = new BCELComparator() {
-
-        @Override
-        public boolean equals( Object o1, Object o2 ) {
-            JavaClass THIS = (JavaClass) o1;
-            JavaClass THAT = (JavaClass) o2;
-            return THIS.getClassName().equals(THAT.getClassName());
-        }
-
-
-        @Override
-        public int hashCode( Object o ) {
-            JavaClass THIS = (JavaClass) o;
-            return THIS.getClassName().hashCode();
-        }
-    };
-
+    private final int access_flags;
+    private final String class_name;
+    private final String superclass_name;
+    private final String[] interface_names;
+    private final Annotations runtimeVisibleAnnotations; // "RuntimeVisibleAnnotations" attribute defined in the class
 
     /**
      * Constructor gets all contents as arguments.
      *
-     * @param class_name_index Index into constant pool referencing a
-     * ConstantClass that represents this class.
-     * @param superclass_name_index Index into constant pool referencing a
-     * ConstantClass that represents this class's superclass.
+     * @param class_name Name of this class.
+     * @param superclass_name Name of this class's superclass.
      * @param access_flags Access rights defined by bit flags
      * @param constant_pool Array of constants
      * @param interfaces Implemented interfaces
-     * @param attributes Class attributes
+     * @param runtimeVisibleAnnotations "RuntimeVisibleAnnotations" attribute defined on the Class, or null
      */
-    public JavaClass(int class_name_index, int superclass_name_index,
-            int access_flags, ConstantPool constant_pool, int[] interfaces,
-            Attribute[] attributes) {
-        if (interfaces == null) {
-            interfaces = new int[0];
-        }
-        if (attributes == null) {
-            attributes = new Attribute[0];
-        }
+    JavaClass(final String class_name, final String superclass_name,
+            final int access_flags, final ConstantPool constant_pool, final String[] interface_names,
+            final Annotations runtimeVisibleAnnotations) {
         this.access_flags = access_flags;
-        this.attributes = attributes;
-        annotationsOutOfDate = true;
-
-        /* According to the specification the following entries must be of type
-         * `ConstantClass' but we check that anyway via the
-         * `ConstPool.getConstant' method.
-         */
-        class_name = constant_pool.getConstantString(class_name_index, Constants.CONSTANT_Class);
-        class_name = Utility.compactClassName(class_name, false);
-        if (superclass_name_index > 0) {
-            // May be zero -> class is java.lang.Object
-            superclass_name = constant_pool.getConstantString(superclass_name_index,
-                    Constants.CONSTANT_Class);
-            superclass_name = Utility.compactClassName(superclass_name, false);
-        } else {
-            superclass_name = "java.lang.Object";
-        }
-        interface_names = new String[interfaces.length];
-        for (int i = 0; i < interfaces.length; i++) {
-            String str = constant_pool.getConstantString(interfaces[i], Constants.CONSTANT_Class);
-            interface_names[i] = Utility.compactClassName(str, false);
-        }
+        this.runtimeVisibleAnnotations = runtimeVisibleAnnotations;
+        this.class_name = class_name;
+        this.superclass_name = superclass_name;
+        this.interface_names = interface_names;
     }
-
 
     /**
-     * @return Attributes of the class.
+     * @return Access flags of the object aka. "modifiers".
      */
-    public Attribute[] getAttributes() {
-        return attributes;
+    public final int getAccessFlags() {
+        return access_flags;
     }
 
+    /**
+     * Return annotations entries from "RuntimeVisibleAnnotations" attribute on
+     * the class, if there is any.
+     *
+     * @return An array of entries or {@code null}
+     */
     public AnnotationEntry[] getAnnotationEntries() {
-        if (annotationsOutOfDate) {
-            // Find attributes that contain annotation data
-            Attribute[] attrs = getAttributes();
-            List<AnnotationEntry> accumulatedAnnotations = new ArrayList<>();
-            for (int i = 0; i < attrs.length; i++) {
-                Attribute attribute = attrs[i];
-                if (attribute instanceof Annotations) {
-                    Annotations runtimeAnnotations = (Annotations)attribute;
-                    for(int j = 0; j < runtimeAnnotations.getAnnotationEntries().length; j++)
-                        accumulatedAnnotations.add(runtimeAnnotations.getAnnotationEntries()[j]);
-                }
-            }
-            annotations = accumulatedAnnotations.toArray(new AnnotationEntry[accumulatedAnnotations.size()]);
-            annotationsOutOfDate = false;
+        if (runtimeVisibleAnnotations != null) {
+            return runtimeVisibleAnnotations.getAnnotationEntries();
         }
-        return annotations;
+        return null;
     }
 
     /**
@@ -164,40 +98,5 @@ public class JavaClass extends AccessFlags
      */
     public String getSuperclassName() {
         return superclass_name;
-    }
-
-
-    /**
-     * Return value as defined by given BCELComparator strategy.
-     * By default two JavaClass objects are said to be equal when
-     * their class names are equal.
-     *
-     * @see java.lang.Object#equals(java.lang.Object)
-     */
-    @Override
-    public boolean equals( Object obj ) {
-        return _cmp.equals(this, obj);
-    }
-
-
-    /**
-     * Return the natural ordering of two JavaClasses.
-     * This ordering is based on the class name
-     */
-    @Override
-    public int compareTo(JavaClass obj) {
-        return getClassName().compareTo(obj.getClassName());
-    }
-
-
-    /**
-     * Return value as defined by given BCELComparator strategy.
-     * By default return the hashcode of the class name.
-     *
-     * @see java.lang.Object#hashCode()
-     */
-    @Override
-    public int hashCode() {
-        return _cmp.hashCode(this);
     }
 }

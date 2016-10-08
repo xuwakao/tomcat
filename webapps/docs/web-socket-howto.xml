@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -38,7 +38,7 @@
 </section>
 
 <section name="Application development">
-<p>Tomcat implements the Java WebSocket 1.0 API defined by <a
+<p>Tomcat implements the Java WebSocket 1.1 API defined by <a
    href="http://www.jcp.org/en/jsr/detail?id=356">JSR-356</a>.</p>
 
 <p>There are several example applications that demonstrate how the WebSocket API
@@ -50,6 +50,7 @@
 </section>
 
 <section name="Tomcat WebSocket specific configuration">
+
 <p>Tomcat provides a number of Tomcat specific configuration options for
    WebSocket. It is anticipated that these will be absorbed into the WebSocket
    specification over time.</p>
@@ -62,15 +63,23 @@
    the timeout to use in milliseconds. For an infinite timeout, use
    <code>-1</code>.</p>
 
-<p>The default buffer size for binary messages is 8192 bytes. This may be
-   changed for a web application by setting the servlet context initialization
-   parameter <code>org.apache.tomcat.websocket.binaryBufferSize</code> to the
-   desired value in bytes.</p>
+<p>If the application does not define a <code>MessageHandler.Partial</code> for
+   incoming binary messages, any incoming binary messages must be buffered so
+   the entire message can be delivered in a single call to the registered
+   <code>MessageHandler.Whole</code> for binary messages. The default buffer
+   size for binary messages is 8192 bytes. This may be changed for a web
+   application by setting the servlet context initialization parameter
+   <code>org.apache.tomcat.websocket.binaryBufferSize</code> to the desired
+   value in bytes.</p>
 
-<p>The default buffer size for text messages is 8192 bytes. This may be
-   changed for a web application by setting the servlet context initialization
-   parameter <code>org.apache.tomcat.websocket.textBufferSize</code> to the
-   desired value in bytes.</p>
+<p>If the application does not define a <code>MessageHandler.Partial</code> for
+   incoming text messages, any incoming text messages must be buffered so the
+   entire message can be delivered in a single call to the registered
+   <code>MessageHandler.Whole</code> for text messages. The default buffer size
+   for text messages is 8192 bytes. This may be changed for a web application by
+   setting the servlet context initialization parameter
+   <code>org.apache.tomcat.websocket.textBufferSize</code> to the desired value
+   in bytes.</p>
 
 <p>The Java WebSocket specification 1.0 does not permit programmatic deployment
    after the first endpoint has started a WebSocket handshake. By default,
@@ -81,6 +90,30 @@
    <code>org.apache.tomcat.websocket.STRICT_SPEC_COMPLIANCE</code> system
    property to <code>true</code> but any explicit setting on the servlet context
    will always take priority.</p>
+
+<p>When using the WebSocket client to connect to server endpoints, the timeout
+   for IO operations while establishing the connection is controlled by the
+   <code>userProperties</code> of the provided
+   <code>javax.websocket.ClientEndpointConfig</code>. The property is
+   <code>org.apache.tomcat.websocket.IO_TIMEOUT_MS</code> and is the
+   timeout as a <code>String</code> in milliseconds. The default is 5000 (5
+   seconds).</p>
+
+<p>When using the WebSocket client to connect to secure server endpoints, the
+   client SSL configuration is controlled by the <code>userProperties</code>
+   of the provided <code>javax.websocket.ClientEndpointConfig</code>. The
+   following user properties are supported:</p>
+   <ul>
+     <li><code>org.apache.tomcat.websocket.SSL_CONTEXT</code></li>
+     <li><code>org.apache.tomcat.websocket.SSL_PROTOCOLS</code></li>
+     <li><code>org.apache.tomcat.websocket.SSL_TRUSTSTORE</code></li>
+     <li><code>org.apache.tomcat.websocket.SSL_TRUSTSTORE_PWD</code></li>
+   </ul>
+   <p>The default truststore password is <code>changeit</code>.</p>
+   <p>If the <code>org.apache.tomcat.websocket.SSL_CONTEXT</code> property is
+      set then the <code>org.apache.tomcat.websocket.SSL_TRUSTSTORE</code> and
+      <code>org.apache.tomcat.websocket.SSL_TRUSTSTORE_PWD</code> properties
+      will be ignored.</p>
 </section>
 
 </body>

@@ -39,22 +39,23 @@ public class Validation {
     private static final boolean SKIP_IDENTIFIER_CHECK;
 
     static {
+        String skipIdentifierCheckStr;
         if (IS_SECURITY_ENABLED) {
-            SKIP_IDENTIFIER_CHECK = AccessController.doPrivileged(
-                    new PrivilegedAction<Boolean>(){
+            skipIdentifierCheckStr = AccessController.doPrivileged(
+                    new PrivilegedAction<String>(){
                         @Override
-                        public Boolean run() {
-                            return Boolean.valueOf(System.getProperty(
+                        public String run() {
+                            return System.getProperty(
                                     "org.apache.el.parser.SKIP_IDENTIFIER_CHECK",
-                            "false"));
+                                    "false");
                         }
                     }
-            ).booleanValue();
+            );
         } else {
-            SKIP_IDENTIFIER_CHECK = Boolean.valueOf(System.getProperty(
-                    "org.apache.el.parser.SKIP_IDENTIFIER_CHECK",
-            "false")).booleanValue();
+            skipIdentifierCheckStr = System.getProperty(
+                    "org.apache.el.parser.SKIP_IDENTIFIER_CHECK", "false");
         }
+        SKIP_IDENTIFIER_CHECK = Boolean.parseBoolean(skipIdentifierCheckStr);
     }
 
 
@@ -63,7 +64,14 @@ public class Validation {
     }
 
     /**
-     * Test whether the argument is a Java identifier.
+     * Test whether a string is a Java identifier. Note that the behaviour of
+     * this method depend on the system property
+     * {@code org.apache.el.parser.SKIP_IDENTIFIER_CHECK}
+     *
+     * @param key The string to test
+     *
+     * @return {@code true} if the provided String should be treated as a Java
+     *         identifier, otherwise false
      */
     public static boolean isIdentifier(String key) {
 

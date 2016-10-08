@@ -28,10 +28,7 @@ package org.apache.catalina;
  *
  * @author Bip Thelin
  * @author Remy Maucherat
- * @author Filip Hanik
- * @version $Id$
  */
-
 public interface Cluster {
 
     // ------------------------------------------------------------- Properties
@@ -75,6 +72,8 @@ public interface Cluster {
      *
      * @param name Name (key) of the application with which the manager is
      * associated
+     *
+     * @return The newly created Manager instance
      */
     public Manager createManager(String name);
 

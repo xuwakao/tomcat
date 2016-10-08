@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Map.Entry;
 
 import javax.management.ObjectName;
 
@@ -48,9 +49,10 @@ public class MbeansDescriptorsIntrospectionSource extends ModelerSource
         this.registry=reg;
     }
 
-    /** Used if a single component is loaded
+    /**
+     * Used if a single component is loaded
      *
-     * @param type
+     * @param type The type
      */
     public void setType( String type ) {
        this.type=type;
@@ -331,11 +333,10 @@ public class MbeansDescriptorsIntrospectionSource extends ModelerSource
                     mbean.addAttribute(ai);
             }
 
-            en=invokeAttMap.keys();
-            while( en.hasMoreElements() ) {
-                String name = en.nextElement();
-                Method m = invokeAttMap.get(name);
-                if( m!=null && name != null ) {
+            for (Entry<String,Method> entry : invokeAttMap.entrySet()) {
+                String name = entry.getKey();
+                Method m = entry.getValue();
+                if(m != null) {
                     OperationInfo op=new OperationInfo();
                     op.setName(name);
                     op.setReturnType(m.getReturnType().getName());
@@ -350,7 +351,7 @@ public class MbeansDescriptorsIntrospectionSource extends ModelerSource
                     }
                     mbean.addOperation(op);
                 } else {
-                    log.error("Null arg " + name + " " + m );
+                    log.error("Null arg method for [" + name + "]");
                 }
             }
 

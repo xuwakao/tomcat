@@ -27,11 +27,9 @@ import java.net.UnknownHostException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -48,7 +46,6 @@ import org.apache.catalina.DistributedManager;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.manager.util.BaseSessionComparator;
-import org.apache.catalina.manager.util.ReverseComparator;
 import org.apache.catalina.manager.util.SessionUtils;
 import org.apache.catalina.util.ContextName;
 import org.apache.catalina.util.RequestUtil;
@@ -75,24 +72,19 @@ import org.apache.tomcat.util.res.StringManager;
 * @author Bip Thelin
 * @author Malcolm Edgar
 * @author Glenn L. Nielsen
-* @version $Id$
 * @see ManagerServlet
 */
-
 public final class HTMLManagerServlet extends ManagerServlet {
 
     private static final long serialVersionUID = 1L;
 
-    protected static final URLEncoder URL_ENCODER;
-    protected static final String APPLICATION_MESSAGE = "message";
-    protected static final String APPLICATION_ERROR = "error";
+    static final URLEncoder URL_ENCODER;
+    static final String APPLICATION_MESSAGE = "message";
+    static final String APPLICATION_ERROR = "error";
 
-    protected static final String sessionsListJspPath  =
-            "/WEB-INF/jsp/sessionsList.jsp";
-    protected static final String sessionDetailJspPath =
-            "/WEB-INF/jsp/sessionDetail.jsp";
-    protected static final String connectorCiphersJspPath =
-            "/WEB-INF/jsp/connectorCiphers.jsp";
+    static final String sessionsListJspPath = "/WEB-INF/jsp/sessionsList.jsp";
+    static final String sessionDetailJspPath = "/WEB-INF/jsp/sessionDetail.jsp";
+    static final String connectorCiphersJspPath = "/WEB-INF/jsp/connectorCiphers.jsp";
 
     static {
         URL_ENCODER = new URLEncoder();
@@ -236,33 +228,18 @@ public final class HTMLManagerServlet extends ManagerServlet {
         list(request, response, message, smClient);
     }
 
-    protected String upload(HttpServletRequest request, StringManager smClient)
-            throws IOException, ServletException {
+    protected String upload(HttpServletRequest request, StringManager smClient) {
         String message = "";
 
-        Part warPart = null;
-        String filename = null;
-
-        Collection<Part> parts = request.getParts();
-        Iterator<Part> iter = parts.iterator();
-
         try {
-            while (iter.hasNext()) {
-                Part part = iter.next();
-                if (part.getName().equals("deployWar") && warPart == null) {
-                    warPart = part;
-                } else {
-                    part.delete();
-                }
-            }
-
             while (true) {
+                Part warPart = request.getPart("deployWar");
                 if (warPart == null) {
                     message = smClient.getString(
                             "htmlManagerServlet.deployUploadNoFile");
                     break;
                 }
-                filename = warPart.getSubmittedFileName();
+                String filename = warPart.getSubmittedFileName();
                 if (!filename.toLowerCase(Locale.ENGLISH).endsWith(".war")) {
                     message = smClient.getString(
                             "htmlManagerServlet.deployUploadNotWar", filename);
@@ -288,7 +265,7 @@ public final class HTMLManagerServlet extends ManagerServlet {
                     break;
                 }
 
-                ContextName cn = new ContextName(filename);
+                ContextName cn = new ContextName(filename, true);
                 String name = cn.getName();
 
                 if ((host.findChild(name) != null) && !isDeployed(name)) {
@@ -298,7 +275,9 @@ public final class HTMLManagerServlet extends ManagerServlet {
                     break;
                 }
 
-                if (!isServiced(name)) {
+                if (isServiced(name)) {
+                    message = smClient.getString("managerServlet.inService", name);
+                } else {
                     addServiced(name);
                     try {
                         warPart.write(file.getAbsolutePath());
@@ -314,11 +293,6 @@ public final class HTMLManagerServlet extends ManagerServlet {
             message = smClient.getString
                 ("htmlManagerServlet.deployUploadFail", e.getMessage());
             log(message, e);
-        } finally {
-            if (warPart != null) {
-                warPart.delete();
-            }
-            warPart = null;
         }
         return message;
     }
@@ -330,6 +304,7 @@ public final class HTMLManagerServlet extends ManagerServlet {
      * @param config URL of the context configuration file to be deployed
      * @param cn Name of the application to be deployed
      * @param war URL of the web application archive to be deployed
+     * @param smClient internationalized strings
      * @return message String
      */
     protected String deployInternal(String config, ContextName cn, String war,
@@ -350,6 +325,8 @@ public final class HTMLManagerServlet extends ManagerServlet {
      * @param request The request
      * @param response The response
      * @param message a message to display
+     * @param smClient internationalized strings
+     * @throws IOException an IO error occurred
      */
     protected void list(HttpServletRequest request,
                      HttpServletResponse response,
@@ -453,10 +430,10 @@ public final class HTMLManagerServlet extends ManagerServlet {
 
                 StringBuilder tmp = new StringBuilder();
                 tmp.append("path=");
-                tmp.append(URL_ENCODER.encode(displayPath));
+                tmp.append(URL_ENCODER.encode(displayPath, "UTF-8"));
                 if (ctxt.getWebappVersion().length() > 0) {
                     tmp.append("&version=");
-                    tmp.append(URL_ENCODER.encode(ctxt.getWebappVersion()));
+                    tmp.append(URL_ENCODER.encode(ctxt.getWebappVersion(), "UTF-8"));
                 }
                 String pathVersion = tmp.toString();
 
@@ -468,7 +445,7 @@ public final class HTMLManagerServlet extends ManagerServlet {
                 }
 
                 args = new Object[7];
-                args[0] = "<a href=\"" + URL_ENCODER.encode(contextPath + "/")
+                args[0] = "<a href=\"" + URL_ENCODER.encode(contextPath + "/", "UTF-8")
                         + "\">" + RequestUtil.filter(displayPath) + "</a>";
                 if ("".equals(ctxt.getWebappVersion())) {
                     args[1] = noVersion;
@@ -487,7 +464,7 @@ public final class HTMLManagerServlet extends ManagerServlet {
                 if (manager instanceof DistributedManager && showProxySessions) {
                     args[5] = Integer.valueOf(
                             ((DistributedManager)manager).getActiveSessionsFull());
-                } else if (ctxt.getManager() != null){
+                } else if (manager != null){
                     args[5] = Integer.valueOf(manager.getActiveSessions());
                 } else {
                     args[5] = Integer.valueOf(0);
@@ -514,14 +491,11 @@ public final class HTMLManagerServlet extends ManagerServlet {
                 args[8] = RequestUtil.filter(response.encodeURL(request
                         .getContextPath() + "/html/expire?" + pathVersion));
                 args[9] = appsExpire;
-                args[10] = smClient.getString(
-                        "htmlManagerServlet.expire.explain");
+                args[10] = smClient.getString("htmlManagerServlet.expire.explain");
                 if (manager == null) {
-                    args[11] = smClient.getString(
-                            "htmlManagerServlet.noManager");
+                    args[11] = smClient.getString("htmlManagerServlet.noManager");
                 } else {
-                    args[11] = Integer.valueOf(
-                            ctxt.getManager().getMaxInactiveInterval()/60);
+                    args[11] = Integer.valueOf(ctxt.getSessionTimeout());
                 }
                 args[12] = smClient.getString("htmlManagerServlet.expire.unit");
                 args[13] = highlightColor;
@@ -588,8 +562,8 @@ public final class HTMLManagerServlet extends ManagerServlet {
         args[4] = smClient.getString("htmlManagerServlet.serverOSName");
         args[5] = smClient.getString("htmlManagerServlet.serverOSVersion");
         args[6] = smClient.getString("htmlManagerServlet.serverOSArch");
-        args[7] = sm.getString("htmlManagerServlet.serverHostname");
-        args[8] = sm.getString("htmlManagerServlet.serverIPAddress");
+        args[7] = smClient.getString("htmlManagerServlet.serverHostname");
+        args[8] = smClient.getString("htmlManagerServlet.serverIPAddress");
         writer.print(MessageFormat.format
                      (Constants.SERVER_HEADER_SECTION, args));
 
@@ -762,7 +736,7 @@ public final class HTMLManagerServlet extends ManagerServlet {
      */
     @Override
     public String getServletInfo() {
-        return "HTMLManagerServlet, Copyright (c) 1999-2013, The Apache Software Foundation";
+        return "HTMLManagerServlet, Copyright (c) 1999-2016, The Apache Software Foundation";
     }
 
     /**
@@ -785,8 +759,9 @@ public final class HTMLManagerServlet extends ManagerServlet {
      * Extract the expiration request parameter
      *
      * @param cn Name of the application from which to expire sessions
-     * @param req
-     * @param smClient  StringManager for the client's locale
+     * @param req The Servlet request
+     * @param smClient StringManager for the client's locale
+     * @return message string
      */
     protected String expireSessions(ContextName cn, HttpServletRequest req,
             StringManager smClient) {
@@ -803,12 +778,14 @@ public final class HTMLManagerServlet extends ManagerServlet {
     }
 
     /**
+     * Handle session operations.
      *
-     * @param req
-     * @param resp
-     * @param smClient  StringManager for the client's locale
-     * @throws ServletException
-     * @throws IOException
+     * @param cn Name of the application for the sessions operation
+     * @param req The Servlet request
+     * @param resp The Servlet response
+     * @param smClient StringManager for the client's locale
+     * @throws ServletException Propagated Servlet error
+     * @throws IOException An IO error occurred
      */
     protected void doSessions(ContextName cn, HttpServletRequest req,
             HttpServletResponse resp, StringManager smClient)
@@ -883,7 +860,7 @@ public final class HTMLManagerServlet extends ManagerServlet {
             StringManager smClient) {
 
         List<Session> sessions = getSessionsForName(cn, smClient);
-        if (sessions == null || sessions.isEmpty()) return null;
+        if (sessions.isEmpty()) return null;
         for(Session session : sessions) {
             if (session.getId().equals(id)) {
                 return session;
@@ -893,13 +870,13 @@ public final class HTMLManagerServlet extends ManagerServlet {
     }
 
     /**
-     *
+     * List session.
      * @param cn Name of the application for which the sessions will be listed
-     * @param req
-     * @param resp
-     * @param smClient  StringManager for the client's locale
-     * @throws ServletException
-     * @throws IOException
+     * @param req The Servlet request
+     * @param resp The Servlet response
+     * @param smClient StringManager for the client's locale
+     * @throws ServletException Propagated Servlet error
+     * @throws IOException An IO error occurred
      */
     protected void displaySessionsListPage(ContextName cn,
             HttpServletRequest req, HttpServletResponse resp,
@@ -913,7 +890,7 @@ public final class HTMLManagerServlet extends ManagerServlet {
             if (comparator != null) {
                 orderBy = req.getParameter("order");
                 if ("DESC".equalsIgnoreCase(orderBy)) {
-                    comparator = new ReverseComparator(comparator);
+                    comparator = Collections.reverseOrder(comparator);
                     orderBy = "ASC";
                 } else {
                     orderBy = "DESC";
@@ -942,12 +919,15 @@ public final class HTMLManagerServlet extends ManagerServlet {
     }
 
     /**
+     * Display session details.
      *
-     * @param req
-     * @param resp
-     * @param smClient  StringManager for the client's locale
-     * @throws ServletException
-     * @throws IOException
+     * @param req The Servlet request
+     * @param resp The Servlet response
+     * @param cn Name of the application for which the sessions will be listed
+     * @param sessionId the session id
+     * @param smClient StringManager for the client's locale
+     * @throws ServletException Propagated Servlet error
+     * @throws IOException An IO error occurred
      */
     protected void displaySessionDetailPage(HttpServletRequest req,
             HttpServletResponse resp, ContextName cn, String sessionId,
@@ -964,16 +944,16 @@ public final class HTMLManagerServlet extends ManagerServlet {
     }
 
     /**
-     * Invalidate HttpSessions
+     * Invalidate specified sessions.
+     *
      * @param cn Name of the application for which sessions are to be
      *           invalidated
-     * @param sessionIds
+     * @param sessionIds the session ids of the sessions
      * @param smClient  StringManager for the client's locale
      * @return number of invalidated sessions
-     * @throws IOException
      */
     protected int invalidateSessions(ContextName cn, String[] sessionIds,
-            StringManager smClient) throws IOException {
+            StringManager smClient) {
         if (null == sessionIds) {
             return 0;
         }
@@ -1008,14 +988,13 @@ public final class HTMLManagerServlet extends ManagerServlet {
      * Removes an attribute from an HttpSession
      * @param cn Name of the application hosting the session from which the
      *           attribute is to be removed
-     * @param sessionId
-     * @param attributeName
+     * @param sessionId the session id
+     * @param attributeName the attribute name
      * @param smClient  StringManager for the client's locale
      * @return true if there was an attribute removed, false otherwise
-     * @throws IOException
      */
     protected boolean removeSessionAttribute(ContextName cn, String sessionId,
-            String attributeName, StringManager smClient) throws IOException {
+            String attributeName, StringManager smClient) {
         HttpSession session =
             getSessionForNameAndId(cn, sessionId, smClient).getSession();
         if (null == session) {
@@ -1109,7 +1088,6 @@ public final class HTMLManagerServlet extends ManagerServlet {
                 }
             };
         }
-        //TODO: complete this to TTL, etc.
         return comparator;
     }
 

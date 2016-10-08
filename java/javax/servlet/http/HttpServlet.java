@@ -25,6 +25,7 @@ import java.text.MessageFormat;
 import java.util.Enumeration;
 import java.util.ResourceBundle;
 
+import javax.servlet.DispatcherType;
 import javax.servlet.GenericServlet;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
@@ -69,9 +70,6 @@ import javax.servlet.ServletResponse;
  * <a href="http://java.sun.com/Series/Tutorial/java/threads/multithreaded.html">
  * Java Tutorial on Multithreaded Programming</a> for more
  * information on handling multiple threads in a Java program.
- *
- * @author  Various
- * @version $Version$
  */
 public abstract class HttpServlet extends GenericServlet {
 
@@ -239,10 +237,13 @@ public abstract class HttpServlet extends GenericServlet {
     protected void doHead(HttpServletRequest req, HttpServletResponse resp)
         throws ServletException, IOException {
 
-        NoBodyResponse response = new NoBodyResponse(resp);
-
-        doGet(req, response);
-        response.setContentLength();
+        if (DispatcherType.INCLUDE.equals(req.getDispatcherType())) {
+            doGet(req, resp);
+        } else {
+            NoBodyResponse response = new NoBodyResponse(resp);
+            doGet(req, response);
+            response.setContentLength();
+        }
     }
 
 

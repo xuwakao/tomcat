@@ -16,21 +16,23 @@
  */
 package org.apache.tomcat.util.net;
 
-import java.io.File;
 import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.StringTokenizer;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import javax.net.ssl.KeyManagerFactory;
-
 import org.apache.juli.logging.Log;
+import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.IntrospectionUtils;
+import org.apache.tomcat.util.collections.SynchronizedStack;
 import org.apache.tomcat.util.net.AbstractEndpoint.Acceptor.AcceptorState;
 import org.apache.tomcat.util.res.StringManager;
 import org.apache.tomcat.util.threads.LimitLatch;
@@ -38,18 +40,21 @@ import org.apache.tomcat.util.threads.ResizableExecutor;
 import org.apache.tomcat.util.threads.TaskQueue;
 import org.apache.tomcat.util.threads.TaskThreadFactory;
 import org.apache.tomcat.util.threads.ThreadPoolExecutor;
+
 /**
+ * @param <S> The type for the sockets managed by this endpoint.
  *
- * @author fhanik
  * @author Mladen Turk
  * @author Remy Maucherat
  */
 public abstract class AbstractEndpoint<S> {
 
     // -------------------------------------------------------------- Constants
-    protected static final StringManager sm = StringManager.getManager("org.apache.tomcat.util.net.res");
 
-    public static interface Handler {
+    protected static final StringManager sm = StringManager.getManager(AbstractEndpoint.class);
+
+    public static interface Handler<S> {
+
         /**
          * Different types of socket states to react upon.
          */
@@ -61,9 +66,48 @@ public abstract class AbstractEndpoint<S> {
 
 
         /**
+         * Process the provided socket with the given current status.
+         *
+         * @param socket The socket to process
+         * @param status The current socket status
+         *
+         * @return The state of the socket after processing
+         */
+        public SocketState process(SocketWrapperBase<S> socket,
+                SocketEvent status);
+
+
+        /**
          * Obtain the GlobalRequestProcessor associated with the handler.
+         *
+         * @return the GlobalRequestProcessor
          */
         public Object getGlobal();
+
+
+        /**
+         * Obtain the currently open sockets.
+         *
+         * @return The sockets for which the handler is tracking a currently
+         *         open connection
+         */
+        public Set<S> getOpenSockets();
+
+        /**
+         * Release any resources associated with the given SocketWrapper.
+         *
+         * @param socketWrapper The socketWrapper to release resources for
+         */
+        public void release(SocketWrapperBase<S> socketWrapper);
+
+
+        /**
+         * Inform the handler that the endpoint has stopped accepting any new
+         * connections. Typically, the endpoint will be stopped shortly
+         * afterwards but it is possible that the endpoint will be resumed so
+         * the handler should not assume that a stop will follow.
+         */
+        public void pause();
 
 
         /**
@@ -96,27 +140,11 @@ public abstract class AbstractEndpoint<S> {
     }
 
 
-    protected static class PrivilegedSetTccl implements PrivilegedAction<Void> {
-
-        private ClassLoader cl;
-
-        PrivilegedSetTccl(ClassLoader cl) {
-            this.cl = cl;
-        }
-
-        @Override
-        public Void run() {
-            Thread.currentThread().setContextClassLoader(cl);
-            return null;
-        }
-    }
-
-
     private static final int INITIAL_ERROR_DELAY = 50;
     private static final int MAX_ERROR_DELAY = 1600;
 
-    // ----------------------------------------------------------------- Fields
 
+    // ----------------------------------------------------------------- Fields
 
     /**
      * Running state of the endpoint.
@@ -133,6 +161,7 @@ public abstract class AbstractEndpoint<S> {
      * Are we using an internal executor
      */
     protected volatile boolean internalExecutor = false;
+
 
     /**
      * counter for nr of connections handled by an endpoint
@@ -152,13 +181,127 @@ public abstract class AbstractEndpoint<S> {
      */
     protected Acceptor[] acceptors;
 
+    /**
+     * Cache for SocketProcessor objects
+     */
+    protected SynchronizedStack<SocketProcessorBase<S>> processorCache;
 
     // ----------------------------------------------------------------- Properties
+
+    private String defaultSSLHostConfigName = SSLHostConfig.DEFAULT_SSL_HOST_NAME;
+    public String getDefaultSSLHostConfigName() {
+        return defaultSSLHostConfigName;
+    }
+    public void setDefaultSSLHostConfigName(String defaultSSLHostConfigName) {
+        this.defaultSSLHostConfigName = defaultSSLHostConfigName;
+    }
+
+
+    protected ConcurrentMap<String,SSLHostConfig> sslHostConfigs = new ConcurrentHashMap<>();
+    public void addSslHostConfig(SSLHostConfig sslHostConfig) throws IllegalArgumentException {
+        String key = sslHostConfig.getHostName();
+        if (key == null || key.length() == 0) {
+            throw new IllegalArgumentException(sm.getString("endpoint.noSslHostName"));
+        }
+        sslHostConfig.setConfigType(getSslConfigType());
+        if (bindState != BindState.UNBOUND) {
+            try {
+                createSSLContext(sslHostConfig);
+            } catch (Exception e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+        SSLHostConfig duplicate = sslHostConfigs.putIfAbsent(key, sslHostConfig);
+        if (duplicate != null) {
+            releaseSSLContext(sslHostConfig);
+            throw new IllegalArgumentException(sm.getString("endpoint.duplicateSslHostName", key));
+        }
+    }
+    public SSLHostConfig[] findSslHostConfigs() {
+        return sslHostConfigs.values().toArray(new SSLHostConfig[0]);
+    }
+
+    protected abstract SSLHostConfig.Type getSslConfigType();
+
+    /**
+     * Create the SSLContextfor the the given SSLHostConfig.
+     *
+     * @param sslHostConfig The SSLHostConfig for which the SSLContext should be
+     *                      created
+     * @throws Exception If the SSLContext cannot be created for the given
+     *                   SSLHostConfig
+     */
+    protected abstract void createSSLContext(SSLHostConfig sslHostConfig) throws Exception;
+
+    /**
+     * Release the SSLContext, if any, associated with the SSLHostConfig.
+     *
+     * @param sslHostConfig The SSLHostConfig for which the SSLContext should be
+     *                      released
+     */
+    protected abstract void releaseSSLContext(SSLHostConfig sslHostConfig);
+
+    protected SSLHostConfig getSSLHostConfig(String sniHostName) {
+        SSLHostConfig result = null;
+
+        if (sniHostName != null) {
+            // First choice - direct match
+            result = sslHostConfigs.get(sniHostName);
+            if (result != null) {
+                return result;
+            }
+            // Second choice, wildcard match
+            int indexOfDot = sniHostName.indexOf('.');
+            if (indexOfDot > -1) {
+                result = sslHostConfigs.get("*" + sniHostName.substring(indexOfDot));
+            }
+        }
+
+        // Fall-back. Use the default
+        if (result == null) {
+            result = sslHostConfigs.get(getDefaultSSLHostConfigName());
+        }
+        if (result == null) {
+            // Should never happen.
+            throw new IllegalStateException();
+        }
+        return result;
+    }
+
+
+    /**
+     * Has the user requested that send file be used where possible?
+     */
+    private boolean useSendfile = true;
+    public boolean getUseSendfile() {
+        return useSendfile;
+    }
+    public void setUseSendfile(boolean useSendfile) {
+        this.useSendfile = useSendfile;
+    }
+
+
+    /**
+     * Time to wait for the internal executor (if used) to terminate when the
+     * endpoint is stopped in milliseconds. Defaults to 5000 (5 seconds).
+     */
+    private long executorTerminationTimeoutMillis = 5000;
+
+    public long getExecutorTerminationTimeoutMillis() {
+        return executorTerminationTimeoutMillis;
+    }
+
+    public void setExecutorTerminationTimeoutMillis(
+            long executorTerminationTimeoutMillis) {
+        this.executorTerminationTimeoutMillis = executorTerminationTimeoutMillis;
+    }
+
 
     /**
      * Acceptor thread count.
      */
-    protected int acceptorThreadCount = 0;
+    protected int acceptorThreadCount = 1;
+
     public void setAcceptorThreadCount(int acceptorThreadCount) {
         this.acceptorThreadCount = acceptorThreadCount;
     }
@@ -221,7 +364,7 @@ public abstract class AbstractEndpoint<S> {
     private Executor executor = null;
     public void setExecutor(Executor executor) {
         this.executor = executor;
-        this.internalExecutor = (executor==null);
+        this.internalExecutor = (executor == null);
     }
     public Executor getExecutor() { return executor; }
 
@@ -260,7 +403,7 @@ public abstract class AbstractEndpoint<S> {
     private boolean bindOnInit = true;
     public boolean getBindOnInit() { return bindOnInit; }
     public void setBindOnInit(boolean b) { this.bindOnInit = b; }
-    private BindState bindState = BindState.UNBOUND;
+    private volatile BindState bindState = BindState.UNBOUND;
 
     /**
      * Keepalive timeout, if not set the soTimeout is used.
@@ -280,6 +423,9 @@ public abstract class AbstractEndpoint<S> {
 
     /**
      * Socket TCP no delay.
+     *
+     * @return The current TCP no delay setting for sockets created by this
+     *         endpoint
      */
     public boolean getTcpNoDelay() { return socketProperties.getTcpNoDelay();}
     public void setTcpNoDelay(boolean tcpNoDelay) { socketProperties.setTcpNoDelay(tcpNoDelay); }
@@ -287,6 +433,9 @@ public abstract class AbstractEndpoint<S> {
 
     /**
      * Socket linger.
+     *
+     * @return The current socket linger time for sockets created by this
+     *         endpoint
      */
     public int getSoLinger() { return socketProperties.getSoLingerTime(); }
     public void setSoLinger(int soLinger) {
@@ -297,6 +446,8 @@ public abstract class AbstractEndpoint<S> {
 
     /**
      * Socket timeout.
+     *
+     * @return The current socket timeout for sockets created by this endpoint
      */
     public int getSoTimeout() { return socketProperties.getSoTimeout(); }
     public void setSoTimeout(int soTimeout) { socketProperties.setSoTimeout(soTimeout); }
@@ -315,11 +466,12 @@ public abstract class AbstractEndpoint<S> {
     }
     public void setMinSpareThreads(int minSpareThreads) {
         this.minSpareThreads = minSpareThreads;
-        if (running && executor!=null) {
+        Executor executor = this.executor;
+        if (running && executor != null) {
             if (executor instanceof java.util.concurrent.ThreadPoolExecutor) {
-                ((java.util.concurrent.ThreadPoolExecutor)executor).setCorePoolSize(minSpareThreads);
+                ((java.util.concurrent.ThreadPoolExecutor) executor).setCorePoolSize(minSpareThreads);
             } else if (executor instanceof ResizableExecutor) {
-                ((ResizableExecutor)executor).resizePool(minSpareThreads, maxThreads);
+                ((ResizableExecutor) executor).resizePool(minSpareThreads, maxThreads);
             }
         }
     }
@@ -330,11 +482,12 @@ public abstract class AbstractEndpoint<S> {
     private int maxThreads = 200;
     public void setMaxThreads(int maxThreads) {
         this.maxThreads = maxThreads;
-        if (running && executor!=null) {
+        Executor executor = this.executor;
+        if (running && executor != null) {
             if (executor instanceof java.util.concurrent.ThreadPoolExecutor) {
-                ((java.util.concurrent.ThreadPoolExecutor)executor).setMaximumPoolSize(maxThreads);
+                ((java.util.concurrent.ThreadPoolExecutor) executor).setMaximumPoolSize(maxThreads);
             } else if (executor instanceof ResizableExecutor) {
-                ((ResizableExecutor)executor).resizePool(minSpareThreads, maxThreads);
+                ((ResizableExecutor) executor).resizePool(minSpareThreads, maxThreads);
             }
         }
     }
@@ -342,6 +495,7 @@ public abstract class AbstractEndpoint<S> {
         return getMaxThreadsExecutor(running);
     }
     protected int getMaxThreadsExecutor(boolean useExecutor) {
+        Executor executor = this.executor;
         if (useExecutor && executor != null) {
             if (executor instanceof java.util.concurrent.ThreadPoolExecutor) {
                 return ((java.util.concurrent.ThreadPoolExecutor)executor).getMaximumPoolSize();
@@ -405,12 +559,27 @@ public abstract class AbstractEndpoint<S> {
     protected abstract boolean getDeferAccept();
 
 
+    protected final List<String> negotiableProtocols = new ArrayList<>();
+    public void addNegotiatedProtocol(String negotiableProtocol) {
+        negotiableProtocols.add(negotiableProtocol);
+    }
+    public boolean hasNegotiableProtocols() {
+        return (negotiableProtocols.size() > 0);
+    }
+
+
+    /**
+     * Handling of accepted sockets.
+     */
+    private Handler<S> handler = null;
+    public void setHandler(Handler<S> handler ) { this.handler = handler; }
+    public Handler<S> getHandler() { return handler; }
+
+
     /**
      * Attributes provide a way for configuration to be passed to sub-components
      * without the {@link org.apache.coyote.ProtocolHandler} being aware of the
-     * properties available on those sub-components. One example of such a
-     * sub-component is the
-     * {@link org.apache.tomcat.util.net.ServerSocketFactory}.
+     * properties available on those sub-components.
      */
     protected HashMap<String, Object> attributes = new HashMap<>();
 
@@ -420,6 +589,9 @@ public abstract class AbstractEndpoint<S> {
      * {@link org.apache.coyote.ProtocolHandler} needs to be made available to
      * sub-components. The specific setter will call this method to populate the
      * attributes.
+     *
+     * @param name  Name of property to set
+     * @param value The value to set the property to
      */
     public void setAttribute(String name, Object value) {
         if (getLog().isTraceEnabled()) {
@@ -429,6 +601,11 @@ public abstract class AbstractEndpoint<S> {
     }
     /**
      * Used by sub-components to retrieve configuration information.
+     *
+     * @param key The name of the property for which the value should be
+     *            retrieved
+     *
+     * @return The value of the specified property
      */
     public Object getAttribute(String key) {
         Object value = attributes.get(key);
@@ -455,7 +632,15 @@ public abstract class AbstractEndpoint<S> {
         }
     }
     public String getProperty(String name) {
-        return (String) getAttribute(name);
+        String value = (String) getAttribute(name);
+        final String socketName = "socket.";
+        if (value == null && name.startsWith(socketName)) {
+            Object result = IntrospectionUtils.getProperty(socketProperties, name.substring(socketName.length()));
+            if (result != null) {
+                value = result.toString();
+            }
+        }
+        return value;
     }
 
     /**
@@ -464,11 +649,12 @@ public abstract class AbstractEndpoint<S> {
      * @return the amount of threads that are managed by the pool
      */
     public int getCurrentThreadCount() {
-        if (executor!=null) {
+        Executor executor = this.executor;
+        if (executor != null) {
             if (executor instanceof ThreadPoolExecutor) {
-                return ((ThreadPoolExecutor)executor).getPoolSize();
+                return ((ThreadPoolExecutor) executor).getPoolSize();
             } else if (executor instanceof ResizableExecutor) {
-                return ((ResizableExecutor)executor).getPoolSize();
+                return ((ResizableExecutor) executor).getPoolSize();
             } else {
                 return -1;
             }
@@ -483,11 +669,12 @@ public abstract class AbstractEndpoint<S> {
      * @return the amount of threads that are in use
      */
     public int getCurrentThreadsBusy() {
-        if (executor!=null) {
+        Executor executor = this.executor;
+        if (executor != null) {
             if (executor instanceof ThreadPoolExecutor) {
-                return ((ThreadPoolExecutor)executor).getActiveCount();
+                return ((ThreadPoolExecutor) executor).getActiveCount();
             } else if (executor instanceof ResizableExecutor) {
-                return ((ResizableExecutor)executor).getActiveCount();
+                return ((ResizableExecutor) executor).getActiveCount();
             } else {
                 return -1;
             }
@@ -514,15 +701,27 @@ public abstract class AbstractEndpoint<S> {
     }
 
     public void shutdownExecutor() {
-        if ( executor!=null && internalExecutor ) {
-            if ( executor instanceof ThreadPoolExecutor ) {
+        Executor executor = this.executor;
+        if (executor != null && internalExecutor) {
+            this.executor = null;
+            if (executor instanceof ThreadPoolExecutor) {
                 //this is our internal one, so we need to shut it down
                 ThreadPoolExecutor tpe = (ThreadPoolExecutor) executor;
                 tpe.shutdownNow();
+                long timeout = getExecutorTerminationTimeoutMillis();
+                if (timeout > 0) {
+                    try {
+                        tpe.awaitTermination(timeout, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException e) {
+                        // Ignore
+                    }
+                    if (tpe.isTerminating()) {
+                        getLog().warn(sm.getString("endpoint.warn.executorShutdown", getName()));
+                    }
+                }
                 TaskQueue queue = (TaskQueue) tpe.getQueue();
                 queue.setParent(null);
             }
-            executor = null;
         }
     }
 
@@ -542,7 +741,6 @@ public abstract class AbstractEndpoint<S> {
             return;
         }
 
-        java.net.Socket s = null;
         InetSocketAddress saddr = null;
         try {
             // Need to create a connection to unlock the accept();
@@ -551,57 +749,49 @@ public abstract class AbstractEndpoint<S> {
             } else {
                 saddr = new InetSocketAddress(address, getLocalPort());
             }
-            s = new java.net.Socket();
-            int stmo = 2 * 1000;
-            int utmo = 2 * 1000;
-            if (getSocketProperties().getSoTimeout() > stmo)
-                stmo = getSocketProperties().getSoTimeout();
-            if (getSocketProperties().getUnlockTimeout() > utmo)
-                utmo = getSocketProperties().getUnlockTimeout();
-            s.setSoTimeout(stmo);
-            // TODO Consider hard-coding to s.setSoLinger(true,0)
-            s.setSoLinger(getSocketProperties().getSoLingerOn(),getSocketProperties().getSoLingerTime());
-            if (getLog().isDebugEnabled()) {
-                getLog().debug("About to unlock socket for:"+saddr);
-            }
-            s.connect(saddr,utmo);
-            if (getDeferAccept()) {
-                /*
-                 * In the case of a deferred accept / accept filters we need to
-                 * send data to wake up the accept. Send OPTIONS * to bypass
-                 * even BSD accept filters. The Acceptor will discard it.
-                 */
-                OutputStreamWriter sw;
+            try (java.net.Socket s = new java.net.Socket()) {
+                int stmo = 2 * 1000;
+                int utmo = 2 * 1000;
+                if (getSocketProperties().getSoTimeout() > stmo)
+                    stmo = getSocketProperties().getSoTimeout();
+                if (getSocketProperties().getUnlockTimeout() > utmo)
+                    utmo = getSocketProperties().getUnlockTimeout();
+                s.setSoTimeout(stmo);
+                s.setSoLinger(getSocketProperties().getSoLingerOn(),getSocketProperties().getSoLingerTime());
+                if (getLog().isDebugEnabled()) {
+                    getLog().debug("About to unlock socket for:"+saddr);
+                }
+                s.connect(saddr,utmo);
+                if (getDeferAccept()) {
+                    /*
+                     * In the case of a deferred accept / accept filters we need to
+                     * send data to wake up the accept. Send OPTIONS * to bypass
+                     * even BSD accept filters. The Acceptor will discard it.
+                     */
+                    OutputStreamWriter sw;
 
-                sw = new OutputStreamWriter(s.getOutputStream(), "ISO-8859-1");
-                sw.write("OPTIONS * HTTP/1.0\r\n" +
-                         "User-Agent: Tomcat wakeup connection\r\n\r\n");
-                sw.flush();
-            }
-            if (getLog().isDebugEnabled()) {
-                getLog().debug("Socket unlock completed for:"+saddr);
-            }
+                    sw = new OutputStreamWriter(s.getOutputStream(), "ISO-8859-1");
+                    sw.write("OPTIONS * HTTP/1.0\r\n" +
+                             "User-Agent: Tomcat wakeup connection\r\n\r\n");
+                    sw.flush();
+                }
+                if (getLog().isDebugEnabled()) {
+                    getLog().debug("Socket unlock completed for:"+saddr);
+                }
 
-            // Wait for upto 1000ms acceptor threads to unlock
-            long waitLeft = 1000;
-            for (Acceptor acceptor : acceptors) {
-                while (waitLeft > 0 &&
-                        acceptor.getState() == AcceptorState.RUNNING) {
-                    Thread.sleep(50);
-                    waitLeft -= 50;
+                // Wait for upto 1000ms acceptor threads to unlock
+                long waitLeft = 1000;
+                for (Acceptor acceptor : acceptors) {
+                    while (waitLeft > 0 &&
+                            acceptor.getState() == AcceptorState.RUNNING) {
+                        Thread.sleep(50);
+                        waitLeft -= 50;
+                    }
                 }
             }
         } catch(Exception e) {
             if (getLog().isDebugEnabled()) {
                 getLog().debug(sm.getString("endpoint.debug.unlock", "" + getPort()), e);
-            }
-        } finally {
-            if (s != null) {
-                try {
-                    s.close();
-                } catch (Exception e) {
-                    // Ignore
-                }
             }
         }
     }
@@ -609,8 +799,52 @@ public abstract class AbstractEndpoint<S> {
 
     // ---------------------------------------------- Request processing methods
 
-    public abstract void processSocketAsync(SocketWrapper<S> socketWrapper,
-            SocketStatus socketStatus);
+    /**
+     * Process the given SocketWrapper with the given status. Used to trigger
+     * processing as if the Poller (for those endpoints that have one)
+     * selected the socket.
+     *
+     * @param socketWrapper The socket wrapper to process
+     * @param event         The socket event to be processed
+     * @param dispatch      Should the processing be performed on a new
+     *                          container thread
+     *
+     * @return if processing was triggered successfully
+     */
+    public boolean processSocket(SocketWrapperBase<S> socketWrapper,
+            SocketEvent event, boolean dispatch) {
+        try {
+            if (socketWrapper == null) {
+                return false;
+            }
+            SocketProcessorBase<S> sc = processorCache.pop();
+            if (sc == null) {
+                sc = createSocketProcessor(socketWrapper, event);
+            } else {
+                sc.reset(socketWrapper, event);
+            }
+            Executor executor = getExecutor();
+            if (dispatch && executor != null) {
+                executor.execute(sc);
+            } else {
+                sc.run();
+            }
+        } catch (RejectedExecutionException ree) {
+            getLog().warn(sm.getString("endpoint.executor.fail", socketWrapper) , ree);
+            return false;
+        } catch (Throwable t) {
+            ExceptionUtils.handleThrowable(t);
+            // This means we got an OOM or similar creating a thread, or that
+            // the pool and its queue are full
+            getLog().error(sm.getString("endpoint.process.fail"), t);
+            return false;
+        }
+        return true;
+    }
+
+
+    protected abstract SocketProcessorBase<S> createSocketProcessor(
+            SocketWrapperBase<S> socketWrapper, SocketEvent event);
 
 
     // ------------------------------------------------------- Lifecycle methods
@@ -633,6 +867,7 @@ public abstract class AbstractEndpoint<S> {
             bindState = BindState.BOUND_ON_INIT;
         }
     }
+
 
     public final void start() throws Exception {
         if (bindState == BindState.UNBOUND) {
@@ -660,6 +895,7 @@ public abstract class AbstractEndpoint<S> {
 
     /**
      * Hook to allow Endpoints to provide a specific Acceptor implementation.
+     * @return the acceptor
      */
     protected abstract Acceptor createAcceptor();
 
@@ -671,6 +907,7 @@ public abstract class AbstractEndpoint<S> {
         if (running && !paused) {
             paused = true;
             unlockAccept();
+            getHandler().pause();
         }
     }
 
@@ -699,28 +936,7 @@ public abstract class AbstractEndpoint<S> {
         }
     }
 
-
-    public String adjustRelativePath(String path, String relativeTo) {
-        String newPath = path;
-        File f = new File(newPath);
-        if ( !f.isAbsolute()) {
-            newPath = relativeTo + File.separator + newPath;
-            f = new File(newPath);
-        }
-        if (!f.exists()) {
-            getLog().warn("configured file:["+newPath+"] does not exist.");
-        }
-        return newPath;
-    }
-
     protected abstract Log getLog();
-    // Flags to indicate optional feature support
-    // Some of these are always hard-coded, some are hard-coded to false (i.e.
-    // the endpoint does not support them) and some are configurable.
-    public abstract boolean getUseSendfile();
-    public abstract boolean getUseComet();
-    public abstract boolean getUseCometTimeout();
-    public abstract boolean getUsePolling();
 
     protected LimitLatch initializeConnectionLatch() {
         if (maxConnections==-1) return null;
@@ -748,7 +964,7 @@ public abstract class AbstractEndpoint<S> {
         if (latch!=null) {
             long result = latch.countDown();
             if (result<0) {
-                getLog().warn("Incorrect connection count, multiple socket.close called on the same socket." );
+                getLog().warn(sm.getString("endpoint.warn.incorrectConnectionCount"));
             }
             return result;
         } else return -1;
@@ -783,164 +999,6 @@ public abstract class AbstractEndpoint<S> {
         } else {
             return MAX_ERROR_DELAY;
         }
-
     }
-
-    // --------------------  SSL related properties --------------------
-
-    private String algorithm = KeyManagerFactory.getDefaultAlgorithm();
-    public String getAlgorithm() { return algorithm;}
-    public void setAlgorithm(String s ) { this.algorithm = s;}
-
-    private String clientAuth = "false";
-    public String getClientAuth() { return clientAuth;}
-    public void setClientAuth(String s ) { this.clientAuth = s;}
-
-    private String keystoreFile = System.getProperty("user.home")+"/.keystore";
-    public String getKeystoreFile() { return keystoreFile;}
-    public void setKeystoreFile(String s ) {
-        String file = adjustRelativePath(s,
-                System.getProperty(Constants.CATALINA_BASE_PROP));
-        this.keystoreFile = file;
-    }
-
-    private String keystorePass = null;
-    public String getKeystorePass() { return keystorePass;}
-    public void setKeystorePass(String s ) { this.keystorePass = s;}
-
-    private String keystoreType = "JKS";
-    public String getKeystoreType() { return keystoreType;}
-    public void setKeystoreType(String s ) { this.keystoreType = s;}
-
-    private String keystoreProvider = null;
-    public String getKeystoreProvider() { return keystoreProvider;}
-    public void setKeystoreProvider(String s ) { this.keystoreProvider = s;}
-
-    private String sslProtocol = "TLS";
-    public String getSslProtocol() { return sslProtocol;}
-    public void setSslProtocol(String s) { sslProtocol = s;}
-
-    // Note: Some implementations use the comma separated string, some use
-    // the array
-    private String ciphers = null;
-    private String[] ciphersarr = new String[0];
-    public String[] getCiphersArray() { return this.ciphersarr;}
-    public String getCiphers() { return ciphers;}
-    public void setCiphers(String s) {
-        ciphers = s;
-        if ( s == null ) ciphersarr = new String[0];
-        else {
-            StringTokenizer t = new StringTokenizer(s,",");
-            ciphersarr = new String[t.countTokens()];
-            for (int i=0; i<ciphersarr.length; i++ ) ciphersarr[i] = t.nextToken();
-        }
-    }
-    /**
-     * @return  The ciphers in use by this Endpoint
-     */
-    public abstract String[] getCiphersUsed();
-
-    private String keyAlias = null;
-    public String getKeyAlias() { return keyAlias;}
-    public void setKeyAlias(String s ) { keyAlias = s;}
-
-    private String keyPass = null;
-    public String getKeyPass() { return keyPass;}
-    public void setKeyPass(String s ) { this.keyPass = s;}
-
-    private String truststoreFile = System.getProperty("javax.net.ssl.trustStore");
-    public String getTruststoreFile() {return truststoreFile;}
-    public void setTruststoreFile(String s) {
-        if (s == null) {
-            this.truststoreFile = null;
-        } else {
-            String file = adjustRelativePath(s,
-                    System.getProperty(Constants.CATALINA_BASE_PROP));
-            this.truststoreFile = file;
-        }
-    }
-
-    private String truststorePass =
-        System.getProperty("javax.net.ssl.trustStorePassword");
-    public String getTruststorePass() {return truststorePass;}
-    public void setTruststorePass(String truststorePass) {
-        this.truststorePass = truststorePass;
-    }
-
-    private String truststoreType =
-        System.getProperty("javax.net.ssl.trustStoreType");
-    public String getTruststoreType() {return truststoreType;}
-    public void setTruststoreType(String truststoreType) {
-        this.truststoreType = truststoreType;
-    }
-
-    private String truststoreProvider = null;
-    public String getTruststoreProvider() {return truststoreProvider;}
-    public void setTruststoreProvider(String truststoreProvider) {
-        this.truststoreProvider = truststoreProvider;
-    }
-
-    private String truststoreAlgorithm = null;
-    public String getTruststoreAlgorithm() {return truststoreAlgorithm;}
-    public void setTruststoreAlgorithm(String truststoreAlgorithm) {
-        this.truststoreAlgorithm = truststoreAlgorithm;
-    }
-
-    private String trustManagerClassName = null;
-    public String getTrustManagerClassName() {return trustManagerClassName;}
-    public void setTrustManagerClassName(String trustManagerClassName) {
-        this.trustManagerClassName = trustManagerClassName;
-    }
-
-    private String crlFile = null;
-    public String getCrlFile() {return crlFile;}
-    public void setCrlFile(String crlFile) {
-        this.crlFile = crlFile;
-    }
-
-    private String trustMaxCertLength = null;
-    public String getTrustMaxCertLength() {return trustMaxCertLength;}
-    public void setTrustMaxCertLength(String trustMaxCertLength) {
-        this.trustMaxCertLength = trustMaxCertLength;
-    }
-
-    private String sessionCacheSize = null;
-    public String getSessionCacheSize() { return sessionCacheSize;}
-    public void setSessionCacheSize(String s) { sessionCacheSize = s;}
-
-    private String sessionTimeout = "86400";
-    public String getSessionTimeout() { return sessionTimeout;}
-    public void setSessionTimeout(String s) { sessionTimeout = s;}
-
-    private String allowUnsafeLegacyRenegotiation = null;
-    public String getAllowUnsafeLegacyRenegotiation() {
-        return allowUnsafeLegacyRenegotiation;
-    }
-    public void setAllowUnsafeLegacyRenegotiation(String s) {
-        allowUnsafeLegacyRenegotiation = s;
-    }
-
-
-    private String[] sslEnabledProtocolsarr =  new String[0];
-    public String[] getSslEnabledProtocolsArray() {
-        return this.sslEnabledProtocolsarr;
-    }
-    public void setSslEnabledProtocols(String s) {
-        if (s == null) {
-            this.sslEnabledProtocolsarr = new String[0];
-        } else {
-            ArrayList<String> sslEnabledProtocols = new ArrayList<>();
-            StringTokenizer t = new StringTokenizer(s,",");
-            while (t.hasMoreTokens()) {
-                String p = t.nextToken().trim();
-                if (p.length() > 0) {
-                    sslEnabledProtocols.add(p);
-                }
-            }
-            sslEnabledProtocolsarr = sslEnabledProtocols.toArray(
-                    new String[sslEnabledProtocols.size()]);
-        }
-    }
-
 }
 

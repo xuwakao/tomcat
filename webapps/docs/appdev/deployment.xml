@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -136,7 +136,7 @@ drivers that are required for both your application or internal Tomcat use
 <p>Out of the box, a standard Tomcat installation includes a variety
 of pre-installed shared library files, including:</p>
 <ul>
-<li>The <em>Servlet 3.1</em> and <em>JSP 2.3</em> APIs that are fundamental
+<li>The <em>Servlet 4.0</em> and <em>JSP 2.3</em> APIs that are fundamental
     to writing servlets and JavaServer Pages.<br/><br/></li>
 </ul>
 
@@ -178,7 +178,7 @@ configuration options, such as an access log, data sources, session manager
 configuration and more. This XML file must contain one Context element, which
 will be considered as if it was the child of the Host element corresponding
 to the Host to which the web application is being deployed. The
-<a href="../config/index.html">Tomcat configuration documentation</a> contains
+<a href="../config/context.html">Tomcat configuration documentation</a> contains
 information on the Context element.</p>
 
 </section>
@@ -222,7 +222,7 @@ approaches:</p>
     web applications</em>.  Tomcat includes a web application, deployed
     by default on context path <code>/manager</code>, that allows you to
     deploy and undeploy applications on a running Tomcat server without
-    restarting it.  See the administrator documentation (TODO: hyperlink)
+    restarting it. See <a href="../manager-howto.html">Manager App HOW-TO</a>
     for more information on using the Manager web application.<br/><br/></li>
 <li><em>Use "Manager" Ant Tasks In Your Build Script</em>.  Tomcat
     includes a set of custom task definitions for the <code>Ant</code>

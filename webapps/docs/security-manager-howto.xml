@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -78,7 +78,8 @@
 
     <p>This is just a short summary of the standard system SecurityManager
     Permission classes applicable to Tomcat.  See
-    <a href="http://java.sun.com/security/">http://java.sun.com/security/</a>
+    <a href="http://docs.oracle.com/javase/7/docs/technotes/guides/security/">
+    http://docs.oracle.com/javase/7/docs/technotes/guides/security/</a>
     for more information.</p>
 
     <ul>
@@ -103,40 +104,6 @@
     </ul>
 
   </subsection>
-
-
-  <subsection name="Tomcat Custom Permissions">
-
-    <p>Tomcat utilizes a custom permission class called
-    <strong>org.apache.naming.JndiPermission</strong>.  This permission
-    controls read access to JNDI named file based resources.  The permission
-    name is the JNDI name and there are no actions.  A trailing "*" can be
-    used to do wild card matching for a JNDI named file resource when
-    granting permission.  For example, you might include the following
-    in your policy file:</p>
-<source>permission  org.apache.naming.JndiPermission  "jndi://localhost/examples/*";</source>
-
-    <p>A Permission entry like this is generated dynamically for each web
-    application that is deployed, to allow it to read its own static resources
-    but disallow it from using file access to read any other files (unless
-    permissions for those files are explicitly granted).</p>
-
-    <p>Also, Tomcat always dynamically creates the following file permissions:</p>
-<source>
-permission java.io.FilePermission "** your application context**", "read";
-
-permission java.io.FilePermission
-  "** application working directory**", "read,write";
-permission java.io.FilePermission
-  "** application working directory**/-", "read,write,delete";
-</source>
-    <p>Where **your application context** equals the folder (or WAR file) under which
-    your application has been deployed and **application working directory** is the
-    temporary directory provided to your application as required by the
-    Servlet Specification.</p>
-
-  </subsection>
-
 
 </section>
 
@@ -187,12 +154,38 @@ grant [signedBy <signer>,] [codeBase <code source>] {
 <source>$CATALINA_HOME/bin/catalina.sh start -security    (Unix)
 %CATALINA_HOME%\bin\catalina start -security      (Windows)</source>
 
+  <subsection name="Permissions for packed WAR files">
+
+    <p>When using packed WAR files, it is necessary to use Tomcat's custom war
+    URL protocol to asisgn permissions to web application code.</p>
+
+    <p>To assign permissions to the entire web application the entry in the
+    policy file would look like this:</p>
+
+<source><![CDATA[// Example policy file entry
+grant codeBase "war:file:${catalina.base}/webapps/examples.war*/-" {
+    ...
+};
+]]></source>
+
+    <p>To assign permissions to a single JAR within the web application the
+    entry in the policy file would look like this:</p>
+
+<source><![CDATA[// Example policy file entry
+grant codeBase "war:file:${catalina.base}/webapps/examples.war*/WEB-INF/lib/foo.jar" {
+    ...
+};
+]]></source>
+
+  </subsection>
+
 </section>
+
 <section name="Configuring Package Protection in Tomcat">
   <p>Starting with Tomcat 5, it is now possible to configure which Tomcat
-  internal package are protected againts package definition and access. See
-  <a href="http://java.sun.com/security/seccodeguide.html">
-    http://java.sun.com/security/seccodeguide.html</a>
+  internal package are protected against package definition and access. See
+  <a href="http://www.oracle.com/technetwork/java/seccodeguide-139067.html">
+    http://www.oracle.com/technetwork/java/seccodeguide-139067.html</a>
     for more information.</p>
 
 

@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -93,6 +93,12 @@
         the generated session identifier, therefore allowing the front end
         proxy to always forward a particular session to the same Tomcat
         instance.</p>
+        <p>
+            Note that the <code>jvmRoute</code> can also be set using the
+            <code>jvmRoute</code> system property. The <code>jvmRoute</code>
+            set in an <code>&lt;Engine&gt;</code> attribute will override
+            any <code>jvmRoute</code> system property.
+        </p>
       </attribute>
 
       <attribute name="name" required="true">
@@ -189,12 +195,12 @@
 <source><![CDATA[<Engine name="Standalone" ...>
   ...
   <Valve className="org.apache.catalina.valves.AccessLogValve"
-         prefix="catalina_access_log." suffix=".txt"
+         prefix="catalina_access_log" suffix=".txt"
          pattern="common"/>
   ...
 </Engine>]]></source>
 
-    <p>See <a href="valve.html#Access_Log_Valve">Access Log Valve</a>
+    <p>See <a href="valve.html#Access_Logging">Access Logging Valves</a>
     for more information on the configuration attributes that are
     supported.</p>
 

@@ -198,7 +198,7 @@ public class TestValueExpressionImpl {
     }
 
 
-    /**
+    /*
      * Test returning an empty list as a bean property.
      */
     @Test
@@ -221,7 +221,7 @@ public class TestValueExpressionImpl {
     }
 
 
-    /**
+    /*
      * Test using list directly as variable.
      */
     @Test
@@ -240,5 +240,30 @@ public class TestValueExpressionImpl {
 
         Integer result = (Integer) ve.getValue(context);
         assertEquals(Integer.valueOf(0), result);
+    }
+
+
+    @Test
+    public void testBug56522SetNullValue() {
+        ExpressionFactory factory = ExpressionFactory.newInstance();
+        ELContext context = new ELContextImpl(factory);
+
+        TesterBeanB beanB = new TesterBeanB();
+        beanB.setName("Tomcat");
+        ValueExpression var =
+            factory.createValueExpression(beanB, TesterBeanB.class);
+        context.getVariableMapper().setVariable("beanB", var);
+
+        ValueExpression ve = factory.createValueExpression(
+                context, "${beanB.name}", String.class);
+
+        // First check the basics work
+        String result = (String) ve.getValue(context);
+        assertEquals("Tomcat", result);
+
+        // Now set the value to null
+        ve.setValue(context, null);
+
+        assertEquals("", beanB.getName());
     }
 }

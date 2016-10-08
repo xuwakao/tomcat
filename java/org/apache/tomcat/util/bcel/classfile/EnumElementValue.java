@@ -17,14 +17,13 @@
  */
 package org.apache.tomcat.util.bcel.classfile;
 
-import org.apache.tomcat.util.bcel.Constants;
+import org.apache.tomcat.util.bcel.Const;
 
 public class EnumElementValue extends ElementValue
 {
-    private int valueIdx;
+    private final int valueIdx;
 
-    public EnumElementValue(int type, int valueIdx, ConstantPool cpool)
-    {
+    EnumElementValue(final int type, final int valueIdx, final ConstantPool cpool) {
         super(type, cpool);
         if (type != ENUM_CONSTANT)
             throw new RuntimeException(
@@ -35,8 +34,8 @@ public class EnumElementValue extends ElementValue
     @Override
     public String stringifyValue()
     {
-        ConstantUtf8 cu8 = (ConstantUtf8) cpool.getConstant(valueIdx,
-                Constants.CONSTANT_Utf8);
+        final ConstantUtf8 cu8 = (ConstantUtf8) super.getConstantPool().getConstant(valueIdx,
+                Const.CONSTANT_Utf8);
         return cu8.getBytes();
     }
 }

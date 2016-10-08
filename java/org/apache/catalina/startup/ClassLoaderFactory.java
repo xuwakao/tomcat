@@ -18,6 +18,7 @@ package org.apache.catalina.startup;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.security.AccessController;
@@ -46,7 +47,6 @@ import org.apache.juli.logging.LogFactory;
  * </ul>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
 public final class ClassLoaderFactory {
 
@@ -68,6 +68,7 @@ public final class ClassLoaderFactory {
      * or <code>null</code> for no directories of JAR files to be considered
      * @param parent Parent class loader for the new class loader, or
      *  <code>null</code> for the system class loader.
+     * @return the new class loader
      *
      * @exception Exception if an error occurs constructing the class loader
      */
@@ -86,7 +87,7 @@ public final class ClassLoaderFactory {
         if (unpacked != null) {
             for (int i = 0; i < unpacked.length; i++)  {
                 File file = unpacked[i];
-                if (!file.exists() || !file.canRead())
+                if (!file.canRead())
                     continue;
                 file = new File(file.getCanonicalPath() + File.separator);
                 URL url = file.toURI().toURL();
@@ -100,10 +101,12 @@ public final class ClassLoaderFactory {
         if (packed != null) {
             for (int i = 0; i < packed.length; i++) {
                 File directory = packed[i];
-                if (!directory.isDirectory() || !directory.exists() ||
-                    !directory.canRead())
+                if (!directory.isDirectory() || !directory.canRead())
                     continue;
                 String filenames[] = directory.list();
+                if (filenames == null) {
+                    continue;
+                }
                 for (int j = 0; j < filenames.length; j++) {
                     String filename = filenames[j].toLowerCase(Locale.ENGLISH);
                     if (!filename.endsWith(".jar"))
@@ -141,6 +144,7 @@ public final class ClassLoaderFactory {
      *                     the class loader.
      * @param parent Parent class loader for the new class loader, or
      *  <code>null</code> for the system class loader.
+     * @return the new class loader
      *
      * @exception Exception if an error occurs constructing the class loader
      */
@@ -157,7 +161,7 @@ public final class ClassLoaderFactory {
         if (repositories != null) {
             for (Repository repository : repositories)  {
                 if (repository.getType() == RepositoryType.URL) {
-                    URL url = new URL(repository.getLocation());
+                    URL url = buildClassLoaderUrl(repository.getLocation());
                     if (log.isDebugEnabled())
                         log.debug("  Including URL " + url);
                     set.add(url);
@@ -167,7 +171,7 @@ public final class ClassLoaderFactory {
                     if (!validateFile(directory, RepositoryType.DIR)) {
                         continue;
                     }
-                    URL url = directory.toURI().toURL();
+                    URL url = buildClassLoaderUrl(directory);
                     if (log.isDebugEnabled())
                         log.debug("  Including directory " + url);
                     set.add(url);
@@ -177,7 +181,7 @@ public final class ClassLoaderFactory {
                     if (!validateFile(file, RepositoryType.JAR)) {
                         continue;
                     }
-                    URL url = file.toURI().toURL();
+                    URL url = buildClassLoaderUrl(file);
                     if (log.isDebugEnabled())
                         log.debug("  Including jar file " + url);
                     set.add(url);
@@ -191,6 +195,9 @@ public final class ClassLoaderFactory {
                         log.debug("  Including directory glob "
                             + directory.getAbsolutePath());
                     String filenames[] = directory.list();
+                    if (filenames == null) {
+                        continue;
+                    }
                     for (int j = 0; j < filenames.length; j++) {
                         String filename = filenames[j].toLowerCase(Locale.ENGLISH);
                         if (!filename.endsWith(".jar"))
@@ -203,7 +210,7 @@ public final class ClassLoaderFactory {
                         if (log.isDebugEnabled())
                             log.debug("    Including glob jar file "
                                 + file.getAbsolutePath());
-                        URL url = file.toURI().toURL();
+                        URL url = buildClassLoaderUrl(file);
                         set.add(url);
                     }
                 }
@@ -232,7 +239,7 @@ public final class ClassLoaderFactory {
     private static boolean validateFile(File file,
             RepositoryType type) throws IOException {
         if (RepositoryType.DIR == type || RepositoryType.GLOB == type) {
-            if (!file.exists() || !file.isDirectory() || !file.canRead()) {
+            if (!file.isDirectory() || !file.canRead()) {
                 String msg = "Problem with directory [" + file +
                         "], exists: [" + file.exists() +
                         "], isDirectory: [" + file.isDirectory() +
@@ -257,7 +264,7 @@ public final class ClassLoaderFactory {
                 return false;
             }
         } else if (RepositoryType.JAR == type) {
-            if (!file.exists() || !file.canRead()) {
+            if (!file.canRead()) {
                 log.warn("Problem with JAR file [" + file +
                         "], exists: [" + file.exists() +
                         "], canRead: [" + file.canRead() + "]");
@@ -266,6 +273,30 @@ public final class ClassLoaderFactory {
         }
         return true;
     }
+
+
+    /*
+     * These two methods would ideally be in the utility class
+     * org.apache.tomcat.util.buf.UriUtil but that class is not visible until
+     * after the class loaders have been constructed.
+     */
+    private static URL buildClassLoaderUrl(String urlString) throws MalformedURLException {
+        // URLs passed to class loaders may point to directories that contain
+        // JARs. If these URLs are used to construct URLs for resources in a JAR
+        // the URL will be used as is. It is therefore necessary to ensure that
+        // the sequence "!/" is not present in a class loader URL.
+        String result = urlString.replaceAll("!/", "%21/");
+        return new URL(result);
+    }
+
+
+    private static URL buildClassLoaderUrl(File file) throws MalformedURLException {
+        // Could be a directory or a file
+        String fileUrlString = file.toURI().toString();
+        fileUrlString = fileUrlString.replaceAll("!/", "%21/");
+        return new URL(fileUrlString);
+    }
+
 
     public static enum RepositoryType {
         DIR,

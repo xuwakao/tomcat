@@ -35,6 +35,12 @@ import org.apache.tomcat.util.buf.ByteChunk;
 
 public class TestOutputBuffer extends TomcatBaseTest{
 
+    /*
+     * Expect that the buffered results are slightly slower since Tomcat now has
+     * an internal buffer so an extra one just adds overhead.
+     *
+     * @see "https://bz.apache.org/bugzilla/show_bug.cgi?id=52328"
+     */
     @Test
     public void testWriteSpeed() throws Exception {
         Tomcat tomcat = getTomcatInstance();
@@ -44,7 +50,7 @@ public class TestOutputBuffer extends TomcatBaseTest{
         for (int i = 1; i <= WritingServlet.EXPECTED_CONTENT_LENGTH; i*=10) {
             WritingServlet servlet = new WritingServlet(i);
             Tomcat.addServlet(root, "servlet" + i, servlet);
-            root.addServletMapping("/servlet" + i, "servlet" + i);
+            root.addServletMappingDecoded("/servlet" + i, "servlet" + i);
         }
 
         tomcat.start();
@@ -78,7 +84,7 @@ public class TestOutputBuffer extends TomcatBaseTest{
 
         Bug52577Servlet bug52577 = new Bug52577Servlet();
         Tomcat.addServlet(root, "bug52577", bug52577);
-        root.addServletMapping("/", "bug52577");
+        root.addServletMappingDecoded("/", "bug52577");
 
         tomcat.start();
 

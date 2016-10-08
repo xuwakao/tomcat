@@ -18,11 +18,11 @@
 package org.apache.coyote.http11.filters;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.apache.coyote.OutputBuffer;
 import org.apache.coyote.Response;
 import org.apache.coyote.http11.OutputFilter;
-import org.apache.tomcat.util.buf.ByteChunk;
 
 /**
  * Identity output filter.
@@ -55,43 +55,37 @@ public class IdentityOutputFilter implements OutputFilter {
 
     // --------------------------------------------------- OutputBuffer Methods
 
-
-    /**
-     * Write some bytes.
-     *
-     * @return number of bytes written by the filter
-     */
     @Override
-    public int doWrite(ByteChunk chunk, Response res)
-        throws IOException {
+    public int doWrite(ByteBuffer chunk) throws IOException {
 
         int result = -1;
 
         if (contentLength >= 0) {
             if (remaining > 0) {
-                result = chunk.getLength();
+                result = chunk.remaining();
                 if (result > remaining) {
                     // The chunk is longer than the number of bytes remaining
                     // in the body; changing the chunk length to the number
                     // of bytes remaining
-                    chunk.setBytes(chunk.getBytes(), chunk.getStart(),
-                                   (int) remaining);
+                    chunk.limit(chunk.position() + (int) remaining);
                     result = (int) remaining;
                     remaining = 0;
                 } else {
                     remaining = remaining - result;
                 }
-                buffer.doWrite(chunk, res);
+                buffer.doWrite(chunk);
             } else {
                 // No more bytes left to be written : return -1 and clear the
                 // buffer
-                chunk.recycle();
+                chunk.position(0);
+                chunk.limit(0);
                 result = -1;
             }
         } else {
             // If no content length was set, just write the bytes
-            buffer.doWrite(chunk, res);
-            result = chunk.getLength();
+            result = chunk.remaining();
+            buffer.doWrite(chunk);
+            result -= chunk.remaining();
         }
 
         return result;

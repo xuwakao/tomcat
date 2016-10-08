@@ -32,10 +32,8 @@ import org.apache.catalina.util.RequestUtil;
  * {@link MemoryUserDatabase} implementation of {@link UserDatabase}.</p>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  * @since 4.1
  */
-
 public class MemoryUser extends AbstractUser {
 
 
@@ -254,8 +252,9 @@ public class MemoryUser extends AbstractUser {
      *
      * <p><strong>IMPLEMENTATION NOTE</strong> - For backwards compatibility,
      * the reader that processes this entry will accept either
-     * <code>username</code> or </code>name</code> for the username
+     * <code>username</code> or <code>name</code> for the username
      * property.</p>
+     * @return the XML representation
      */
     public String toXml() {
 

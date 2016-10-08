@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 package org.apache.catalina.session;
 
 /**
@@ -23,16 +21,16 @@ package org.apache.catalina.session;
  * a Store to swap active Sessions to disk. It can be configured to
  * achieve several different goals:
  *
+ * <ul>
  * <li>Persist sessions across restarts of the Container</li>
  * <li>Fault tolerance, keep sessions backed up on disk to allow
  *     recovery in the event of unplanned restarts.</li>
  * <li>Limit the number of active sessions kept in memory by
  *     swapping less active sessions out to disk.</li>
+ * </ul>
  *
- * @version $Revision$
  * @author Kief Morris (kief@kief.com)
  */
-
 public final class PersistentManager extends PersistentManagerBase {
 
     // ----------------------------------------------------- Instance Variables
@@ -40,17 +38,14 @@ public final class PersistentManager extends PersistentManagerBase {
     /**
      * The descriptive name of this Manager implementation (for logging).
      */
-    protected static final String name = "PersistentManager";
+    private static final String name = "PersistentManager";
 
 
     // ------------------------------------------------------------- Properties
 
-    /**
-     * Return the descriptive short name of this Manager implementation.
-     */
     @Override
     public String getName() {
-        return (name);
+        return name;
     }
  }
 

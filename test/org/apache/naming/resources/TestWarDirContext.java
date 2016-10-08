@@ -26,6 +26,7 @@ import org.apache.catalina.core.JreMemoryLeakPreventionListener;
 import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
+import org.apache.catalina.webresources.StandardRoot;
 import org.apache.tomcat.util.buf.ByteChunk;
 
 public class TestWarDirContext extends TomcatBaseTest {
@@ -44,7 +45,7 @@ public class TestWarDirContext extends TomcatBaseTest {
                 new JreMemoryLeakPreventionListener());
     }
 
-    /**
+    /*
      * Check https://jira.springsource.org/browse/SPR-7350 isn't really an issue
      */
     @Test
@@ -64,7 +65,7 @@ public class TestWarDirContext extends TomcatBaseTest {
     }
 
 
-    /**
+    /*
      * Additional test following on from SPR-7350 above to check files that
      * contain JNDI reserved characters can be served when caching is enabled.
      */
@@ -76,7 +77,9 @@ public class TestWarDirContext extends TomcatBaseTest {
         // app dir is relative to server home
         StandardContext ctxt = (StandardContext) tomcat.addWebapp(
                 null, "/test", appDir.getAbsolutePath());
-        ctxt.setCachingAllowed(true);
+        StandardRoot root = new StandardRoot();
+        root.setCachingAllowed(true);
+        ctxt.setResources(root);
 
         tomcat.start();
 
@@ -94,7 +97,7 @@ public class TestWarDirContext extends TomcatBaseTest {
     }
 
 
-    /**
+    /*
      * Additional test following on from SPR-7350 above to check files that
      * contain JNDI reserved characters can be served when caching is disabled.
      */
@@ -106,7 +109,10 @@ public class TestWarDirContext extends TomcatBaseTest {
         // app dir is relative to server home
         StandardContext ctxt = (StandardContext) tomcat.addWebapp(
                 null, "/test", appDir.getAbsolutePath());
-        ctxt.setCachingAllowed(false);
+        StandardRoot root = new StandardRoot();
+        root.setCachingAllowed(true);
+        ctxt.setResources(root);
+        skipTldsForResourceJars(ctxt);
 
         tomcat.start();
 

@@ -30,7 +30,6 @@ import org.apache.tools.ant.BuildException;
  * (<code>/jmxproxy/?qry</code>) supported by the Tomcat manager application.
  *
  * @author Vivek Chopra
- * @version $Revision$
  */
 public class JMXQueryTask extends AbstractCatalinaTask {
 
@@ -54,14 +53,13 @@ public class JMXQueryTask extends AbstractCatalinaTask {
 
     /**
      * Set method for the JMX query string.
-    * <P>Examples of query format:
+    * <p>Examples of query format:</p>
      * <UL>
      * <LI>*:*</LI>
      * <LI>*:type=RequestProcessor,*</LI>
      * <LI>*:j2eeType=Servlet,*</LI>
      * <LI>Catalina:type=Environment,resourcetype=Global,name=simpleValue</LI>
      * </UL>
-     * </P>
      * @param query JMX Query string
      */
     public void setQuery (String query) {

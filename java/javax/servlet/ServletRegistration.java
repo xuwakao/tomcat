@@ -20,15 +20,14 @@ import java.util.Collection;
 import java.util.Set;
 
 /**
- * @since Servlet 3.0
- * $Id$
  * TODO SERVLET3 - Add comments
+ * @since Servlet 3.0
  */
 public interface ServletRegistration extends Registration {
 
     /**
-     *
-     * @param urlPatterns
+     * TODO
+     * @param urlPatterns The URL patterns that this Servlet should be mapped to
      * @return TODO
      * @throws IllegalArgumentException if urlPattern is null or empty
      * @throws IllegalStateException if the associated ServletContext has
@@ -43,8 +42,8 @@ public interface ServletRegistration extends Registration {
     public static interface Dynamic
     extends ServletRegistration, Registration.Dynamic {
         public void setLoadOnStartup(int loadOnStartup);
+        public Set<String> setServletSecurity(ServletSecurityElement constraint);
         public void setMultipartConfig(MultipartConfigElement multipartConfig);
         public void setRunAsRole(String roleName);
-        public Set<String> setServletSecurity(ServletSecurityElement constraint);
     }
 }

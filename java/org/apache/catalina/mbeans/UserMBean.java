@@ -38,9 +38,7 @@ import org.apache.tomcat.util.modeler.Registry;
  * <code>org.apache.catalina.User</code> component.</p>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class UserMBean extends BaseModelMBean {
 
 
@@ -84,7 +82,7 @@ public class UserMBean extends BaseModelMBean {
 
 
     /**
-     * Return the MBean Names of all groups this user is a member of.
+     * @return the MBean Names of all groups this user is a member of.
      */
     public String[] getGroups() {
 
@@ -111,7 +109,7 @@ public class UserMBean extends BaseModelMBean {
 
 
     /**
-     * Return the MBean Names of all roles assigned to this user.
+     * @return the MBean Names of all roles assigned to this user.
      */
     public String[] getRoles() {
 

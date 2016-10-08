@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -36,7 +36,7 @@
 
 <section name="Introduction">
 
-<p>Tomcat 8.0 uses the Jasper 2 JSP Engine to implement
+<p>Tomcat <version-major-minor/> uses the Jasper 2 JSP Engine to implement
 the <a href="http://wiki.apache.org/tomcat/Specifications">JavaServer Pages 2.3</a>
 specification.</p>
 
@@ -106,10 +106,10 @@ set then <code>setenv.[sh|bat]</code> should be used to add
 to the <code>CLASSPATH</code> environment variable.</li>
 
 <li><strong>compilerSourceVM</strong> - What JDK version are the source files
-compatible with? (Default value: <code>1.6</code>)</li>
+compatible with? (Default value: <code>1.8</code>)</li>
 
 <li><strong>compilerTargetVM</strong> - What JDK version are the generated files
-compatible with? (Default value: <code>1.6</code>)</li>
+compatible with? (Default value: <code>1.8</code>)</li>
 
 <li><strong>development</strong> - Is Jasper used in development mode? If true,
 the frequency at which JSPs are checked for modification may be specified via
@@ -132,7 +132,7 @@ default <code>true</code>.
 
 <li><strong>engineOptionsClass</strong> - Allows specifying the Options class
 used to configure Jasper. If not present, the default EmbeddedServletOptions
-will be used.
+will be used. This option is ignored if running under a SecurityManager.
 </li>
 
 <li><strong>errorOnUseBeanInvalidClassAttribute</strong> - Should Jasper issue
@@ -185,7 +185,7 @@ may be expensive and could lead to excessive resource usage.</li>
 
 <li><strong>scratchdir</strong> - What scratch directory should we use when
 compiling JSP pages? Default is the work directory for the current web
-application.</li>
+application. This option is ignored if running under a SecurityManager.</li>
 
 <li><strong>suppressSmap</strong> - Should the generation of SMAP info for JSR45
 debugging be suppressed? <code>true</code> or <code>false</code>, default
@@ -197,8 +197,17 @@ actions or directives be trimmed ?, default <code>false</code>.</li>
 <li><strong>xpoweredBy</strong> - Determines whether X-Powered-By response
 header is added by generated servlet. <code>true</code> or <code>false</code>,
 default <code>false</code>.</li>
-</ul>
 
+<li><strong>strictQuoteEscaping</strong> - When scriptlet expressions are used
+for attribute values, should the rules in JSP.1.6 for the escaping of quote
+characters be strictly applied? <code>true</code> or <code>false</code>, default
+<code>true</code>.</li>
+
+<li><strong>quoteAttributeEL</strong> - When EL is used in an attribute value
+on a JSP page, should the rules for quoting of attributes described in JSP.1.6
+be applied to the expression? <code>true</code> or <code>false</code>, default
+<code>true</code>.</li>
+</ul>
 
 <p>The Java compiler from Eclipse JDT in included as the default compiler. It is
 an advanced Java compiler which will load all dependencies from the Tomcat class
@@ -215,7 +224,7 @@ of the new compiler by configuring the compiler attribute as explained above.
 <section name="Known issues">
 
 <p>As described in
-<a href="https://issues.apache.org/bugzilla/show_bug.cgi?id=39089">
+<a href="https://bz.apache.org/bugzilla/show_bug.cgi?id=39089">
 bug 39089</a>, a known JVM issue,
 <a href="http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6294277">
 bug 6294277</a>, may cause a
@@ -353,8 +362,8 @@ without debug info <code>debug=&quot;off&quot;</code>.
 <p>
 When you don't want to stop the jsp generation at first jsp syntax error, use
 <code>failOnError=&quot;false&quot;</code>and with
-<code>showSuccess=&quot;true&quot;</code> all successfull <i>jsp to java</i>
-generation are printed out. Sometimes it is very helpfull, when you cleanup the
+<code>showSuccess=&quot;true&quot;</code> all successful <i>jsp to java</i>
+generation are printed out. Sometimes it is very helpful, when you cleanup the
 generate java source files at <code>${webapp.path}/WEB-INF/src</code>
 and the compile jsp servlet classes at
 <code>${webapp.path}/WEB-INF/classes/org/apache/jsp</code>.

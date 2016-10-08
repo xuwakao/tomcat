@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -34,8 +34,8 @@
 <section name="Introduction">
 
 <p>This is the top-level entry point of the documentation bundle for the
-<strong>Apache Tomcat</strong> Servlet/JSP container.  Apache Tomcat version 8.0
-implements the Servlet 3.1 and JavaServer Pages 2.3
+<strong>Apache Tomcat</strong> Servlet/JSP container.  Apache Tomcat version
+<version-major-minor/> implements the Servlet 4.0 and JavaServer Pages 2.3
 <a href="http://wiki.apache.org/tomcat/Specifications">specifications</a> from the
 <a href="http://www.jcp.org">Java Community Process</a>, and includes many
 additional features that make it a useful platform for developing and deploying
@@ -50,8 +50,8 @@ manual is described in more detail below.</p>
 
 <section name="Apache Tomcat User Guide">
 
-<p>The following documents will assist you in downloading, installing
-Apache Tomcat 7, and using many of the Apache Tomcat features.</p>
+<p>The following documents will assist you in downloading and installing
+Apache Tomcat, and using many of the Apache Tomcat features.</p>
 
 <ol>
 <li><a href="introduction.html"><strong>Introduction</strong></a> - A
@@ -83,7 +83,7 @@ Apache Tomcat 7, and using many of the Apache Tomcat features.</p>
     that is provided to each web application.</li>
 <li><a href="jndi-datasource-examples-howto.html">
     <strong>JDBC DataSource</strong></a>
-    - Configuring a JNDI DataSoure with a DB connection pool.
+    - Configuring a JNDI DataSource with a DB connection pool.
     Examples for many popular databases.</li>
 <li><a href="class-loader-howto.html"><strong>Classloading</strong></a>
     - Information about class loading in Apache Tomcat, including where to place
@@ -91,10 +91,9 @@ Apache Tomcat 7, and using many of the Apache Tomcat features.</p>
 <li><a href="jasper-howto.html"><strong>JSPs</strong></a>
     - Information about Jasper configuration, as well as the JSP compiler
     usage.</li>
-<li><a href="ssl-howto.html"><strong>SSL</strong></a> -
-    Installing and
-    configuring SSL support so that your Apache Tomcat will serve requests using
-    the <code>https</code> protocol.</li>
+<li><a href="ssl-howto.html"><strong>SSL/TLS</strong></a> -
+    Installing and configuring SSL/TLS support so that your Apache Tomcat will
+    serve requests using the <code>https</code> protocol.</li>
 <li><a href="ssi-howto.html"><strong>SSI</strong></a> -
     Using Server Side Includes in Apache Tomcat.</li>
 <li><a href="cgi-howto.html"><strong>CGI</strong></a> -
@@ -102,7 +101,7 @@ Apache Tomcat 7, and using many of the Apache Tomcat features.</p>
 <li><a href="proxy-howto.html"><strong>Proxy Support</strong></a> -
     Configuring Apache Tomcat to run behind a proxy server (or a web server
     functioning as a proxy server).</li>
-<li><a href="mbeans-descriptor-howto.html"><strong>MBean Descriptor</strong></a> -
+<li><a href="mbeans-descriptors-howto.html"><strong>MBeans Descriptors</strong></a> -
     Configuring MBean descriptors files for custom components.</li>
 <li><a href="default-servlet.html"><strong>Default Servlet</strong></a> -
     Configuring the default servlet and customizing directory listings.</li>
@@ -137,6 +136,8 @@ Apache Tomcat 7, and using many of the Apache Tomcat features.</p>
     Configuring Tomcat to use an alternative JDBC pool.</li>
 <li><a href="web-socket-howto.html"><strong>WebSocket support</strong></a> -
     Developing WebSocket applications for Apache Tomcat.</li>
+<li><a href="rewrite.html"><strong>URL rewrite</strong></a> -
+    Using the regexp based rewrite valve for conditional URL and host rewrite.</li>
 
 </ol>
 
@@ -165,6 +166,7 @@ are responsible for installing, configuring, and operating an Apache Tomcat serv
     <strong>Specification</strong></a> and
     <a href="http://docs.oracle.com/javaee/7/api/javax/servlet/package-summary.html">
     <strong>Javadoc</strong></a>
+    <p>TODO Servlet 4.0</p>
     </li>
 <li>JSP 2.3
     <a href="http://jcp.org/aboutJava/communityprocess/mrel/jsr245/index2.html">
@@ -178,8 +180,8 @@ are responsible for installing, configuring, and operating an Apache Tomcat serv
     <a href="http://docs.oracle.com/javaee/7/api/javax/el/package-summary.html">
     <strong>Javadoc</strong></a>
     </li>
-<li>WebSocket 1.0
-    <a href="http://jcp.org/aboutJava/communityprocess/final/jsr356/index.html">
+<li>WebSocket 1.1
+    <a href="https://jcp.org/aboutJava/communityprocess/mrel/jsr356/index.html">
     <strong>Specification</strong></a> and
     <a href="http://docs.oracle.com/javaee/7/api/javax/websocket/package-summary.html">
     <strong>Javadoc</strong></a>

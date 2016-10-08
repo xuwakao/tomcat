@@ -24,17 +24,17 @@ import org.apache.catalina.ha.ClusterManager;
 import org.apache.catalina.ha.ClusterMessage;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.res.StringManager;
 
 /**
  * Receive replicated SessionMessage form other cluster node.
- * @author Filip Hanik
  * @author Peter Rossbach
- * @version $Id$
  */
 public class ClusterSessionListener extends ClusterListener {
 
     private static final Log log =
         LogFactory.getLog(ClusterSessionListener.class);
+    private static final StringManager sm = StringManager.getManager(ClusterSessionListener.class);
 
     //--Constructor---------------------------------------------
 
@@ -53,7 +53,7 @@ public class ClusterSessionListener extends ClusterListener {
      */
     @Override
     public void messageReceived(ClusterMessage myobj) {
-        if (myobj != null && myobj instanceof SessionMessage) {
+        if (myobj instanceof SessionMessage) {
             SessionMessage msg = (SessionMessage) myobj;
             String ctxname = msg.getContextName();
             //check if the message is a EVT_GET_ALL_SESSIONS,
@@ -68,8 +68,7 @@ public class ClusterSessionListener extends ClusterListener {
                         //this happens a lot before the system has started
                         // up
                         if (log.isDebugEnabled())
-                            log.debug("Context manager doesn't exist:"
-                                    + entry.getKey());
+                            log.debug(sm.getString("clusterSessionListener.noManager", entry.getKey()));
                     }
                 }
             } else {
@@ -78,7 +77,7 @@ public class ClusterSessionListener extends ClusterListener {
                     mgr.messageDataReceived(msg);
                 } else {
                     if (log.isWarnEnabled())
-                        log.warn("Context manager doesn't exist:" + ctxname);
+                        log.warn(sm.getString("clusterSessionListener.noManager", ctxname));
 
                     // A no context manager message is replied in order to avoid
                     // timeout of GET_ALL_SESSIONS sync phase.

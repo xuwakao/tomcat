@@ -29,8 +29,7 @@ import javax.servlet.jsp.tagext.TagLibraryInfo;
 import org.apache.jasper.compiler.JspConfig;
 import org.apache.jasper.compiler.Localizer;
 import org.apache.jasper.compiler.TagPluginManager;
-import org.apache.jasper.compiler.TldLocationsCache;
-import org.apache.jasper.xmlparser.ParserUtils;
+import org.apache.jasper.compiler.TldCache;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -133,12 +132,12 @@ public final class EmbeddedServletOptions implements Options {
     /**
      * Compiler target VM.
      */
-    private String compilerTargetVM = "1.6";
+    private String compilerTargetVM = "1.8";
 
     /**
      * The compiler source VM.
      */
-    private String compilerSourceVM = "1.6";
+    private String compilerSourceVM = "1.8";
 
     /**
      * The compiler class name.
@@ -146,9 +145,9 @@ public final class EmbeddedServletOptions implements Options {
     private String compilerClassName = null;
 
     /**
-     * Cache for the TLD locations
+     * Cache for the TLD URIs, resource paths and parsed files.
      */
-    private TldLocationsCache tldLocationsCache = null;
+    private TldCache tldCache = null;
 
     /**
      * Jsp config information
@@ -200,6 +199,18 @@ public final class EmbeddedServletOptions implements Options {
      */
     private int jspIdleTimeout = -1;
 
+    /**
+     * Should JSP.1.6 be applied strictly to attributes defined using scriptlet
+     * expressions?
+     */
+    private boolean strictQuoteEscaping = true;
+
+    /**
+     * When EL is used in JSP attribute values, should the rules for quoting of
+     * attributes described in JSP.1.6 be applied to the expression?
+     */
+    private boolean quoteAttributeEL = true;
+
     public String getProperty(String name ) {
         return settings.getProperty( name );
     }
@@ -208,6 +219,15 @@ public final class EmbeddedServletOptions implements Options {
         if (name != null && value != null){
             settings.setProperty( name, value );
         }
+    }
+
+    public void setQuoteAttributeEL(boolean b) {
+        this.quoteAttributeEL = b;
+    }
+
+    @Override
+    public boolean getQuoteAttributeEL() {
+        return quoteAttributeEL;
     }
 
     /**
@@ -378,12 +398,12 @@ public final class EmbeddedServletOptions implements Options {
     }
 
     @Override
-    public TldLocationsCache getTldLocationsCache() {
-        return tldLocationsCache;
+    public TldCache getTldCache() {
+        return tldCache;
     }
 
-    public void setTldLocationsCache( TldLocationsCache tldC ) {
-        tldLocationsCache = tldC;
+    public void setTldCache(TldCache tldCache) {
+        this.tldCache = tldCache;
     }
 
     @Override
@@ -443,12 +463,18 @@ public final class EmbeddedServletOptions implements Options {
         return jspIdleTimeout;
     }
 
+    @Override
+    public boolean getStrictQuoteEscaping() {
+        return strictQuoteEscaping;
+    }
+
     /**
      * Create an EmbeddedServletOptions object using data available from
      * ServletConfig and ServletContext.
+     * @param config The Servlet config
+     * @param context The Servlet context
      */
-    public EmbeddedServletOptions(ServletConfig config,
-            ServletContext context) {
+    public EmbeddedServletOptions(ServletConfig config, ServletContext context) {
 
         Enumeration<String> enumeration=config.getInitParameterNames();
         while( enumeration.hasMoreElements() ) {
@@ -456,10 +482,6 @@ public final class EmbeddedServletOptions implements Options {
             String v=config.getInitParameter( k );
             setProperty( k, v);
         }
-
-        // quick hack
-        String validating=config.getInitParameter( "validating");
-        if( "false".equals( validating )) ParserUtils.validating=false;
 
         String keepgen = config.getInitParameter("keepgenerated");
         if (keepgen != null) {
@@ -489,8 +511,7 @@ public final class EmbeddedServletOptions implements Options {
         }
 
         this.isPoolingEnabled = true;
-        String poolingEnabledParam
-        = config.getInitParameter("enablePooling");
+        String poolingEnabledParam = config.getInitParameter("enablePooling");
         if (poolingEnabledParam != null
                 && !poolingEnabledParam.equalsIgnoreCase("true")) {
             if (poolingEnabledParam.equalsIgnoreCase("false")) {
@@ -614,8 +635,7 @@ public final class EmbeddedServletOptions implements Options {
             }
         }
 
-        String errBeanClass =
-            config.getInitParameter("errorOnUseBeanInvalidClassAttribute");
+        String errBeanClass = config.getInitParameter("errorOnUseBeanInvalidClassAttribute");
         if (errBeanClass != null) {
             if (errBeanClass.equalsIgnoreCase("true")) {
                 errorOnUseBeanInvalidClassAttribute = true;
@@ -640,6 +660,10 @@ public final class EmbeddedServletOptions implements Options {
          * scratchdir
          */
         String dir = config.getInitParameter("scratchdir");
+        if (dir != null && Constants.IS_SECURITY_ENABLED) {
+            log.info(Localizer.getMessage("jsp.info.ignoreSetting", "scratchdir", dir));
+            dir = null;
+        }
         if (dir != null) {
             scratchDir = new File(dir);
         } else {
@@ -746,9 +770,35 @@ public final class EmbeddedServletOptions implements Options {
             }
         }
 
+        String strictQuoteEscaping = config.getInitParameter("strictQuoteEscaping");
+        if (strictQuoteEscaping != null) {
+            if (strictQuoteEscaping.equalsIgnoreCase("true")) {
+                this.strictQuoteEscaping = true;
+            } else if (strictQuoteEscaping.equalsIgnoreCase("false")) {
+                this.strictQuoteEscaping = false;
+            } else {
+                if (log.isWarnEnabled()) {
+                    log.warn(Localizer.getMessage("jsp.warning.strictQuoteEscaping"));
+                }
+            }
+        }
+
+        String quoteAttributeEL = config.getInitParameter("quoteAttributeEL");
+        if (quoteAttributeEL != null) {
+            if (quoteAttributeEL.equalsIgnoreCase("true")) {
+                this.quoteAttributeEL = true;
+            } else if (quoteAttributeEL.equalsIgnoreCase("false")) {
+                this.quoteAttributeEL = false;
+            } else {
+                if (log.isWarnEnabled()) {
+                    log.warn(Localizer.getMessage("jsp.warning.quoteAttributeEL"));
+                }
+            }
+        }
+
         // Setup the global Tag Libraries location cache for this
         // web-application.
-        tldLocationsCache = TldLocationsCache.getInstance(context);
+        tldCache = TldCache.getInstance(context);
 
         // Setup the jsp config info for this web app.
         jspConfig = new JspConfig(context);

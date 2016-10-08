@@ -16,7 +16,9 @@
  */
 package org.apache.tomcat.util.descriptor.web;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -30,13 +32,18 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import javax.servlet.DispatcherType;
 import javax.servlet.ServletContext;
 import javax.servlet.SessionTrackingMode;
 import javax.servlet.descriptor.JspConfigDescriptor;
 import javax.servlet.descriptor.JspPropertyGroupDescriptor;
 import javax.servlet.descriptor.TaglibDescriptor;
 
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.buf.UDecoder;
 import org.apache.tomcat.util.descriptor.XmlIdentifiers;
+import org.apache.tomcat.util.digester.DocumentProperties;
 import org.apache.tomcat.util.res.StringManager;
 
 /**
@@ -47,7 +54,7 @@ import org.apache.tomcat.util.res.StringManager;
  * This class checks for invalid duplicates (eg filter/servlet names)
  * StandardContext will check validity of values (eg URL formats etc)
  */
-public class WebXml {
+public class WebXml extends XmlEncodingBase implements DocumentProperties.Encoding {
 
     protected static final String ORDER_OTHERS =
         "org.apache.catalina.order.others";
@@ -55,12 +62,13 @@ public class WebXml {
     private static final StringManager sm =
         StringManager.getManager(Constants.PACKAGE_NAME);
 
-    private static final org.apache.juli.logging.Log log=
-        org.apache.juli.logging.LogFactory.getLog(WebXml.class);
+    private static final Log log = LogFactory.getLog(WebXml.class);
 
-    // Global defaults are overridable but Servlets and Servlet mappings need to
-    // be unique. Duplicates normally trigger an error. This flag indicates if
-    // newly added Servlet elements are marked as overridable.
+    /**
+     * Global defaults are overridable but Servlets and Servlet mappings need to
+     * be unique. Duplicates normally trigger an error. This flag indicates if
+     * newly added Servlet elements are marked as overridable.
+     */
     private boolean overridable = false;
     public boolean isOverridable() {
         return overridable;
@@ -69,8 +77,10 @@ public class WebXml {
         this.overridable = overridable;
     }
 
-    // web.xml only elements
-    // Absolute Ordering
+    /**
+     * web.xml only elements
+     * Absolute Ordering
+     */
     private Set<String> absoluteOrdering = null;
     public void createAbsoluteOrdering() {
         if (absoluteOrdering == null) {
@@ -89,8 +99,10 @@ public class WebXml {
         return absoluteOrdering;
     }
 
-    // web-fragment.xml only elements
-    // Relative ordering
+    /**
+     * web-fragment.xml only elements
+     * Relative ordering
+     */
     private final Set<String> after = new LinkedHashSet<>();
     public void addAfterOrdering(String fragmentName) {
         after.add(fragmentName);
@@ -118,7 +130,6 @@ public class WebXml {
     public Set<String> getBeforeOrdering() { return before; }
 
     // Common elements and attributes
-
     // Required attribute of web-app element
     public String getVersion() {
         StringBuilder sb = new StringBuilder(3);
@@ -151,6 +162,10 @@ public class WebXml {
             case "3.1":
                 majorVersion = 3;
                 minorVersion = 1;
+                break;
+            case "4.0":
+                majorVersion = 4;
+                minorVersion = 0;
                 break;
             default:
                 log.warn(sm.getString("webXml.version.unknown", version));
@@ -203,9 +218,9 @@ public class WebXml {
     }
 
     // Derived major and minor version attributes
-    // Default to 3.1 until we know otherwise
-    private int majorVersion = 3;
-    private int minorVersion = 1;
+    // Default to 4.0 until we know otherwise
+    private int majorVersion = 4;
+    private int minorVersion = 0;
     public int getMajorVersion() { return majorVersion; }
     public int getMinorVersion() { return minorVersion; }
 
@@ -297,9 +312,14 @@ public class WebXml {
     public Map<String,ServletDef> getServlets() { return servlets; }
 
     // servlet-mapping
+    // Note: URLPatterns from web.xml may be URL encoded
+    //       (http://svn.apache.org/r285186)
     private final Map<String,String> servletMappings = new HashMap<>();
     private final Set<String> servletMappingNames = new HashSet<>();
     public void addServletMapping(String urlPattern, String servletName) {
+        addServletMappingDecoded(UDecoder.URLDecode(urlPattern, getEncoding()), servletName);
+    }
+    public void addServletMappingDecoded(String urlPattern, String servletName) {
         String oldServletName = servletMappings.put(urlPattern, servletName);
         if (oldServletName != null) {
             // Duplicate mapping. As per clarification from the Servlet EG,
@@ -333,6 +353,8 @@ public class WebXml {
     /**
      * When merging/parsing web.xml files into this web.xml should the current
      * set be completely replaced?
+     * @param replaceWelcomeFiles <code>true</code> to replace welcome files
+     *  rather than add to the list
      */
     public void setReplaceWelcomeFiles(boolean replaceWelcomeFiles) {
         this.replaceWelcomeFiles = replaceWelcomeFiles;
@@ -340,6 +362,7 @@ public class WebXml {
     /**
      * When merging from this web.xml, should the welcome files be added to the
      * target web.xml even if it already contains welcome file definitions.
+     * @param alwaysAddWelcomeFiles <code>true</code> to add welcome files
      */
     public void setAlwaysAddWelcomeFiles(boolean alwaysAddWelcomeFiles) {
         this.alwaysAddWelcomeFiles = alwaysAddWelcomeFiles;
@@ -379,6 +402,7 @@ public class WebXml {
     // jsp-config/jsp-property-group
     private final Set<JspPropertyGroup> jspPropertyGroups = new LinkedHashSet<>();
     public void addJspPropertyGroup(JspPropertyGroup propertyGroup) {
+        propertyGroup.setEncoding(getEncoding());
         jspPropertyGroups.add(propertyGroup);
     }
     public Set<JspPropertyGroup> getJspPropertyGroups() {
@@ -390,6 +414,7 @@ public class WebXml {
     // TODO: Should support multiple description elements with language
     private final Set<SecurityConstraint> securityConstraints = new HashSet<>();
     public void addSecurityConstraint(SecurityConstraint securityConstraint) {
+        securityConstraint.setEncoding(getEncoding());
         securityConstraints.add(securityConstraint);
     }
     public Set<SecurityConstraint> getSecurityConstraints() {
@@ -629,24 +654,73 @@ public class WebXml {
      */
     public String toXml() {
         StringBuilder sb = new StringBuilder(2048);
-
         // TODO - Various, icon, description etc elements are skipped - mainly
         //        because they are ignored when web.xml is parsed - see above
+
+        // NOTE - Elements need to be written in the order defined in the 2.3
+        //        DTD else validation of the merged web.xml will fail
+
+        // NOTE - Some elements need to be skipped based on the version of the
+        //        specification being used. Version is validated and starts at
+        //        2.2. The version tests used in this method take advantage of
+        //        this.
 
         // Declaration
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
         // Root element
-        sb.append("<web-app xmlns=\"http://xmlns.jcp.org/xml/ns/javaee\"\n");
-        sb.append("         xmlns:xsi=");
-        sb.append("\"http://www.w3.org/2001/XMLSchema-instance\"\n");
-        sb.append("         xsi:schemaLocation=");
-        sb.append("\"http://xmlns.jcp.org/xml/ns/javaee" +
-                  " http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd\"\n");
-        sb.append("         version=\"");
-        sb.append(getVersion());
-        sb.append("\"\n");
-        sb.append("         metadata-complete=\"true\">\n\n");
+        if (publicId != null) {
+            sb.append("<!DOCTYPE web-app PUBLIC\n");
+            sb.append("  \"");
+            sb.append(publicId);
+            sb.append("\"\n");
+            sb.append("  \"");
+            if (XmlIdentifiers.WEB_22_PUBLIC.equals(publicId)) {
+                sb.append(XmlIdentifiers.WEB_22_SYSTEM);
+            } else {
+                sb.append(XmlIdentifiers.WEB_23_SYSTEM);
+            }
+            sb.append("\">\n");
+            sb.append("<web-app>");
+        } else {
+            String javaeeNamespace = null;
+            String webXmlSchemaLocation = null;
+            String version = getVersion();
+            if ("2.4".equals(version)) {
+                javaeeNamespace = XmlIdentifiers.JAVAEE_1_4_NS;
+                webXmlSchemaLocation = XmlIdentifiers.WEB_24_XSD;
+            } else if ("2.5".equals(version)) {
+                javaeeNamespace = XmlIdentifiers.JAVAEE_5_NS;
+                webXmlSchemaLocation = XmlIdentifiers.WEB_25_XSD;
+            } else if ("3.0".equals(version)) {
+                javaeeNamespace = XmlIdentifiers.JAVAEE_6_NS;
+                webXmlSchemaLocation = XmlIdentifiers.WEB_30_XSD;
+            } else if ("3.1".equals(version)) {
+                javaeeNamespace = XmlIdentifiers.JAVAEE_7_NS;
+                webXmlSchemaLocation = XmlIdentifiers.WEB_31_XSD;
+            } else if ("4.0".equals(version)) {
+                javaeeNamespace = XmlIdentifiers.JAVAEE_8_NS;
+                webXmlSchemaLocation = XmlIdentifiers.WEB_40_XSD;
+            }
+            sb.append("<web-app xmlns=\"");
+            sb.append(javaeeNamespace);
+            sb.append("\"\n");
+            sb.append("         xmlns:xsi=");
+            sb.append("\"http://www.w3.org/2001/XMLSchema-instance\"\n");
+            sb.append("         xsi:schemaLocation=\"");
+            sb.append(javaeeNamespace);
+            sb.append(" ");
+            sb.append(webXmlSchemaLocation);
+            sb.append("\"\n");
+            sb.append("         version=\"");
+            sb.append(getVersion());
+            sb.append("\"");
+            if ("2.4".equals(version)) {
+                sb.append(">\n\n");
+            } else {
+                sb.append("\n         metadata-complete=\"true\">\n\n");
+            }
+        }
 
         appendElement(sb, INDENT2, "display-name", displayName);
 
@@ -662,61 +736,77 @@ public class WebXml {
         }
         sb.append('\n');
 
-        for (Map.Entry<String, FilterDef> entry : filters.entrySet()) {
-            FilterDef filterDef = entry.getValue();
-            sb.append("  <filter>\n");
-            appendElement(sb, INDENT4, "description",
-                    filterDef.getDescription());
-            appendElement(sb, INDENT4, "display-name",
-                    filterDef.getDisplayName());
-            appendElement(sb, INDENT4, "filter-name",
-                    filterDef.getFilterName());
-            appendElement(sb, INDENT4, "filter-class",
-                    filterDef.getFilterClass());
-            appendElement(sb, INDENT4, "async-supported",
-                    filterDef.getAsyncSupported());
-            for (Map.Entry<String, String> param :
-                    filterDef.getParameterMap().entrySet()) {
-                sb.append("    <init-param>\n");
-                appendElement(sb, INDENT6, "param-name", param.getKey());
-                appendElement(sb, INDENT6, "param-value", param.getValue());
-                sb.append("    </init-param>\n");
-            }
-            sb.append("  </filter>\n");
-        }
-        sb.append('\n');
-
-        for (FilterMap filterMap : filterMaps) {
-            sb.append("  <filter-mapping>\n");
-            appendElement(sb, INDENT4, "filter-name",
-                    filterMap.getFilterName());
-            if (filterMap.getMatchAllServletNames()) {
-                sb.append("    <servlet-name>*</servlet-name>\n");
-            } else {
-                for (String servletName : filterMap.getServletNames()) {
-                    appendElement(sb, INDENT4, "servlet-name", servletName);
+        // Filters were introduced in Servlet 2.3
+        if (getMajorVersion() > 2 || getMinorVersion() > 2) {
+            for (Map.Entry<String, FilterDef> entry : filters.entrySet()) {
+                FilterDef filterDef = entry.getValue();
+                sb.append("  <filter>\n");
+                appendElement(sb, INDENT4, "description",
+                        filterDef.getDescription());
+                appendElement(sb, INDENT4, "display-name",
+                        filterDef.getDisplayName());
+                appendElement(sb, INDENT4, "filter-name",
+                        filterDef.getFilterName());
+                appendElement(sb, INDENT4, "filter-class",
+                        filterDef.getFilterClass());
+                // Async support was introduced for Servlet 3.0 onwards
+                if (getMajorVersion() != 2) {
+                    appendElement(sb, INDENT4, "async-supported",
+                            filterDef.getAsyncSupported());
                 }
-            }
-            if (filterMap.getMatchAllUrlPatterns()) {
-                sb.append("    <url-pattern>*</url-pattern>\n");
-            } else {
-                for (String urlPattern : filterMap.getURLPatterns()) {
-                    appendElement(sb, INDENT4, "url-pattern", urlPattern);
+                for (Map.Entry<String, String> param :
+                        filterDef.getParameterMap().entrySet()) {
+                    sb.append("    <init-param>\n");
+                    appendElement(sb, INDENT6, "param-name", param.getKey());
+                    appendElement(sb, INDENT6, "param-value", param.getValue());
+                    sb.append("    </init-param>\n");
                 }
+                sb.append("  </filter>\n");
             }
-            for (String dispatcher : filterMap.getDispatcherNames()) {
-                appendElement(sb, INDENT4, "dispatcher", dispatcher);
-            }
-            sb.append("  </filter-mapping>\n");
-        }
-        sb.append('\n');
+            sb.append('\n');
 
-        for (String listener : listeners) {
-            sb.append("  <listener>\n");
-            appendElement(sb, INDENT4, "listener-class", listener);
-            sb.append("  </listener>\n");
+            for (FilterMap filterMap : filterMaps) {
+                sb.append("  <filter-mapping>\n");
+                appendElement(sb, INDENT4, "filter-name",
+                        filterMap.getFilterName());
+                if (filterMap.getMatchAllServletNames()) {
+                    sb.append("    <servlet-name>*</servlet-name>\n");
+                } else {
+                    for (String servletName : filterMap.getServletNames()) {
+                        appendElement(sb, INDENT4, "servlet-name", servletName);
+                    }
+                }
+                if (filterMap.getMatchAllUrlPatterns()) {
+                    sb.append("    <url-pattern>*</url-pattern>\n");
+                } else {
+                    for (String urlPattern : filterMap.getURLPatterns()) {
+                        appendElement(sb, INDENT4, "url-pattern", encodeUrl(urlPattern));
+                    }
+                }
+                // dispatcher was added in Servlet 2.4
+                if (getMajorVersion() > 2 || getMinorVersion() > 3) {
+                    for (String dispatcher : filterMap.getDispatcherNames()) {
+                        if (getMajorVersion() == 2 &&
+                                DispatcherType.ASYNC.name().equals(dispatcher)) {
+                            continue;
+                        }
+                        appendElement(sb, INDENT4, "dispatcher", dispatcher);
+                    }
+                }
+                sb.append("  </filter-mapping>\n");
+            }
+            sb.append('\n');
         }
-        sb.append('\n');
+
+        // Listeners were introduced in Servlet 2.3
+        if (getMajorVersion() > 2 || getMinorVersion() > 2) {
+            for (String listener : listeners) {
+                sb.append("  <listener>\n");
+                appendElement(sb, INDENT4, "listener-class", listener);
+                sb.append("  </listener>\n");
+            }
+            sb.append('\n');
+        }
 
         for (Map.Entry<String, ServletDef> entry : servlets.entrySet()) {
             ServletDef servletDef = entry.getValue();
@@ -739,12 +829,18 @@ public class WebXml {
             appendElement(sb, INDENT4, "load-on-startup",
                     servletDef.getLoadOnStartup());
             appendElement(sb, INDENT4, "enabled", servletDef.getEnabled());
-            appendElement(sb, INDENT4, "async-supported",
-                    servletDef.getAsyncSupported());
-            if (servletDef.getRunAs() != null) {
-                sb.append("    <run-as>\n");
-                appendElement(sb, INDENT6, "role-name", servletDef.getRunAs());
-                sb.append("    </run-as>\n");
+            // Async support was introduced for Servlet 3.0 onwards
+            if (getMajorVersion() != 2) {
+                appendElement(sb, INDENT4, "async-supported",
+                        servletDef.getAsyncSupported());
+            }
+            // servlet/run-as was introduced in Servlet 2.3
+            if (getMajorVersion() > 2 || getMinorVersion() > 2) {
+                if (servletDef.getRunAs() != null) {
+                    sb.append("    <run-as>\n");
+                    appendElement(sb, INDENT6, "role-name", servletDef.getRunAs());
+                    sb.append("    </run-as>\n");
+                }
             }
             for (SecurityRoleRef roleRef : servletDef.getSecurityRoleRefs()) {
                 sb.append("    <security-role-ref>\n");
@@ -752,18 +848,21 @@ public class WebXml {
                 appendElement(sb, INDENT6, "role-link", roleRef.getLink());
                 sb.append("    </security-role-ref>\n");
             }
-            MultipartDef multipartDef = servletDef.getMultipartDef();
-            if (multipartDef != null) {
-                sb.append("    <multipart-config>\n");
-                appendElement(sb, INDENT6, "location",
-                        multipartDef.getLocation());
-                appendElement(sb, INDENT6, "max-file-size",
-                        multipartDef.getMaxFileSize());
-                appendElement(sb, INDENT6, "max-request-size",
-                        multipartDef.getMaxRequestSize());
-                appendElement(sb, INDENT6, "file-size-threshold",
-                        multipartDef.getFileSizeThreshold());
-                sb.append("    </multipart-config>\n");
+            // multipart-config was added in Servlet 3.0
+            if (getMajorVersion() != 2) {
+                MultipartDef multipartDef = servletDef.getMultipartDef();
+                if (multipartDef != null) {
+                    sb.append("    <multipart-config>\n");
+                    appendElement(sb, INDENT6, "location",
+                            multipartDef.getLocation());
+                    appendElement(sb, INDENT6, "max-file-size",
+                            multipartDef.getMaxFileSize());
+                    appendElement(sb, INDENT6, "max-request-size",
+                            multipartDef.getMaxRequestSize());
+                    appendElement(sb, INDENT6, "file-size-threshold",
+                            multipartDef.getFileSizeThreshold());
+                    sb.append("    </multipart-config>\n");
+                }
             }
             sb.append("  </servlet>\n");
         }
@@ -772,7 +871,7 @@ public class WebXml {
         for (Map.Entry<String, String> entry : servletMappings.entrySet()) {
             sb.append("  <servlet-mapping>\n");
             appendElement(sb, INDENT4, "servlet-name", entry.getValue());
-            appendElement(sb, INDENT4, "url-pattern", entry.getKey());
+            appendElement(sb, INDENT4, "url-pattern", encodeUrl(entry.getKey()));
             sb.append("  </servlet-mapping>\n");
         }
         sb.append('\n');
@@ -781,23 +880,25 @@ public class WebXml {
             sb.append("  <session-config>\n");
             appendElement(sb, INDENT4, "session-timeout",
                     sessionConfig.getSessionTimeout());
-            sb.append("    <cookie-config>\n");
-            appendElement(sb, INDENT6, "name", sessionConfig.getCookieName());
-            appendElement(sb, INDENT6, "domain",
-                    sessionConfig.getCookieDomain());
-            appendElement(sb, INDENT6, "path", sessionConfig.getCookiePath());
-            appendElement(sb, INDENT6, "comment",
-                    sessionConfig.getCookieComment());
-            appendElement(sb, INDENT6, "http-only",
-                    sessionConfig.getCookieHttpOnly());
-            appendElement(sb, INDENT6, "secure",
-                    sessionConfig.getCookieSecure());
-            appendElement(sb, INDENT6, "max-age",
-                    sessionConfig.getCookieMaxAge());
-            sb.append("    </cookie-config>\n");
-            for (SessionTrackingMode stm :
-                    sessionConfig.getSessionTrackingModes()) {
-                appendElement(sb, INDENT4, "tracking-mode", stm.name());
+            if (majorVersion >= 3) {
+                sb.append("    <cookie-config>\n");
+                appendElement(sb, INDENT6, "name", sessionConfig.getCookieName());
+                appendElement(sb, INDENT6, "domain",
+                        sessionConfig.getCookieDomain());
+                appendElement(sb, INDENT6, "path", sessionConfig.getCookiePath());
+                appendElement(sb, INDENT6, "comment",
+                        sessionConfig.getCookieComment());
+                appendElement(sb, INDENT6, "http-only",
+                        sessionConfig.getCookieHttpOnly());
+                appendElement(sb, INDENT6, "secure",
+                        sessionConfig.getCookieSecure());
+                appendElement(sb, INDENT6, "max-age",
+                        sessionConfig.getCookieMaxAge());
+                sb.append("    </cookie-config>\n");
+                for (SessionTrackingMode stm :
+                        sessionConfig.getSessionTrackingModes()) {
+                    appendElement(sb, INDENT4, "tracking-mode", stm.name());
+                }
             }
             sb.append("  </session-config>\n\n");
         }
@@ -819,62 +920,129 @@ public class WebXml {
         }
 
         for (ErrorPage errorPage : errorPages.values()) {
+            String exeptionType = errorPage.getExceptionType();
+            int errorCode = errorPage.getErrorCode();
+
+            if (exeptionType == null && errorCode == 0 && getMajorVersion() == 2) {
+                // Default error pages are only supported from 3.0 onwards
+                continue;
+            }
             sb.append("  <error-page>\n");
-            if (errorPage.getExceptionType() == null) {
+            if (errorPage.getExceptionType() != null) {
+                appendElement(sb, INDENT4, "exception-type", exeptionType);
+            } else if (errorPage.getErrorCode() > 0) {
                 appendElement(sb, INDENT4, "error-code",
-                        Integer.toString(errorPage.getErrorCode()));
-            } else {
-                appendElement(sb, INDENT4, "exception-type",
-                        errorPage.getExceptionType());
+                        Integer.toString(errorCode));
             }
             appendElement(sb, INDENT4, "location", errorPage.getLocation());
             sb.append("  </error-page>\n");
         }
         sb.append('\n');
 
+        // jsp-config was added in Servlet 2.4. Prior to that, tag-libs was used
+        // directly and jsp-property-group did not exist
         if (taglibs.size() > 0 || jspPropertyGroups.size() > 0) {
-            sb.append("  <jsp-config>\n");
+            if (getMajorVersion() > 2 || getMinorVersion() > 3) {
+                sb.append("  <jsp-config>\n");
+            }
             for (Map.Entry<String, String> entry : taglibs.entrySet()) {
                 sb.append("    <taglib>\n");
                 appendElement(sb, INDENT6, "taglib-uri", entry.getKey());
                 appendElement(sb, INDENT6, "taglib-location", entry.getValue());
                 sb.append("    </taglib>\n");
             }
-            for (JspPropertyGroup jpg : jspPropertyGroups) {
-                sb.append("    <jsp-property-group>\n");
-                for (String urlPattern : jpg.getUrlPatterns()) {
-                    appendElement(sb, INDENT6, "url-pattern", urlPattern);
+            if (getMajorVersion() > 2 || getMinorVersion() > 3) {
+                for (JspPropertyGroup jpg : jspPropertyGroups) {
+                    sb.append("    <jsp-property-group>\n");
+                    for (String urlPattern : jpg.getUrlPatterns()) {
+                        appendElement(sb, INDENT6, "url-pattern", encodeUrl(urlPattern));
+                    }
+                    appendElement(sb, INDENT6, "el-ignored", jpg.getElIgnored());
+                    appendElement(sb, INDENT6, "page-encoding",
+                            jpg.getPageEncoding());
+                    appendElement(sb, INDENT6, "scripting-invalid",
+                            jpg.getScriptingInvalid());
+                    appendElement(sb, INDENT6, "is-xml", jpg.getIsXml());
+                    for (String prelude : jpg.getIncludePreludes()) {
+                        appendElement(sb, INDENT6, "include-prelude", prelude);
+                    }
+                    for (String coda : jpg.getIncludeCodas()) {
+                        appendElement(sb, INDENT6, "include-coda", coda);
+                    }
+                    appendElement(sb, INDENT6, "deferred-syntax-allowed-as-literal",
+                            jpg.getDeferredSyntax());
+                    appendElement(sb, INDENT6, "trim-directive-whitespaces",
+                            jpg.getTrimWhitespace());
+                    appendElement(sb, INDENT6, "default-content-type",
+                            jpg.getDefaultContentType());
+                    appendElement(sb, INDENT6, "buffer", jpg.getBuffer());
+                    appendElement(sb, INDENT6, "error-on-undeclared-namespace",
+                            jpg.getErrorOnUndeclaredNamespace());
+                    sb.append("    </jsp-property-group>\n");
                 }
-                appendElement(sb, INDENT6, "el-ignored", jpg.getElIgnored());
-                appendElement(sb, INDENT6, "page-encoding",
-                        jpg.getPageEncoding());
-                appendElement(sb, INDENT6, "scripting-invalid",
-                        jpg.getScriptingInvalid());
-                appendElement(sb, INDENT6, "is-xml", jpg.getIsXml());
-                for (String prelude : jpg.getIncludePreludes()) {
-                    appendElement(sb, INDENT6, "include-prelude", prelude);
-                }
-                for (String coda : jpg.getIncludeCodas()) {
-                    appendElement(sb, INDENT6, "include-coda", coda);
-                }
-                appendElement(sb, INDENT6, "deferred-syntax-allowed-as-literal",
-                        jpg.getDeferredSyntax());
-                appendElement(sb, INDENT6, "trim-directive-whitespaces",
-                        jpg.getTrimWhitespace());
-                appendElement(sb, INDENT6, "default-content-type",
-                        jpg.getDefaultContentType());
-                appendElement(sb, INDENT6, "buffer", jpg.getBuffer());
-                appendElement(sb, INDENT6, "error-on-undeclared-namespace",
-                        jpg.getErrorOnUndeclaredNamespace());
-                sb.append("    </jsp-property-group>\n");
+                sb.append("  </jsp-config>\n\n");
             }
-            sb.append("  </jsp-config>\n\n");
         }
+
+        // resource-env-ref was introduced in Servlet 2.3
+        if (getMajorVersion() > 2 || getMinorVersion() > 2) {
+            for (ContextResourceEnvRef resourceEnvRef : resourceEnvRefs.values()) {
+                sb.append("  <resource-env-ref>\n");
+                appendElement(sb, INDENT4, "description",
+                        resourceEnvRef.getDescription());
+                appendElement(sb, INDENT4, "resource-env-ref-name",
+                        resourceEnvRef.getName());
+                appendElement(sb, INDENT4, "resource-env-ref-type",
+                        resourceEnvRef.getType());
+                // TODO mapped-name
+                for (InjectionTarget target :
+                        resourceEnvRef.getInjectionTargets()) {
+                    sb.append("    <injection-target>\n");
+                    appendElement(sb, INDENT6, "injection-target-class",
+                            target.getTargetClass());
+                    appendElement(sb, INDENT6, "injection-target-name",
+                            target.getTargetName());
+                    sb.append("    </injection-target>\n");
+                }
+                // TODO lookup-name
+                sb.append("  </resource-env-ref>\n");
+            }
+            sb.append('\n');
+        }
+
+        for (ContextResource resourceRef : resourceRefs.values()) {
+            sb.append("  <resource-ref>\n");
+            appendElement(sb, INDENT4, "description",
+                    resourceRef.getDescription());
+            appendElement(sb, INDENT4, "res-ref-name", resourceRef.getName());
+            appendElement(sb, INDENT4, "res-type", resourceRef.getType());
+            appendElement(sb, INDENT4, "res-auth", resourceRef.getAuth());
+            // resource-ref/res-sharing-scope was introduced in Servlet 2.3
+            if (getMajorVersion() > 2 || getMinorVersion() > 2) {
+                appendElement(sb, INDENT4, "res-sharing-scope",
+                        resourceRef.getScope());
+            }
+            // TODO mapped-name
+            for (InjectionTarget target : resourceRef.getInjectionTargets()) {
+                sb.append("    <injection-target>\n");
+                appendElement(sb, INDENT6, "injection-target-class",
+                        target.getTargetClass());
+                appendElement(sb, INDENT6, "injection-target-name",
+                        target.getTargetName());
+                sb.append("    </injection-target>\n");
+            }
+            // TODO lookup-name
+            sb.append("  </resource-ref>\n");
+        }
+        sb.append('\n');
 
         for (SecurityConstraint constraint : securityConstraints) {
             sb.append("  <security-constraint>\n");
-            appendElement(sb, INDENT4, "display-name",
-                    constraint.getDisplayName());
+            // security-constraint/display-name was introduced in Servlet 2.3
+            if (getMajorVersion() > 2 || getMinorVersion() > 2) {
+                appendElement(sb, INDENT4, "display-name",
+                        constraint.getDisplayName());
+            }
             for (SecurityCollection collection : constraint.findCollections()) {
                 sb.append("    <web-resource-collection>\n");
                 appendElement(sb, INDENT6, "web-resource-name",
@@ -882,7 +1050,7 @@ public class WebXml {
                 appendElement(sb, INDENT6, "description",
                         collection.getDescription());
                 for (String urlPattern : collection.findPatterns()) {
-                    appendElement(sb, INDENT6, "url-pattern", urlPattern);
+                    appendElement(sb, INDENT6, "url-pattern", encodeUrl(urlPattern));
                 }
                 for (String method : collection.findMethods()) {
                     appendElement(sb, INDENT6, "http-method", method);
@@ -976,130 +1144,90 @@ public class WebXml {
         }
         sb.append('\n');
 
-        for (ContextLocalEjb ejbLocalRef : ejbLocalRefs.values()) {
-            sb.append("  <ejb-local-ref>\n");
-            appendElement(sb, INDENT4, "description",
-                    ejbLocalRef.getDescription());
-            appendElement(sb, INDENT4, "ejb-ref-name", ejbLocalRef.getName());
-            appendElement(sb, INDENT4, "ejb-ref-type", ejbLocalRef.getType());
-            appendElement(sb, INDENT4, "local-home", ejbLocalRef.getHome());
-            appendElement(sb, INDENT4, "local", ejbLocalRef.getLocal());
-            appendElement(sb, INDENT4, "ejb-link", ejbLocalRef.getLink());
-            // TODO mapped-name
-            for (InjectionTarget target : ejbLocalRef.getInjectionTargets()) {
-                sb.append("    <injection-target>\n");
-                appendElement(sb, INDENT6, "injection-target-class",
-                        target.getTargetClass());
-                appendElement(sb, INDENT6, "injection-target-name",
-                        target.getTargetName());
-                sb.append("    </injection-target>\n");
+        // ejb-local-ref was introduced in Servlet 2.3
+        if (getMajorVersion() > 2 || getMinorVersion() > 2) {
+            for (ContextLocalEjb ejbLocalRef : ejbLocalRefs.values()) {
+                sb.append("  <ejb-local-ref>\n");
+                appendElement(sb, INDENT4, "description",
+                        ejbLocalRef.getDescription());
+                appendElement(sb, INDENT4, "ejb-ref-name", ejbLocalRef.getName());
+                appendElement(sb, INDENT4, "ejb-ref-type", ejbLocalRef.getType());
+                appendElement(sb, INDENT4, "local-home", ejbLocalRef.getHome());
+                appendElement(sb, INDENT4, "local", ejbLocalRef.getLocal());
+                appendElement(sb, INDENT4, "ejb-link", ejbLocalRef.getLink());
+                // TODO mapped-name
+                for (InjectionTarget target : ejbLocalRef.getInjectionTargets()) {
+                    sb.append("    <injection-target>\n");
+                    appendElement(sb, INDENT6, "injection-target-class",
+                            target.getTargetClass());
+                    appendElement(sb, INDENT6, "injection-target-name",
+                            target.getTargetName());
+                    sb.append("    </injection-target>\n");
+                }
+                // TODO lookup-name
+                sb.append("  </ejb-local-ref>\n");
             }
-            // TODO lookup-name
-            sb.append("  </ejb-local-ref>\n");
+            sb.append('\n');
         }
-        sb.append('\n');
 
-        for (ContextService serviceRef : serviceRefs.values()) {
-            sb.append("  <service-ref>\n");
-            appendElement(sb, INDENT4, "description",
-                    serviceRef.getDescription());
-            appendElement(sb, INDENT4, "display-name",
-                    serviceRef.getDisplayname());
-            appendElement(sb, INDENT4, "service-ref-name",
-                    serviceRef.getName());
-            appendElement(sb, INDENT4, "service-interface",
-                    serviceRef.getInterface());
-            appendElement(sb, INDENT4, "service-ref-type",
-                    serviceRef.getType());
-            appendElement(sb, INDENT4, "wsdl-file", serviceRef.getWsdlfile());
-            appendElement(sb, INDENT4, "jaxrpc-mapping-file",
-                    serviceRef.getJaxrpcmappingfile());
-            String qname = serviceRef.getServiceqnameNamespaceURI();
-            if (qname != null) {
-                qname = qname + ":";
+        // service-ref was introduced in Servlet 2.4
+        if (getMajorVersion() > 2 || getMinorVersion() > 3) {
+            for (ContextService serviceRef : serviceRefs.values()) {
+                sb.append("  <service-ref>\n");
+                appendElement(sb, INDENT4, "description",
+                        serviceRef.getDescription());
+                appendElement(sb, INDENT4, "display-name",
+                        serviceRef.getDisplayname());
+                appendElement(sb, INDENT4, "service-ref-name",
+                        serviceRef.getName());
+                appendElement(sb, INDENT4, "service-interface",
+                        serviceRef.getInterface());
+                appendElement(sb, INDENT4, "service-ref-type",
+                        serviceRef.getType());
+                appendElement(sb, INDENT4, "wsdl-file", serviceRef.getWsdlfile());
+                appendElement(sb, INDENT4, "jaxrpc-mapping-file",
+                        serviceRef.getJaxrpcmappingfile());
+                String qname = serviceRef.getServiceqnameNamespaceURI();
+                if (qname != null) {
+                    qname = qname + ":";
+                }
+                qname = qname + serviceRef.getServiceqnameLocalpart();
+                appendElement(sb, INDENT4, "service-qname", qname);
+                Iterator<String> endpointIter = serviceRef.getServiceendpoints();
+                while (endpointIter.hasNext()) {
+                    String endpoint = endpointIter.next();
+                    sb.append("    <port-component-ref>\n");
+                    appendElement(sb, INDENT6, "service-endpoint-interface",
+                            endpoint);
+                    appendElement(sb, INDENT6, "port-component-link",
+                            serviceRef.getProperty(endpoint));
+                    sb.append("    </port-component-ref>\n");
+                }
+                Iterator<String> handlerIter = serviceRef.getHandlers();
+                while (handlerIter.hasNext()) {
+                    String handler = handlerIter.next();
+                    sb.append("    <handler>\n");
+                    ContextHandler ch = serviceRef.getHandler(handler);
+                    appendElement(sb, INDENT6, "handler-name", ch.getName());
+                    appendElement(sb, INDENT6, "handler-class",
+                            ch.getHandlerclass());
+                    sb.append("    </handler>\n");
+                }
+                // TODO handler-chains
+                // TODO mapped-name
+                for (InjectionTarget target : serviceRef.getInjectionTargets()) {
+                    sb.append("    <injection-target>\n");
+                    appendElement(sb, INDENT6, "injection-target-class",
+                            target.getTargetClass());
+                    appendElement(sb, INDENT6, "injection-target-name",
+                            target.getTargetName());
+                    sb.append("    </injection-target>\n");
+                }
+                // TODO lookup-name
+                sb.append("  </service-ref>\n");
             }
-            qname = qname + serviceRef.getServiceqnameLocalpart();
-            appendElement(sb, INDENT4, "service-qname", qname);
-            Iterator<String> endpointIter = serviceRef.getServiceendpoints();
-            while (endpointIter.hasNext()) {
-                String endpoint = endpointIter.next();
-                sb.append("    <port-component-ref>\n");
-                appendElement(sb, INDENT6, "service-endpoint-interface",
-                        endpoint);
-                appendElement(sb, INDENT6, "port-component-link",
-                        serviceRef.getProperty(endpoint));
-                sb.append("    </port-component-ref>\n");
-            }
-            Iterator<String> handlerIter = serviceRef.getHandlers();
-            while (handlerIter.hasNext()) {
-                String handler = handlerIter.next();
-                sb.append("    <handler>\n");
-                ContextHandler ch = serviceRef.getHandler(handler);
-                appendElement(sb, INDENT6, "handler-name", ch.getName());
-                appendElement(sb, INDENT6, "handler-class",
-                        ch.getHandlerclass());
-                sb.append("    </handler>\n");
-            }
-            // TODO handler-chains
-            // TODO mapped-name
-            for (InjectionTarget target : serviceRef.getInjectionTargets()) {
-                sb.append("    <injection-target>\n");
-                appendElement(sb, INDENT6, "injection-target-class",
-                        target.getTargetClass());
-                appendElement(sb, INDENT6, "injection-target-name",
-                        target.getTargetName());
-                sb.append("    </injection-target>\n");
-            }
-            // TODO lookup-name
-            sb.append("  </service-ref>\n");
+            sb.append('\n');
         }
-        sb.append('\n');
-
-        for (ContextResource resourceRef : resourceRefs.values()) {
-            sb.append("  <resource-ref>\n");
-            appendElement(sb, INDENT4, "description",
-                    resourceRef.getDescription());
-            appendElement(sb, INDENT4, "res-ref-name", resourceRef.getName());
-            appendElement(sb, INDENT4, "res-type", resourceRef.getType());
-            appendElement(sb, INDENT4, "res-auth", resourceRef.getAuth());
-            appendElement(sb, INDENT4, "res-sharing-scope",
-                    resourceRef.getScope());
-            // TODO mapped-name
-            for (InjectionTarget target : resourceRef.getInjectionTargets()) {
-                sb.append("    <injection-target>\n");
-                appendElement(sb, INDENT6, "injection-target-class",
-                        target.getTargetClass());
-                appendElement(sb, INDENT6, "injection-target-name",
-                        target.getTargetName());
-                sb.append("    </injection-target>\n");
-            }
-            // TODO lookup-name
-            sb.append("  </resource-ref>\n");
-        }
-        sb.append('\n');
-
-        for (ContextResourceEnvRef resourceEnvRef : resourceEnvRefs.values()) {
-            sb.append("  <resource-env-ref>\n");
-            appendElement(sb, INDENT4, "description",
-                    resourceEnvRef.getDescription());
-            appendElement(sb, INDENT4, "resource-env-ref-name",
-                    resourceEnvRef.getName());
-            appendElement(sb, INDENT4, "resource-env-ref-type",
-                    resourceEnvRef.getType());
-            // TODO mapped-name
-            for (InjectionTarget target :
-                    resourceEnvRef.getInjectionTargets()) {
-                sb.append("    <injection-target>\n");
-                appendElement(sb, INDENT6, "injection-target-class",
-                        target.getTargetClass());
-                appendElement(sb, INDENT6, "injection-target-name",
-                        target.getTargetName());
-                sb.append("    </injection-target>\n");
-            }
-            // TODO lookup-name
-            sb.append("  </resource-env-ref>\n");
-        }
-        sb.append('\n');
 
         if (!postConstructMethods.isEmpty()) {
             for (Entry<String, String> entry : postConstructMethods
@@ -1127,68 +1255,105 @@ public class WebXml {
             sb.append('\n');
         }
 
-        for (MessageDestinationRef mdr : messageDestinationRefs.values()) {
-            sb.append("  <message-destination-ref>\n");
-            appendElement(sb, INDENT4, "description", mdr.getDescription());
-            appendElement(sb, INDENT4, "message-destination-ref-name",
-                    mdr.getName());
-            appendElement(sb, INDENT4, "message-destination-type",
-                    mdr.getType());
-            appendElement(sb, INDENT4, "message-destination-usage",
-                    mdr.getUsage());
-            appendElement(sb, INDENT4, "message-destination-link",
-                    mdr.getLink());
-            // TODO mapped-name
-            for (InjectionTarget target : mdr.getInjectionTargets()) {
-                sb.append("    <injection-target>\n");
-                appendElement(sb, INDENT6, "injection-target-class",
-                        target.getTargetClass());
-                appendElement(sb, INDENT6, "injection-target-name",
-                        target.getTargetName());
-                sb.append("    </injection-target>\n");
+        // message-destination-ref, message-destination were introduced in
+        // Servlet 2.4
+        if (getMajorVersion() > 2 || getMinorVersion() > 3) {
+            for (MessageDestinationRef mdr : messageDestinationRefs.values()) {
+                sb.append("  <message-destination-ref>\n");
+                appendElement(sb, INDENT4, "description", mdr.getDescription());
+                appendElement(sb, INDENT4, "message-destination-ref-name",
+                        mdr.getName());
+                appendElement(sb, INDENT4, "message-destination-type",
+                        mdr.getType());
+                appendElement(sb, INDENT4, "message-destination-usage",
+                        mdr.getUsage());
+                appendElement(sb, INDENT4, "message-destination-link",
+                        mdr.getLink());
+                // TODO mapped-name
+                for (InjectionTarget target : mdr.getInjectionTargets()) {
+                    sb.append("    <injection-target>\n");
+                    appendElement(sb, INDENT6, "injection-target-class",
+                            target.getTargetClass());
+                    appendElement(sb, INDENT6, "injection-target-name",
+                            target.getTargetName());
+                    sb.append("    </injection-target>\n");
+                }
+                // TODO lookup-name
+                sb.append("  </message-destination-ref>\n");
             }
-            // TODO lookup-name
-            sb.append("  </message-destination-ref>\n");
-        }
-        sb.append('\n');
+            sb.append('\n');
 
-        for (MessageDestination md : messageDestinations.values()) {
-            sb.append("  <message-destination>\n");
-            appendElement(sb, INDENT4, "description", md.getDescription());
-            appendElement(sb, INDENT4, "display-name", md.getDisplayName());
-            appendElement(sb, INDENT4, "message-destination-name",
-                    md.getName());
-            // TODO mapped-name
-            sb.append("  </message-destination>\n");
-        }
-        sb.append('\n');
-
-        if (localeEncodingMappings.size() > 0) {
-            sb.append("  <locale-encoding-mapping-list>\n");
-            for (Map.Entry<String, String> entry :
-                    localeEncodingMappings.entrySet()) {
-                sb.append("    <locale-encoding-mapping>\n");
-                appendElement(sb, INDENT6, "locale", entry.getKey());
-                appendElement(sb, INDENT6, "encoding", entry.getValue());
-                sb.append("    </locale-encoding-mapping>\n");
+            for (MessageDestination md : messageDestinations.values()) {
+                sb.append("  <message-destination>\n");
+                appendElement(sb, INDENT4, "description", md.getDescription());
+                appendElement(sb, INDENT4, "display-name", md.getDisplayName());
+                appendElement(sb, INDENT4, "message-destination-name",
+                        md.getName());
+                // TODO mapped-name
+                sb.append("  </message-destination>\n");
             }
-            sb.append("  </locale-encoding-mapping-list>\n");
+            sb.append('\n');
         }
+
+        // locale-encoding-mapping-list was introduced in Servlet 2.4
+        if (getMajorVersion() > 2 || getMinorVersion() > 3) {
+            if (localeEncodingMappings.size() > 0) {
+                sb.append("  <locale-encoding-mapping-list>\n");
+                for (Map.Entry<String, String> entry :
+                        localeEncodingMappings.entrySet()) {
+                    sb.append("    <locale-encoding-mapping>\n");
+                    appendElement(sb, INDENT6, "locale", entry.getKey());
+                    appendElement(sb, INDENT6, "encoding", entry.getValue());
+                    sb.append("    </locale-encoding-mapping>\n");
+                }
+                sb.append("  </locale-encoding-mapping-list>\n");
+            }
+        }
+
+        // deny-uncovered-http-methods was introduced in Servlet 3.1
+        if (getMajorVersion() > 3 ||
+                (getMajorVersion() == 3 && getMinorVersion() > 0)) {
+            if (denyUncoveredHttpMethods) {
+                sb.append("\n");
+                sb.append("  <deny-uncovered-http-methods/>");
+            }
+        }
+
         sb.append("</web-app>");
         return sb.toString();
     }
 
+
+    private String encodeUrl(String input) {
+        try {
+            return URLEncoder.encode(input, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            // Impossible. UTF-8 is a required character set
+            return null;
+        }
+    }
+
+
     private static void appendElement(StringBuilder sb, String indent,
             String elementName, String value) {
-        if (value == null || value.length() == 0) return;
-        sb.append(indent);
-        sb.append('<');
-        sb.append(elementName);
-        sb.append('>');
-        sb.append(escapeXml(value));
-        sb.append("</");
-        sb.append(elementName);
-        sb.append(">\n");
+        if (value == null) {
+            return;
+        }
+        if (value.length() == 0) {
+            sb.append(indent);
+            sb.append('<');
+            sb.append(elementName);
+            sb.append("/>\n");
+        } else {
+            sb.append(indent);
+            sb.append('<');
+            sb.append(elementName);
+            sb.append('>');
+            sb.append(escapeXml(value));
+            sb.append("</");
+            sb.append(elementName);
+            sb.append(">\n");
+        }
     }
 
     private static void appendElement(StringBuilder sb, String indent,
@@ -1483,7 +1648,7 @@ public class WebXml {
 
         // Add fragment mappings
         for (Map.Entry<String,String> mapping : servletMappingsToAdd) {
-            addServletMapping(mapping.getKey(), mapping.getValue());
+            addServletMappingDecoded(mapping.getKey(), mapping.getValue());
         }
 
         for (WebXml fragment : fragments) {
@@ -1954,7 +2119,7 @@ public class WebXml {
 
         if (dest.getMaxFileSize() == null) {
             dest.setMaxFileSize(src.getMaxFileSize());
-        } else if (src.getLocation() != null) {
+        } else if (src.getMaxFileSize() != null) {
             if (failOnConflict &&
                     !src.getMaxFileSize().equals(dest.getMaxFileSize())) {
                 return false;
@@ -1975,7 +2140,7 @@ public class WebXml {
     }
 
 
-    private static <T> boolean mergeLifecycleCallback(
+    private static boolean mergeLifecycleCallback(
             Map<String, String> fragmentMap, Map<String, String> tempMap,
             WebXml fragment, String mapName) {
         for (Entry<String, String> entry : fragmentMap.entrySet()) {

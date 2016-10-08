@@ -32,10 +32,10 @@ import org.apache.tomcat.util.res.StringManager;
  * to avoid modifications.  When first created, a <code>ResourceMap</code>
  * is not locked.
  *
+ * @param <T> The type of elements in the Set
+ *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public final class ResourceSet<T> extends HashSet<T> {
 
     private static final long serialVersionUID = 1L;
@@ -101,7 +101,7 @@ public final class ResourceSet<T> extends HashSet<T> {
 
 
     /**
-     * Return the locked state of this parameter map.
+     * @return the locked state of this parameter map.
      */
     public boolean isLocked() {
 

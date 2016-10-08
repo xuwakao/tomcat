@@ -31,10 +31,8 @@ import org.apache.tomcat.util.buf.UDecoder;
  * a URL pattern or a servlet name.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
-public class FilterMap implements Serializable {
+public class FilterMap extends XmlEncodingBase implements Serializable {
 
 
     // ------------------------------------------------------------- Properties
@@ -129,6 +127,9 @@ public class FilterMap implements Serializable {
     }
 
     public void addURLPattern(String urlPattern) {
+        addURLPatternDecoded(UDecoder.URLDecode(urlPattern, getEncoding()));
+    }
+    public void addURLPatternDecoded(String urlPattern) {
         if ("*".equals(urlPattern)) {
             this.matchAllUrlPatterns = true;
         } else {
@@ -140,9 +141,10 @@ public class FilterMap implements Serializable {
     }
 
     /**
-     *
      * This method will be used to set the current state of the FilterMap
      * representing the state of when filters should be applied.
+     * @param dispatcherString the dispatcher type which should
+     *  match this filter
      */
     public void setDispatcher(String dispatcherString) {
         String dispatcher = dispatcherString.toUpperCase(Locale.ENGLISH);

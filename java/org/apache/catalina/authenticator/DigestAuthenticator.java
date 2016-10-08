@@ -19,8 +19,6 @@ package org.apache.catalina.authenticator;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,11 +29,11 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.Realm;
 import org.apache.catalina.connector.Request;
-import org.apache.catalina.util.ConcurrentMessageDigest;
-import org.apache.catalina.util.MD5Encoder;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-import org.apache.tomcat.util.http.parser.HttpParser;
+import org.apache.tomcat.util.http.parser.Authorization;
+import org.apache.tomcat.util.security.ConcurrentMessageDigest;
+import org.apache.tomcat.util.security.MD5Encoder;
 
 
 /**
@@ -44,7 +42,6 @@ import org.apache.tomcat.util.http.parser.HttpParser;
  *
  * @author Craig R. McClanahan
  * @author Remy Maucherat
- * @version $Id$
  */
 public class DigestAuthenticator extends AuthenticatorBase {
 
@@ -58,32 +55,16 @@ public class DigestAuthenticator extends AuthenticatorBase {
      */
     protected static final String QOP = "auth";
 
-    // ----------------------------------------------------------- Constructors
 
+    // ----------------------------------------------------------- Constructors
 
     public DigestAuthenticator() {
         super();
         setCache(false);
-        try {
-            if (md5Helper == null) {
-                md5Helper = MessageDigest.getInstance("MD5");
-            }
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
 
     // ----------------------------------------------------- Instance Variables
-
-
-    /**
-     * MD5 message digest provider.
-     * @deprecated  Unused - will be removed in Tomcat 8.0.x onwards
-     */
-    @Deprecated
-    protected static volatile MessageDigest md5Helper;
-
 
     /**
      * List of server nonce values currently being tracked
@@ -213,51 +194,23 @@ public class DigestAuthenticator extends AuthenticatorBase {
      * @exception IOException if an input/output error occurs
      */
     @Override
-    public boolean authenticate(Request request, HttpServletResponse response)
+    protected boolean doAuthenticate(Request request, HttpServletResponse response)
             throws IOException {
-
-        // Have we already authenticated someone?
-        Principal principal = request.getUserPrincipal();
-        //String ssoId = (String) request.getNote(Constants.REQ_SSOID_NOTE);
-        if (principal != null) {
-            if (log.isDebugEnabled()) {
-                log.debug("Already authenticated '" + principal.getName() + "'");
-            }
-            // Associate the session with any existing SSO session in order
-            // to get coordinated session invalidation at logout
-            String ssoId = (String) request.getNote(Constants.REQ_SSOID_NOTE);
-            if (ssoId != null) {
-                associate(ssoId, request.getSessionInternal(true));
-            }
-            return (true);
-        }
 
         // NOTE: We don't try to reauthenticate using any existing SSO session,
         // because that will only work if the original authentication was
         // BASIC or FORM, which are less secure than the DIGEST auth-type
         // specified for this webapp
         //
-        // Uncomment below to allow previous FORM or BASIC authentications
+        // Change to true below to allow previous FORM or BASIC authentications
         // to authenticate users for this webapp
         // TODO make this a configurable attribute (in SingleSignOn??)
-        /*
-        // Is there an SSO session against which we can try to reauthenticate?
-        if (ssoId != null) {
-            if (log.isDebugEnabled())
-                log.debug("SSO Id " + ssoId + " set; attempting " +
-                          "reauthentication");
-            // Try to reauthenticate using data cached by SSO.  If this fails,
-            // either the original SSO logon was of DIGEST or SSL (which
-            // we can't reauthenticate ourselves because there is no
-            // cached username and password), or the realm denied
-            // the user's reauthentication for some reason.
-            // In either case we have to prompt the user for a logon
-            if (reauthenticateFromSSO(ssoId, request))
-                return true;
+        if (checkForCachedAuthentication(request, response, false)) {
+            return true;
         }
-        */
 
         // Validate any credentials already included with this request
+        Principal principal = null;
         String authorization = request.getHeader("authorization");
         DigestInfo digestInfo = new DigestInfo(getOpaque(), getNonceValidity(),
                 getKey(), nonces, isValidateUri());
@@ -301,6 +254,10 @@ public class DigestAuthenticator extends AuthenticatorBase {
     /**
      * Removes the quotes on a string. RFC2617 states quotes are optional for
      * all parameters except realm.
+     *
+     * @param quotedString The quoted string
+     * @param quotesRequired <code>true</code> if quotes were required
+     * @return The unquoted string
      */
     protected static String removeQuotes(String quotedString,
                                          boolean quotesRequired) {
@@ -317,6 +274,9 @@ public class DigestAuthenticator extends AuthenticatorBase {
 
     /**
      * Removes the quotes on a string.
+     *
+     * @param quotedString The quoted string
+     * @return The unquoted string
      */
     protected static String removeQuotes(String quotedString) {
         return removeQuotes(quotedString, false);
@@ -328,6 +288,7 @@ public class DigestAuthenticator extends AuthenticatorBase {
      * time-stamp ":" private-key ) ).
      *
      * @param request HTTP Servlet request
+     * @return The generated nonce
      */
     protected String generateNonce(Request request) {
 
@@ -370,7 +331,7 @@ public class DigestAuthenticator extends AuthenticatorBase {
      *
      *      realm               = "realm" "=" realm-value
      *      realm-value         = quoted-string
-     *      domain              = "domain" "=" <"> 1#URI <">
+     *      domain              = "domain" "=" &lt;"&gt; 1#URI &lt;"&gt;
      *      nonce               = "nonce" "=" nonce-value
      *      nonce-value         = quoted-string
      *      opaque              = "opaque" "=" quoted-string
@@ -381,6 +342,7 @@ public class DigestAuthenticator extends AuthenticatorBase {
      * @param request HTTP Servlet request
      * @param response HTTP Servlet response
      * @param nonce nonce token
+     * @param isNonceStale <code>true</code> to add a stale parameter
      */
     protected void setAuthenticateHeader(HttpServletRequest request,
                                          HttpServletResponse response,
@@ -449,7 +411,7 @@ public class DigestAuthenticator extends AuthenticatorBase {
         };
     }
 
-    private static class DigestInfo {
+    public static class DigestInfo {
 
         private final String opaque;
         private final long nonceValidity;
@@ -494,7 +456,7 @@ public class DigestAuthenticator extends AuthenticatorBase {
 
             Map<String,String> directives;
             try {
-                directives = HttpParser.parseAuthorizationDigest(
+                directives = Authorization.parseAuthorizationDigest(
                         new StringReader(authorization));
             } catch (IOException e) {
                 return false;
@@ -566,7 +528,7 @@ public class DigestAuthenticator extends AuthenticatorBase {
             }
 
             // Validate nonce
-            int i = nonce.indexOf(":");
+            int i = nonce.indexOf(':');
             if (i < 0 || (i + 1) == nonce.length()) {
                 return false;
             }
@@ -655,11 +617,11 @@ public class DigestAuthenticator extends AuthenticatorBase {
 
     }
 
-    private static class NonceInfo {
-        private volatile long timestamp;
-        private volatile boolean seen[];
-        private volatile int offset;
-        private volatile int count = 0;
+    public static class NonceInfo {
+        private final long timestamp;
+        private final boolean seen[];
+        private final int offset;
+        private int count = 0;
 
         public NonceInfo(long currentTime, int seenWindowSize) {
             this.timestamp = currentTime;

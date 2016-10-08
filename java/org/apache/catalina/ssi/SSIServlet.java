@@ -42,7 +42,6 @@ import org.apache.catalina.Globals;
  * @author Amy Roh
  * @author Dan Sandberg
  * @author David Becker
- * @version $Id$
  */
 public class SSIServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
@@ -146,6 +145,7 @@ public class SSIServlet extends HttpServlet {
      *            a value of type 'HttpServletRequest'
      * @param res
      *            a value of type 'HttpServletResponse'
+     * @throws IOException an IO error occurred
      */
     protected void requestHandler(HttpServletRequest req,
             HttpServletResponse res) throws IOException {

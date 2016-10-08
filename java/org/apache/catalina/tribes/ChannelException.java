@@ -26,17 +26,14 @@ import java.util.ArrayList;
  * If an application is sending a message and some of the recipients fail to receive it,
  * the application can retrieve what recipients failed by using the <code>getFaultyMembers()</code>
  * method. This way, an application will always know if a message was delivered successfully or not.
- * @author Filip Hanik
- * @version $Id$
  */
-
 public class ChannelException extends Exception {
     private static final long serialVersionUID = 1L;
     /**
      * Empty list to avoid reinstatiating lists
      */
     protected static final FaultyMember[] EMPTY_LIST = new FaultyMember[0];
-    /*
+    /**
      * Holds a list of faulty members
      */
     private ArrayList<FaultyMember> faultyMembers=null;
@@ -51,6 +48,7 @@ public class ChannelException extends Exception {
 
     /**
      * Constructor, creates a ChannelException with an error message
+     * @param message The error message
      * @see java.lang.Exception#Exception(String)
      */
     public ChannelException(String message) {
@@ -59,7 +57,7 @@ public class ChannelException extends Exception {
 
     /**
      * Constructor, creates a ChannelException with an error message and a cause
-     * @param message String
+     * @param message The error message
      * @param cause Throwable
      * @see java.lang.Exception#Exception(String,Throwable)
      */
@@ -78,7 +76,7 @@ public class ChannelException extends Exception {
 
     /**
      * Returns the message for this exception
-     * @return String
+     * @return the error message
      * @see java.lang.Exception#getMessage()
      */
     @Override
@@ -101,6 +99,7 @@ public class ChannelException extends Exception {
      * Adds a faulty member, and the reason the member failed.
      * @param mbr Member
      * @param x Exception
+     * @return <code>true</code> if the member was added
      */
     public boolean addFaultyMember(Member mbr, Exception x ) {
         return addFaultyMember(new FaultyMember(mbr,x));
@@ -109,6 +108,7 @@ public class ChannelException extends Exception {
     /**
      * Adds a list of faulty members
      * @param mbrs FaultyMember[]
+     * @return the number of members added
      */
     public int addFaultyMember(FaultyMember[] mbrs) {
         int result = 0;
@@ -121,6 +121,7 @@ public class ChannelException extends Exception {
     /**
      * Adds a faulty member
      * @param mbr FaultyMember
+     * @return <code>true</code> if the member was added
      */
     public boolean addFaultyMember(FaultyMember mbr) {
         if ( this.faultyMembers==null ) this.faultyMembers = new ArrayList<>();
@@ -144,7 +145,6 @@ public class ChannelException extends Exception {
      * <p>Description: Represent a failure to a specific member when a message was sent
      * to more than one member</p>
      *
-     * @author Filip Hanik
      * @version 1.0
      */
     public static class FaultyMember {

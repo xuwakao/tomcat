@@ -33,7 +33,6 @@ import org.apache.juli.logging.LogFactory;
  * A DataSource that can be instantiated through IoC and implements the DataSource interface
  * since the DataSourceProxy is used as a generic proxy.
  * The DataSource simply wraps a {@link ConnectionPool} in order to provide a standard interface to the user.
- * @author Filip Hanik
  * @version 1.0
  */
 public class DataSource extends DataSourceProxy implements javax.sql.DataSource,MBeanRegistration, org.apache.tomcat.jdbc.pool.jmx.ConnectionPoolMBean, javax.sql.ConnectionPoolDataSource {
@@ -48,7 +47,7 @@ public class DataSource extends DataSourceProxy implements javax.sql.DataSource,
 
     /**
      * Constructs a DataSource object wrapping a connection
-     * @param poolProperties
+     * @param poolProperties The pool properties
      */
     public DataSource(PoolConfiguration poolProperties) {
         super(poolProperties);
@@ -64,7 +63,7 @@ public class DataSource extends DataSourceProxy implements javax.sql.DataSource,
     protected volatile ObjectName oname = null;
 
     /**
-     * Unregisters the underlying connection pool mbean.<br/>
+     * Unregisters the underlying connection pool mbean.<br>
      * {@inheritDoc}
      */
     @Override
@@ -73,7 +72,7 @@ public class DataSource extends DataSourceProxy implements javax.sql.DataSource,
     }
 
     /**
-     * no-op<br/>
+     * no-op<br>
      * {@inheritDoc}
      */
     @Override
@@ -83,7 +82,7 @@ public class DataSource extends DataSourceProxy implements javax.sql.DataSource,
 
 
     /**
-     * no-op<br/>
+     * no-op<br>
      * {@inheritDoc}
      */
     @Override
@@ -92,7 +91,7 @@ public class DataSource extends DataSourceProxy implements javax.sql.DataSource,
     }
 
     /**
-     * If the connection pool MBean exists, it will be registered during this operation.<br/>
+     * If the connection pool MBean exists, it will be registered during this operation.<br>
      * {@inheritDoc}
      */
     @Override
@@ -112,7 +111,7 @@ public class DataSource extends DataSourceProxy implements javax.sql.DataSource,
      * Creates the ObjectName for the ConnectionPoolMBean object to be registered
      * @param original the ObjectName for the DataSource
      * @return the ObjectName for the ConnectionPoolMBean
-     * @throws MalformedObjectNameException
+     * @throws MalformedObjectNameException Invalid object name
      */
     public ObjectName createObjectName(ObjectName original) throws MalformedObjectNameException {
         String domain = ConnectionPool.POOL_JMX_DOMAIN;

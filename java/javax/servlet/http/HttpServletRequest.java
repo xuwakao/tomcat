@@ -170,6 +170,31 @@ public interface HttpServletRequest extends ServletRequest {
      */
     public int getIntHeader(String name);
 
+    public default Mapping getMapping() {
+        return new Mapping() {
+
+            @Override
+            public String getMatchValue() {
+                return "";
+            }
+
+            @Override
+            public String getPattern() {
+                return "";
+            }
+
+            @Override
+            public MappingMatch getMappingMatch() {
+                return MappingMatch.UNKNOWN;
+            }
+
+            @Override
+            public String getServletName() {
+                return "";
+            }
+        };
+    }
+
     /**
      * Returns the name of the HTTP method with which this request was made, for
      * example, GET, POST, or PUT. Same as the value of the CGI variable
@@ -213,6 +238,33 @@ public interface HttpServletRequest extends ServletRequest {
      *         information
      */
     public String getPathTranslated();
+
+    /**
+     * Does the current request allow push requests. This will return {@code
+     * true} only if the underlying protocol supports server push and if pushes
+     * are permitted from the current request.
+     *
+     * @return {@code true} if server push is supported for the current request
+     *         otherwise {@code false}
+     */
+    public default boolean isPushSupported() {
+        return false;
+    }
+
+    /**
+     * Obtain a builder for generating push requests. {@link PushBuilder}
+     * documents how this request will be used as the basis for a push request.
+     * Each call to this method will return a new instance, independent of any
+     * previous instance obtained.
+     *
+     * @return A builder that can be used to generate push requests based on
+     *         this request.
+     *
+     * @since Servlet 4.0
+     */
+    public default PushBuilder getPushBuilder() {
+        return null;
+    }
 
     /**
      * Returns the portion of the request URI that indicates the context of the
@@ -423,11 +475,11 @@ public interface HttpServletRequest extends ServletRequest {
     public boolean isRequestedSessionIdFromURL();
 
     /**
+     * @return {@link #isRequestedSessionIdFromURL()}
      * @deprecated As of Version 2.1 of the Java Servlet API, use
      *             {@link #isRequestedSessionIdFromURL} instead.
      */
-    @SuppressWarnings("dep-ann")
-    // Spec API does not use @Deprecated
+    @Deprecated
     public boolean isRequestedSessionIdFromUrl();
 
     /**
@@ -439,6 +491,12 @@ public interface HttpServletRequest extends ServletRequest {
      * @return <code>true</code> if the user is successfully authenticated and
      *         <code>false</code> if not
      *
+     * @throws IOException if the authentication process attempted to read from
+     *         the request or write to the response and an I/O error occurred
+     * @throws IllegalStateException if the authentication process attempted to
+     *         write to the response after it had been committed
+     * @throws ServletException if the authentication failed and the caller is
+     *         expected to handle the failure
      * @since Servlet 3.0
      */
     public boolean authenticate(HttpServletResponse response)
@@ -490,7 +548,8 @@ public interface HttpServletRequest extends ServletRequest {
      * Gets the named Part or null if the Part does not exist. Triggers upload
      * of all Parts.
      *
-     * @param name
+     * @param name The name of the Part to obtain
+     *
      * @return The named Part or null if the Part does not exist
      * @throws IOException
      *             if an I/O error occurs
@@ -510,6 +569,12 @@ public interface HttpServletRequest extends ServletRequest {
      * HttpServletResponse#SC_SWITCHING_PROTOCOLS} and flushes the response.
      * Protocol specific headers must have already been set before this method
      * is called.
+     *
+     * @param <T>                     The type of the upgrade handler
+     * @param httpUpgradeHandlerClass The class that implements the upgrade
+     *                                handler
+     *
+     * @return A newly created instance of the specified upgrade handler type
      *
      * @throws IOException
      *             if an I/O error occurred during the upgrade

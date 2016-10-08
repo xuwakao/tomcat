@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -39,18 +39,19 @@
 <p>Tomcat provides a JNDI <strong>InitialContext</strong> implementation
 instance for each web application running under it, in a manner that is
 compatible with those provided by a
-<a href="http://java.sun.com/j2ee">Java Enterprise Edition</a> application
-server. The Java EE standard provides a standard set of elements in the
-<code>/WEB-INF/web.xml</code> file to reference/define resources.</p>
+<a href="http://www.oracle.com/technetwork/java/javaee/overview/index.html">
+Java Enterprise Edition</a> application server. The Java EE standard provides
+a standard set of elements in the <code>/WEB-INF/web.xml</code> file to
+reference/define resources.</p>
 
 <p>See the following Specifications for more information about programming APIs
 for JNDI, and for the features supported by Java Enterprise Edition (Java EE)
 servers, which Tomcat emulates for the services that it provides:</p>
 <ul>
-<li><a href="http://java.sun.com/products/jndi">Java Naming and Directory
-    Interface</a> (included in JDK 1.4 onwards)</li>
-<li><a href="http://java.sun.com/j2ee/download.html">Java EE Platform
-    Specification</a> (in particular, see Chapter 5 on <em>Naming</em>)</li>
+<li><a href="http://docs.oracle.com/javase/7/docs/technotes/guides/jndi/index.html">
+    Java Naming and Directory Interface</a> (included in JDK 1.4 onwards)</li>
+<li><a href="http://www.oracle.com/technetwork/java/javaee/documentation/index.html">
+    Java EE Platform Specification</a> (in particular, see Chapter 5 on <em>Naming</em>)</li>
 </ul>
 
 </section>
@@ -227,8 +228,9 @@ conn.close();]]></source>
     Java class that conforms to standard JavaBeans naming conventions (i.e.
     it has a zero-arguments constructor, and has property setters that
     conform to the setFoo() naming pattern.  The resource factory will
-    create a new instance of the appropriate bean class every time a
-    <code>lookup()</code> for this entry is made.</p>
+    only create a new instance of the appropriate bean class every time a
+    <code>lookup()</code> for this entry is made if the <code>singleton</code>
+    attribute of the factory is set to <code>false</code>.</p>
 
     <p>The steps required to use this facility are described below.</p>
 
@@ -326,6 +328,103 @@ writer.println("foo = " + bean.getFoo() + ", bar = " +
     <code>foo</code> property (although we could have), the bean will
     contain whatever default value is set up by its constructor.</p>
 
+    <p>Some beans have properties with types that cannot automatically be
+    converted from a string value. Setting such properties using the Tomcat
+    BeanFactory will fail with a NamingException. In cases were those beans
+    provide methods to set the properties from a string value, the Tomcat
+    BeanFactory can be configured to use these methods. The configuration is
+    done with the <code>forceString</code> attribute.</p>
+
+    <p>Assume our bean looks like this:</p>
+
+<source><![CDATA[package com.mycompany;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
+public class MyBean2 {
+
+  private InetAddress local = null;
+
+  public InetAddress getLocal() {
+    return local;
+  }
+
+  public void setLocal(InetAddress ip) {
+    local = ip;
+  }
+
+  public void setLocal(String localHost) {
+    try {
+      local = InetAddress.getByName(localHost);
+    } catch (UnknownHostException ex) {
+    }
+  }
+
+  private InetAddress remote = null;
+
+  public InetAddress getRemote() {
+    return remote;
+  }
+
+  public void setRemote(InetAddress ip) {
+    remote = ip;
+  }
+
+  public void host(String remoteHost) {
+    try {
+      remote = InetAddress.getByName(remoteHost);
+    } catch (UnknownHostException ex) {
+    }
+  }
+
+}]]></source>
+
+    <p>The bean has two properties, both are of type <code>InetAddress</code>.
+    The first property <code>local</code> has an additional setter taking a
+    string argument. By default the Tomcat BeanFactory would try to use the
+    automatically detected setter with the same argument type as the property
+    type and then throw a NamingException, because it is not prepared to convert
+    the given string attribute value to <code>InetAddress</code>.
+    We can tell the Tomcat BeanFactory to use the other setter like that:</p>
+
+<source><![CDATA[<Context ...>
+  ...
+  <Resource name="bean/MyBeanFactory" auth="Container"
+            type="com.mycompany.MyBean2"
+            factory="org.apache.naming.factory.BeanFactory"
+            forceString="local"
+            local="localhost"/>
+  ...
+</Context>]]></source>
+
+    <p>The bean property <code>remote</code> can also be set from a string,
+    but one has to use the non-standard method name <code>host</code>.
+    To set <code>local</code> and <code>remote</code> use the following
+    configuration:</p>
+
+<source><![CDATA[<Context ...>
+  ...
+  <Resource name="bean/MyBeanFactory" auth="Container"
+            type="com.mycompany.MyBean2"
+            factory="org.apache.naming.factory.BeanFactory"
+            forceString="local,remote=host"
+            local="localhost"
+            remote="tomcat.apache.org"/>
+  ...
+</Context>]]></source>
+
+    <p>Multiple property descriptions can be combined in
+    <code>forceString</code> by concatenation with comma as a separator.
+    Each property description consists of either only the property name
+    in which case the BeanFactory calls the setter method. Or it consist
+    of <code>name=method</code> in which case the property named
+    <code>name</code> is set by calling method <code>method</code>.
+    For properties of types <code>String</code> or of primitive type
+    or of their associated primitive wrapper classes using
+    <code>forceString</code> is not needed. The correct setter will be
+    automatically detected and argument conversion will be applied.</p>
+
   </subsection>
 
 
@@ -343,13 +442,13 @@ writer.println("foo = " + bean.getFoo() + ", bar = " +
 
     <h5>1. Create/edit the XML file</h5>
 
-    <p>The XMl file is typically located at
+    <p>The XML file is typically located at
     <code>$CATALINA_BASE/conf/tomcat-users.xml</code> however, you are free to
     locate the file anywhere on the file system. It is recommended that the XML
     files are placed in <code>$CATALINA_BASE/conf</code>. A typical XML would
     look like:</p>
 
-<source><![CDATA[<?xml version='1.0' encoding='utf-8'?>
+<source><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <tomcat-users>
   <role rolename="tomcat"/>
   <role rolename="role1"/>
@@ -361,7 +460,7 @@ writer.println("foo = " + bean.getFoo() + ", bar = " +
     <h5>2.  Declare Your Resource</h5>
 
     <p>Next, modify <code>$CATALINA_BASE/conf/server.xml</code> to create the
-    UserDatabase resource based on your XMl file. It should look something like
+    UserDatabase resource based on your XML file. It should look something like
     this:</p>
 
 <source><![CDATA[<Resource name="UserDatabase"
@@ -372,8 +471,9 @@ writer.println("foo = " + bean.getFoo() + ", bar = " +
           pathname="conf/tomcat-users.xml"
           readonly="false" />]]></source>
 
-    <p>The <code>pathname</code> attribute can be absolute or relative. If
-    relative, it is relative to <code>$CATALINA_BASE</code>.</p>
+    <p>The <code>pathname</code> attribute can be a URL, an absolute path or a
+    relative path. If relative, it is relative to <code>$CATALINA_BASE</code>.
+    </p>
 
     <p>The <code>readonly</code> attribute is optional and defaults to
     <code>true</code> if not supplied. If the XML is writeable then it will be
@@ -396,7 +496,7 @@ writer.println("foo = " + bean.getFoo() + ", bar = " +
 
     <p>In many web applications, sending electronic mail messages is a
     required part of the system's functionality.  The
-    <a href="http://java.sun.com/products/javamail">Java Mail</a> API
+    <a href="http://www.oracle.com/technetwork/java/javamail/index.html">Java Mail</a> API
     makes this process relatively straightforward, but requires many
     configuration details that the client application must be aware of
     (including the name of the SMTP host to be used for message sending).</p>
@@ -547,7 +647,8 @@ Transport.send(message);]]></source>
 
     <p>For information about JDBC, you should consult the following:</p>
     <ul>
-    <li><a href="http://java.sun.com/products/jdbc/">http://java.sun.com/products/jdbc/</a> -
+    <li><a href="http://www.oracle.com/technetwork/java/javase/jdbc/index.html">
+        http://www.oracle.com/technetwork/java/javase/jdbc/index.html</a> -
         Home page for information about Java Database Connectivity.</li>
     <li><a href="http://java.sun.com/j2se/1.3/docs/guide/jdbc/spec2/jdbc2.1.frame.html">http://java.sun.com/j2se/1.3/docs/guide/jdbc/spec2/jdbc2.1.frame.html</a> -
         The JDBC 2.1 API Specification.</li>
@@ -555,7 +656,8 @@ Transport.send(message);]]></source>
         The JDBC 2.0 Standard Extension API (including the
         <code>javax.sql.DataSource</code> API).  This package is now known
         as the "JDBC Optional Package".</li>
-    <li><a href="http://java.sun.com/j2ee/download.html">http://java.sun.com/j2ee/download.html</a> -
+    <li><a href="http://www.oracle.com/technetwork/java/javaee/overview/index.htm">
+        http://www.oracle.com/technetwork/java/javaee/overview/index.htm</a> -
         The Java EE Platform Specification (covers the JDBC facilities that
         all Java EE platforms must provide to applications).</li>
     </ul>
@@ -591,7 +693,7 @@ Transport.send(message);]]></source>
     Resource reference to a factory for java.sql.Connection
     instances that may be used for talking to a particular
     database that is configured in the <Context>
-    configurartion for the web application.
+    configuration for the web application.
   </description>
   <res-ref-name>
     jdbc/EmployeeDB
@@ -643,7 +745,7 @@ conn.close();]]></source>
             password="dbpassword"
             driverClassName="org.hsql.jdbcDriver"
             url="jdbc:HypersonicSQL:database"
-            maxActive="8"
+            maxTotal="8"
             maxIdle="4"/>
   ...
 </Context>]]></source>
@@ -672,13 +774,13 @@ conn.close();]]></source>
         is also recognized.)</li>
     <li><strong>initialSize</strong> - The initial number of connections
         that will be created in the pool during pool initialization. Default: 0</li>
-    <li><strong>maxActive</strong> - The maximum number of connections
+    <li><strong>maxTotal</strong> - The maximum number of connections
         that can be allocated from this pool at the same time. Default: 8</li>
     <li><strong>minIdle</strong> - The minimum number of connections that
         will sit idle in this pool at the same time. Default: 0</li>
     <li><strong>maxIdle</strong> - The maximum number of connections that
         can sit idle in this pool at the same time. Default: 8</li>
-    <li><strong>maxWait</strong> - The maximum number of milliseconds that the
+    <li><strong>maxWaitMillis</strong> - The maximum number of milliseconds that the
         pool will wait (when there are no available connections) for a
         connection to be returned before throwing an exception. Default: -1 (infinite)</li>
     </ul>
@@ -698,7 +800,7 @@ conn.close();]]></source>
         returned to the pool. Default: false</li>
     </ul>
     <p>The optional evictor thread is responsible for shrinking the pool
-    by removing any conections which are idle for a long time. The evictor
+    by removing any connections which are idle for a long time. The evictor
     does not respect <code>minIdle</code>. Note that you do not need to
     activate the evictor thread if you only want the pool to shrink according
     to the configured <code>maxIdle</code> property.</p>
@@ -709,7 +811,7 @@ conn.close();]]></source>
         milliseconds between consecutive runs of the evictor.
         Default: -1 (disabled)</li>
     <li><strong>numTestsPerEvictionRun</strong> - The number of connections
-        that will be checked for idleness by the evitor during each
+        that will be checked for idleness by the evictor during each
         run of the evictor. Default: 3</li>
     <li><strong>minEvictableIdleTimeMillis</strong> - The idle time in
         milliseconds after which a connection can be removed from the pool
@@ -787,10 +889,12 @@ conn.close();]]></source>
   <h4>1.  Write A Resource Factory Class</h4>
 
   <p>You must write a class that implements the JNDI service provider
-  <code>javax.naming.spi.ObjectFactory</code> inteface.  Every time your
+  <code>javax.naming.spi.ObjectFactory</code> interface.  Every time your
   web application calls <code>lookup()</code> on a context entry that is
-  bound to this factory, the <code>getObjectInstance()</code> method is
-  called, with the following arguments:</p>
+  bound to this factory (assuming that the factory is configured with
+  <code>singleton=&quot;false&quot;</code>), the
+  <code>getObjectInstance()</code> method is called, with the following
+  arguments:</p>
   <ul>
   <li><strong>Object obj</strong> - The (possibly null) object containing
       location or reference information that can be used in creating an object.
@@ -827,7 +931,7 @@ import javax.naming.spi.ObjectFactory;
 public class MyBeanFactory implements ObjectFactory {
 
   public Object getObjectInstance(Object obj,
-      Name name, Context nameCtx, Hashtable environment)
+      Name name2, Context nameCtx, Hashtable environment)
       throws NamingException {
 
       // Acquire an instance of our specified bean class
@@ -868,8 +972,8 @@ public class MyBeanFactory implements ObjectFactory {
   bean being configured.</p>
 
   <p>For more information about <code>ObjectFactory</code>, see the
-  <a href="http://java.sun.com/products/jndi/docs.html">JNDI 1.2 Service
-  Provider Interface (SPI) Specification</a>.</p>
+  <a href="http://docs.oracle.com/javase/7/docs/technotes/guides/jndi/index.html">
+  JNDI Service Provider Interface (SPI) Specification</a>.</p>
 
   <p>You will need to compile this class against a class path that includes
   all of the JAR files in the <code>$CATALINA_HOME/lib</code> directory.  When you are through,
@@ -896,7 +1000,7 @@ public class MyBeanFactory implements ObjectFactory {
   <resource-env-ref-type>
     com.mycompany.MyBean
   </resource-env-ref-type>
-<resource-env-ref>]]></source>
+</resource-env-ref>]]></source>
 
     <p><strong>WARNING</strong> - Be sure you respect the element ordering
     that is required by the DTD for web application deployment descriptors!
@@ -927,6 +1031,7 @@ writer.println("foo = " + bean.getFoo() + ", bar = " +
   <Resource name="bean/MyBeanFactory" auth="Container"
             type="com.mycompany.MyBean"
             factory="com.mycompany.MyBeanFactory"
+            singleton="false"
             bar="23"/>
   ...
 </Context>]]></source>

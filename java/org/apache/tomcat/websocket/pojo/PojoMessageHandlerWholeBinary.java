@@ -39,7 +39,7 @@ public class PojoMessageHandlerWholeBinary
         extends PojoMessageHandlerWholeBase<ByteBuffer> {
 
     private static final StringManager sm =
-            StringManager.getManager(Constants.PACKAGE_NAME);
+            StringManager.getManager(PojoMessageHandlerWholeBinary.class);
 
     private final List<Decoder> decoders = new ArrayList<>();
 
@@ -52,6 +52,16 @@ public class PojoMessageHandlerWholeBinary
             boolean isForInputStream, long maxMessageSize) {
         super(pojo, method, session, params, indexPayload, convert,
                 indexSession, maxMessageSize);
+
+        // Update binary text size handled by session
+        if (maxMessageSize > -1 && maxMessageSize > session.getMaxBinaryMessageBufferSize()) {
+            if (maxMessageSize > Integer.MAX_VALUE) {
+                throw new IllegalArgumentException(sm.getString(
+                        "pojoMessageHandlerWhole.maxBufferSize"));
+            }
+            session.setMaxBinaryMessageBufferSize((int) maxMessageSize);
+        }
+
         try {
             if (decoderClazzes != null) {
                 for (Class<? extends Decoder> decoderClazz : decoderClazzes) {

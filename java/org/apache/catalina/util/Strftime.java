@@ -40,7 +40,6 @@ import java.util.TimeZone;
  *
  * @author Bip Thelin
  * @author Dan Sandberg
- * @version $Id$
  */
 public class Strftime {
     protected static final Properties translate;
@@ -140,6 +139,7 @@ public class Strftime {
     /**
      * Change the timezone used to format dates
      *
+     * @param timeZone The new time zone
      * @see SimpleDateFormat#setTimeZone
      */
     public void setTimeZone( TimeZone timeZone ) {

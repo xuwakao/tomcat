@@ -21,6 +21,8 @@ import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
 
+import javax.websocket.CloseReason;
+import javax.websocket.CloseReason.CloseCodes;
 import javax.websocket.Session;
 
 public class Snake {
@@ -52,12 +54,12 @@ public class Snake {
 
     private synchronized void kill() {
         resetState();
-        sendMessage("{'type': 'dead'}");
+        sendMessage("{\"type\": \"dead\"}");
     }
 
     private synchronized void reward() {
         length++;
-        sendMessage("{'type': 'kill'}");
+        sendMessage("{\"type\": \"kill\"}");
     }
 
 
@@ -65,7 +67,13 @@ public class Snake {
         try {
             session.getBasicRemote().sendText(msg);
         } catch (IOException ioe) {
-            // Ignore
+            CloseReason cr =
+                    new CloseReason(CloseCodes.CLOSED_ABNORMALLY, ioe.getMessage());
+            try {
+                session.close(cr);
+            } catch (IOException ioe2) {
+                // Ignore
+            }
         }
     }
 
@@ -121,14 +129,14 @@ public class Snake {
 
     public synchronized String getLocationsJson() {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("{x: %d, y: %d}",
+        sb.append(String.format("{\"x\": %d, \"y\": %d}",
                 Integer.valueOf(head.x), Integer.valueOf(head.y)));
         for (Location location : tail) {
             sb.append(',');
-            sb.append(String.format("{x: %d, y: %d}",
+            sb.append(String.format("{\"x\": %d, \"y\": %d}",
                     Integer.valueOf(location.x), Integer.valueOf(location.y)));
         }
-        return String.format("{'id':%d,'body':[%s]}",
+        return String.format("{\"id\":%d,\"body\":[%s]}",
                 Integer.valueOf(id), sb.toString());
     }
 

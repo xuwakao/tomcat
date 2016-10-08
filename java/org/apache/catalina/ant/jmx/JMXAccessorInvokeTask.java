@@ -87,10 +87,8 @@ import org.apache.tools.ant.BuildException;
  * These tasks require Ant 1.6 or later interface.
  *
  * @author Peter Rossbach
- * @version $Id$
  * @since 5.5.10
  */
-
 public class JMXAccessorInvokeTask extends JMXAccessorTask {
 
 
@@ -133,14 +131,6 @@ public class JMXAccessorInvokeTask extends JMXAccessorTask {
 
     // ------------------------------------------------------ protected Methods
 
-    /**
-     * Execute the specified command, based on the configured properties. The
-     * input stream will be closed upon completion of this task, whether it was
-     * executed successfully or not.
-     *
-     * @exception BuildException
-     *                if an error occurs
-     */
     @Override
     public String jmxExecute(MBeanServerConnection jmxServerConnection)
         throws Exception {
@@ -156,8 +146,12 @@ public class JMXAccessorInvokeTask extends JMXAccessorTask {
      }
 
     /**
-     * @param jmxServerConnection
-     * @throws Exception
+     * Invoke specified operation.
+     *
+     * @param jmxServerConnection Connection to the JMX server
+     * @param name The MBean name
+     * @return null (no error message to report other than exception)
+     * @throws Exception An error occurred
      */
     protected String jmxInvoke(MBeanServerConnection jmxServerConnection, String name) throws Exception {
         Object result ;

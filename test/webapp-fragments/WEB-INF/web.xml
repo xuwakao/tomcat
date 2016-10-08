@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -75,5 +75,15 @@
       <injection-target-class>org.apache.catalina.startup.TesterServletWithAnnotations</injection-target-class>
       <injection-target-name>envEntry3</injection-target-name>
     </injection-target>
+  </env-entry>
+  <env-entry>
+    <env-entry-name>envEntry5</env-entry-name>
+    <env-entry-type>java.lang.Integer</env-entry-type>
+    <env-entry-value>55</env-entry-value>
+  </env-entry>
+  <env-entry>
+    <env-entry-name>envEntry6</env-entry-name>
+    <env-entry-type>java.lang.Integer</env-entry-type>
+    <env-entry-value>66</env-entry-value>
   </env-entry>
 </web-app>

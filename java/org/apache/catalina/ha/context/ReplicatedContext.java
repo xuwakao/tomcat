@@ -36,15 +36,16 @@ import org.apache.catalina.tribes.tipis.AbstractReplicatedMap.MapOwner;
 import org.apache.catalina.tribes.tipis.ReplicatedMap;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.res.StringManager;
 
 /**
- * @author Filip Hanik
  * @version 1.0
  */
 public class ReplicatedContext extends StandardContext implements MapOwner {
     private int mapSendOptions = Channel.SEND_OPTIONS_DEFAULT;
-    private static final Log log = LogFactory.getLog( ReplicatedContext.class );
+    private static final Log log = LogFactory.getLog(ReplicatedContext.class);
     protected static final long DEFAULT_REPL_TIMEOUT = 15000;//15 seconds
+    private static final StringManager sm = StringManager.getManager(ReplicatedContext.class);
 
     /**
      * Start this component and implement the requirements
@@ -69,8 +70,8 @@ public class ReplicatedContext extends StandardContext implements MapOwner {
             }
             super.startInternal();
         }  catch ( Exception x ) {
-            log.error("Unable to start ReplicatedContext",x);
-            throw new LifecycleException("Failed to start ReplicatedContext",x);
+            log.error(sm.getString("replicatedContext.startUnable", getName()),x);
+            throw new LifecycleException(sm.getString("replicatedContext.startFailed", getName()),x);
         }
     }
 
@@ -84,13 +85,15 @@ public class ReplicatedContext extends StandardContext implements MapOwner {
     @Override
     protected synchronized void stopInternal() throws LifecycleException {
 
+        Map<String, Object> map = ((ReplApplContext) this.context)
+                .getAttributeMap();
+
         super.stopInternal();
 
-        Map<String,Object> map =
-                ((ReplApplContext)this.context).getAttributeMap();
-        if ( map!=null && map instanceof ReplicatedMap) {
-            ((ReplicatedMap<?,?>)map).breakdown();
+        if (map instanceof ReplicatedMap) {
+            ((ReplicatedMap<?, ?>) map).breakdown();
         }
+
     }
 
 
@@ -129,8 +132,7 @@ public class ReplicatedContext extends StandardContext implements MapOwner {
 
 
     protected static class ReplApplContext extends ApplicationContext {
-        protected final ConcurrentHashMap<String, Object> tomcatAttributes =
-            new ConcurrentHashMap<>();
+        protected final Map<String, Object> tomcatAttributes = new ConcurrentHashMap<>();
 
         public ReplApplContext(ReplicatedContext context) {
             super(context);
@@ -161,6 +163,13 @@ public class ReplicatedContext extends StandardContext implements MapOwner {
 
         @Override
         public void setAttribute(String name, Object value) {
+            if (name == null) {
+                throw new IllegalArgumentException(sm.getString("applicationContext.setAttribute.namenull"));
+            }
+            if (value == null) {
+                removeAttribute(name);
+                return;
+            }
             if ( (!getParent().getState().isAvailable()) || "org.apache.jasper.runtime.JspApplicationContextImpl".equals(name) ){
                 tomcatAttributes.put(name,value);
             } else

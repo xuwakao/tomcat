@@ -20,30 +20,17 @@ package org.apache.tomcat.util.bcel.classfile;
 import java.io.DataInput;
 import java.io.IOException;
 
-import org.apache.tomcat.util.bcel.Constants;
+import org.apache.tomcat.util.bcel.Const;
 
 /**
- * This class is derived from the abstract
- * <A HREF="org.apache.tomcat.util.bcel.classfile.Constant.html">Constant</A> class
+ * This class is derived from the abstract  {@link Constant}
  * and represents a reference to a Double object.
  *
- * @version $Id$
- * @author  <A HREF="mailto:m.dahm@gmx.de">M. Dahm</A>
  * @see     Constant
  */
 public final class ConstantDouble extends Constant {
 
-    private static final long serialVersionUID = 3450743772468544760L;
-    private double bytes;
-
-
-    /**
-     * @param bytes Data
-     */
-    public ConstantDouble(double bytes) {
-        super(Constants.CONSTANT_Double);
-        this.bytes = bytes;
-    }
+    private final double bytes;
 
 
     /**
@@ -52,8 +39,9 @@ public final class ConstantDouble extends Constant {
      * @param file Input stream
      * @throws IOException
      */
-    ConstantDouble(DataInput file) throws IOException {
-        this(file.readDouble());
+    ConstantDouble(final DataInput file) throws IOException {
+        super(Const.CONSTANT_Double);
+        this.bytes = file.readDouble();
     }
 
 

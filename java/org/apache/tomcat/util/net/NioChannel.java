@@ -24,30 +24,29 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 
 import org.apache.tomcat.util.net.NioEndpoint.Poller;
-import org.apache.tomcat.util.net.SecureNioChannel.ApplicationBufferHandler;
+import org.apache.tomcat.util.res.StringManager;
 
 /**
- *
  * Base class for a SocketChannel wrapper used by the endpoint.
  * This way, logic for a SSL socket channel remains the same as for
  * a non SSL, making sure we don't need to code for any exception cases.
  *
- * @author Filip Hanik
  * @version 1.0
  */
 public class NioChannel implements ByteChannel {
 
-    protected static ByteBuffer emptyBuf = ByteBuffer.allocate(0);
+    protected static final StringManager sm = StringManager.getManager(NioChannel.class);
+
+    protected static final ByteBuffer emptyBuf = ByteBuffer.allocate(0);
 
     protected SocketChannel sc = null;
+    protected SocketWrapperBase<NioChannel> socketWrapper = null;
 
-    protected ApplicationBufferHandler bufHandler;
+    protected final SocketBufferHandler bufHandler;
 
     protected Poller poller;
 
-    protected boolean sendFile = false;
-
-    public NioChannel(SocketChannel channel, ApplicationBufferHandler bufHandler) {
+    public NioChannel(SocketChannel channel, SocketBufferHandler bufHandler) {
         this.sc = channel;
         this.bufHandler = bufHandler;
     }
@@ -58,17 +57,19 @@ public class NioChannel implements ByteChannel {
      * @throws IOException If a problem was encountered resetting the channel
      */
     public void reset() throws IOException {
-        bufHandler.getReadBuffer().clear();
-        bufHandler.getWriteBuffer().clear();
-        this.sendFile = false;
+        bufHandler.reset();
     }
 
-    public int getBufferSize() {
-        if ( bufHandler == null ) return 0;
-        int size = 0;
-        size += bufHandler.getReadBuffer()!=null?bufHandler.getReadBuffer().capacity():0;
-        size += bufHandler.getWriteBuffer()!=null?bufHandler.getWriteBuffer().capacity():0;
-        return size;
+
+    void setSocketWrapper(SocketWrapperBase<NioChannel> socketWrapper) {
+        this.socketWrapper = socketWrapper;
+    }
+
+    /**
+     * Free the channel memory
+     */
+    public void free() {
+        bufHandler.free();
     }
 
     /**
@@ -79,7 +80,8 @@ public class NioChannel implements ByteChannel {
      * @param timeout   Unused. May be used when overridden
      * @return Always returns <code>true</code> since there is no network buffer
      *         in the regular channel
-     * @throws IOException
+     *
+     * @throws IOException Never for non-secure channel
      */
     public boolean flush(boolean block, Selector s, long timeout)
             throws IOException {
@@ -91,7 +93,6 @@ public class NioChannel implements ByteChannel {
      * Closes this channel.
      *
      * @throws IOException If an I/O error occurs
-     * TODO Implement this java.nio.channels.Channel method
      */
     @Override
     public void close() throws IOException {
@@ -99,14 +100,21 @@ public class NioChannel implements ByteChannel {
         getIOChannel().close();
     }
 
+    /**
+     * Close the connection.
+     *
+     * @param force Should the underlying socket be forcibly closed?
+     *
+     * @throws IOException If closing the secure channel fails.
+     */
     public void close(boolean force) throws IOException {
         if (isOpen() || force ) close();
     }
+
     /**
      * Tells whether or not this channel is open.
      *
      * @return <tt>true</tt> if, and only if, this channel is open
-     * TODO Implement this java.nio.channels.Channel method
      */
     @Override
     public boolean isOpen() {
@@ -119,10 +127,10 @@ public class NioChannel implements ByteChannel {
      * @param src The buffer from which bytes are to be retrieved
      * @return The number of bytes written, possibly zero
      * @throws IOException If some other I/O error occurs
-     * TODO Implement this java.nio.channels.WritableByteChannel method
      */
     @Override
     public int write(ByteBuffer src) throws IOException {
+        checkInterruptStatus();
         return sc.write(src);
     }
 
@@ -130,61 +138,39 @@ public class NioChannel implements ByteChannel {
      * Reads a sequence of bytes from this channel into the given buffer.
      *
      * @param dst The buffer into which bytes are to be transferred
-     * @return The number of bytes read, possibly zero, or <tt>-1</tt> if the channel has reached end-of-stream
+     * @return The number of bytes read, possibly zero, or <tt>-1</tt> if the
+     *         channel has reached end-of-stream
      * @throws IOException If some other I/O error occurs
-     * TODO Implement this java.nio.channels.ReadableByteChannel method
      */
     @Override
     public int read(ByteBuffer dst) throws IOException {
         return sc.read(dst);
     }
 
-    public Object getAttachment(boolean remove) {
+    public Object getAttachment() {
         Poller pol = getPoller();
         Selector sel = pol!=null?pol.getSelector():null;
         SelectionKey key = sel!=null?getIOChannel().keyFor(sel):null;
         Object att = key!=null?key.attachment():null;
-        if (key != null && att != null && remove ) key.attach(null);
         return att;
     }
-    /**
-     * getBufHandler
-     *
-     * @return ApplicationBufferHandler
-     * TODO Implement this org.apache.tomcat.util.net.SecureNioChannel method
-     */
-    public ApplicationBufferHandler getBufHandler() {
+
+    public SocketBufferHandler getBufHandler() {
         return bufHandler;
     }
 
     public Poller getPoller() {
         return poller;
     }
-    /**
-     * getIOChannel
-     *
-     * @return SocketChannel
-     * TODO Implement this org.apache.tomcat.util.net.SecureNioChannel method
-     */
+
     public SocketChannel getIOChannel() {
         return sc;
     }
 
-    /**
-     * isClosing
-     *
-     * @return boolean
-     * TODO Implement this org.apache.tomcat.util.net.SecureNioChannel method
-     */
     public boolean isClosing() {
         return false;
     }
 
-    /**
-     * isInitHandshakeComplete
-     *
-     * @return boolean
-     */
     public boolean isHandshakeComplete() {
         return true;
     }
@@ -196,7 +182,7 @@ public class NioChannel implements ByteChannel {
      * @param read  Unused in non-secure implementation
      * @param write Unused in non-secure implementation
      * @return Always returns zero
-     * @throws IOException
+     * @throws IOException Never for non-secure channel
      */
     public int handshake(boolean read, boolean write) throws IOException {
         return 0;
@@ -220,20 +206,39 @@ public class NioChannel implements ByteChannel {
     }
 
     /**
-     * Return true if the buffer wrote data
-     * @throws IOException
+     * Return true if the buffer wrote data. NO-OP for non-secure channel.
+     *
+     * @return Always returns {@code false} for non-secure channel
+     *
+     * @throws IOException Never for non-secure channel
      */
     public boolean flushOutbound() throws IOException {
         return false;
     }
 
-    public boolean isSendFile() {
-        return sendFile;
+    /**
+     * This method should be used to check the interrupt status before
+     * attempting a write.
+     *
+     * If a thread has been interrupted and the interrupt has not been cleared
+     * then an attempt to write to the socket will fail. When this happens the
+     * socket is removed from the poller without the socket being selected. This
+     * results in a connection limit leak for NIO as the endpoint expects the
+     * socket to be selected even in error conditions.
+     * @throws IOException If the current thread was interrupted
+     */
+    protected void checkInterruptStatus() throws IOException {
+        if (Thread.interrupted()) {
+            throw new IOException(sm.getString("channel.nio.interrupted"));
+        }
     }
 
-    public void setSendFile(boolean s) {
-        this.sendFile = s;
+
+    private ApplicationBufferHandler appReadBufHandler;
+    public void setAppReadBufHandler(ApplicationBufferHandler handler) {
+        this.appReadBufHandler = handler;
     }
-
-
+    protected ApplicationBufferHandler getAppReadBufHandler() {
+        return appReadBufHandler;
+    }
 }

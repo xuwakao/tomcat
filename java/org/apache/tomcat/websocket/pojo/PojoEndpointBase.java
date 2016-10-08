@@ -40,8 +40,7 @@ import org.apache.tomcat.util.res.StringManager;
 public abstract class PojoEndpointBase extends Endpoint {
 
     private static final Log log = LogFactory.getLog(PojoEndpointBase.class);
-    private static final StringManager sm =
-            StringManager.getManager(Constants.PACKAGE_NAME);
+    private static final StringManager sm = StringManager.getManager(PojoEndpointBase.class);
 
     private Object pojo;
     private Map<String,String> pathParameters;
@@ -52,6 +51,14 @@ public abstract class PojoEndpointBase extends Endpoint {
         PojoMethodMapping methodMapping = getMethodMapping();
         Object pojo = getPojo();
         Map<String,String> pathParameters = getPathParameters();
+
+        // Add message handlers before calling onOpen since that may trigger a
+        // message which in turn could trigger a response and/or close the
+        // session
+        for (MessageHandler mh : methodMapping.getMessageHandlers(pojo,
+                pathParameters, session, config)) {
+            session.addMessageHandler(mh);
+        }
 
         if (methodMapping.getOnOpen() != null) {
             try {
@@ -64,26 +71,21 @@ public abstract class PojoEndpointBase extends Endpoint {
                 log.error(sm.getString(
                         "pojoEndpointBase.onOpenFail",
                         pojo.getClass().getName()), e);
-                handleOnOpenError(session, e);
+                handleOnOpenOrCloseError(session, e);
                 return;
             } catch (InvocationTargetException e) {
                 Throwable cause = e.getCause();
-                handleOnOpenError(session, cause);
+                handleOnOpenOrCloseError(session, cause);
                 return;
             } catch (Throwable t) {
-                handleOnOpenError(session, t);
+                handleOnOpenOrCloseError(session, t);
                 return;
             }
-        }
-
-        for (MessageHandler mh : methodMapping.getMessageHandlers(pojo,
-                pathParameters, session, config)) {
-            session.addMessageHandler(mh);
         }
     }
 
 
-    private void handleOnOpenError(Session session, Throwable t) {
+    private void handleOnOpenOrCloseError(Session session, Throwable t) {
         // If really fatal - re-throw
         ExceptionUtils.handleThrowable(t);
 
@@ -104,9 +106,9 @@ public abstract class PojoEndpointBase extends Endpoint {
                 methodMapping.getOnClose().invoke(pojo,
                         methodMapping.getOnCloseArgs(pathParameters, session, closeReason));
             } catch (Throwable t) {
-                ExceptionUtils.handleThrowable(t);
                 log.error(sm.getString("pojoEndpointBase.onCloseFail",
                         pojo.getClass().getName()), t);
+                handleOnOpenOrCloseError(session, t);
             }
         }
 

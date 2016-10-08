@@ -22,6 +22,7 @@ import java.util.Map;
 
 import javax.naming.directory.DirContext;
 
+import org.apache.catalina.CredentialHandler;
 import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Realm;
@@ -39,8 +40,10 @@ import org.apache.catalina.tribes.Member;
 import org.apache.catalina.tribes.MembershipService;
 import org.apache.catalina.tribes.MessageListener;
 import org.apache.catalina.tribes.transport.DataSender;
+import org.apache.coyote.UpgradeProtocol;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.http.CookieProcessor;
 
 /**
  * Central StoreRegistry for all server.xml elements
@@ -63,7 +66,9 @@ public class StoreRegistry {
             Manager.class, DirContext.class, LifecycleListener.class,
             Valve.class, ClusterListener.class, MessageListener.class,
             DataSender.class, ChannelInterceptor.class, Member.class,
-            WebResourceRoot.class, WebResourceSet.class };
+            WebResourceRoot.class, WebResourceSet.class,
+            CredentialHandler.class, UpgradeProtocol.class,
+            CookieProcessor.class };
 
     /**
      * @return Returns the name.
@@ -99,7 +104,7 @@ public class StoreRegistry {
      * Find a description for id. Handle interface search when no direct match
      * found.
      *
-     * @param id
+     * @param id The class name
      * @return The description
      */
     public StoreDescription findDescription(String id) {
@@ -133,9 +138,9 @@ public class StoreRegistry {
     }
 
     /**
-     * Find Description by class
+     * Find Description by class.
      *
-     * @param aClass
+     * @param aClass The class
      * @return The description
      */
     public StoreDescription findDescription(Class<?> aClass) {
@@ -143,9 +148,9 @@ public class StoreRegistry {
     }
 
     /**
-     * Find factory from classname
+     * Find factory from class name.
      *
-     * @param aClassName
+     * @param aClassName The class name
      * @return The factory
      */
     public IStoreFactory findStoreFactory(String aClassName) {
@@ -158,9 +163,9 @@ public class StoreRegistry {
     }
 
     /**
-     * find factory from class
+     * Find factory from class.
      *
-     * @param aClass
+     * @param aClass The class
      * @return The factory
      */
     public IStoreFactory findStoreFactory(Class<?> aClass) {
@@ -168,9 +173,9 @@ public class StoreRegistry {
     }
 
     /**
-     * Register a new description
+     * Register a new description.
      *
-     * @param desc
+     * @param desc New description
      */
     public void registerDescription(StoreDescription desc) {
         String key = desc.getId();
@@ -182,6 +187,12 @@ public class StoreRegistry {
                     + "#" + desc.getTagClass());
     }
 
+    /**
+     * Unregister a description.
+     *
+     * @param desc The description
+     * @return the description, or <code>null</code> if it was not registered
+     */
     public StoreDescription unregisterDescription(StoreDescription desc) {
         String key = desc.getId();
         if (key == null || "".equals(key))
@@ -199,7 +210,8 @@ public class StoreRegistry {
     }
 
     /**
-     * @param string
+     * Set the encoding to use when writing the configuration files.
+     * @param string The encoding
      */
     public void setEncoding(String string) {
         encoding = string;

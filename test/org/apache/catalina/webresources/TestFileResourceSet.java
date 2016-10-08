@@ -17,56 +17,56 @@
 package org.apache.catalina.webresources;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
 
-import org.junit.Test;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
-import org.apache.catalina.WebResourceRoot;
-import org.apache.catalina.WebResourceSet;
+import org.apache.catalina.startup.ExpandWar;
+import org.apache.catalina.startup.TomcatBaseTest;
 
-public class TestFileResourceSet extends AbstractTestResourceSet {
+public class TestFileResourceSet extends AbstractTestFileResourceSet {
 
-    @Override
-    public WebResourceRoot getWebResourceRoot() {
-        File f = new File(getBaseDir());
-        TesterWebResourceRoot root = new TesterWebResourceRoot();
-        WebResourceSet webResourceSet =
-                new DirResourceSet(new TesterWebResourceRoot(),
-                        f.getAbsolutePath(), "/", "/");
-        root.setMainResources(webResourceSet);
+    private static Path tempDir;
+    private static File dir2;
 
-        WebResourceSet f1 = new FileResourceSet(root,
-                "test/webresources/dir1/f1.txt", "/f1.txt", "/");
-        root.addPreResources(f1);
+    @BeforeClass
+    public static void before() throws IOException {
+        tempDir = Files.createTempDirectory("test", new FileAttribute[0]);
+        dir2 = new File(tempDir.toFile(), "dir2");
+        TomcatBaseTest.recursiveCopy(new File("test/webresources/dir2").toPath(), dir2.toPath());
+    }
 
-        WebResourceSet f2 = new FileResourceSet(root,
-                "test/webresources/dir1/f2.txt", "/f2.txt", "/");
-        root.addPreResources(f2);
+    @AfterClass
+    public static void after() {
+        ExpandWar.delete(tempDir.toFile());
+    }
 
-        WebResourceSet d1f1 = new FileResourceSet(root,
-                "test/webresources/dir1/d1/d1-f1.txt", "/d1/d1-f1.txt", "/");
-        root.addPreResources(d1f1);
 
-        WebResourceSet d2f1 = new FileResourceSet(root,
-                "test/webresources/dir1/d2/d2-f1.txt", "/d2/d2-f1.txt", "/");
-        root.addPreResources(d2f1);
-
-        return root;
+    public TestFileResourceSet() {
+        super(false);
     }
 
     @Override
-    protected boolean isWriteable() {
-        return true;
+    protected File getDir2() {
+        return dir2;
     }
 
     @Override
-    public String getBaseDir() {
-        return "test/webresources/dir2";
+    protected String getNewDirName() {
+        return "test-dir-06";
     }
 
     @Override
-    @Test
-    public void testNoArgConstructor() {
-        @SuppressWarnings("unused")
-        Object obj = new FileResourceSet();
+    protected String getNewFileNameNull() {
+        return "test-null-06";
+    }
+
+    @Override
+    protected String getNewFileName() {
+        return "test-file-06";
     }
 }

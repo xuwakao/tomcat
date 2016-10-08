@@ -18,22 +18,24 @@ package org.apache.catalina.startup;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Enumeration;
 import java.util.Properties;
+
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 
 /**
  * Utility class to read the bootstrap Catalina configuration.
  *
  * @author Remy Maucherat
- * @version $Id$
  */
 public class CatalinaProperties {
 
-    private static final org.apache.juli.logging.Log log=
-        org.apache.juli.logging.LogFactory.getLog( CatalinaProperties.class );
+    private static final Log log = LogFactory.getLog(CatalinaProperties.class);
 
     private static Properties properties = null;
 
@@ -44,7 +46,8 @@ public class CatalinaProperties {
 
 
     /**
-     * Return specified property value.
+     * @param name The property name
+     * @return specified property value
      */
     public static String getProperty(String name) {
         return properties.getProperty(name);
@@ -57,10 +60,8 @@ public class CatalinaProperties {
     private static void loadProperties() {
 
         InputStream is = null;
-        Throwable error = null;
-
         try {
-            String configUrl = getConfigUrl();
+            String configUrl = System.getProperty("catalina.config");
             if (configUrl != null) {
                 is = (new URL(configUrl)).openStream();
             }
@@ -92,18 +93,23 @@ public class CatalinaProperties {
             try {
                 properties = new Properties();
                 properties.load(is);
-                is.close();
             } catch (Throwable t) {
                 handleThrowable(t);
-                error = t;
+                log.warn(t);
+            } finally {
+                try {
+                    is.close();
+                } catch (IOException ioe) {
+                    log.warn("Could not close catalina.properties", ioe);
+                }
             }
         }
 
-        if ((is == null) || (error != null)) {
+        if ((is == null)) {
             // Do something
-            log.warn("Failed to load catalina.properties", error);
+            log.warn("Failed to load catalina.properties");
             // That's fine - we have reasonable defaults.
-            properties=new Properties();
+            properties = new Properties();
         }
 
         // Register the properties as system properties
@@ -115,14 +121,6 @@ public class CatalinaProperties {
                 System.setProperty(name, value);
             }
         }
-    }
-
-
-    /**
-     * Get the value of the configuration URL.
-     */
-    private static String getConfigUrl() {
-        return System.getProperty("catalina.config");
     }
 
 

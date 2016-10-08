@@ -17,22 +17,28 @@
 package org.apache.catalina.webresources;
 
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Set;
+import java.util.jar.Manifest;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.WebResource;
 import org.apache.catalina.WebResourceRoot;
 import org.apache.catalina.WebResourceRoot.ResourceSetType;
-import org.apache.catalina.util.IOTools;
 import org.apache.catalina.util.ResourceSet;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 
 /**
  * Represents a {@link org.apache.catalina.WebResourceSet} based on a directory.
  */
 public class DirResourceSet extends AbstractFileResourceSet {
+
+    private static final Log log = LogFactory.getLog(DirResourceSet.class);
 
     /**
      * A no argument constructor is required for this to work with the digester.
@@ -48,31 +54,31 @@ public class DirResourceSet extends AbstractFileResourceSet {
      * @param root          The {@link WebResourceRoot} this new
      *                          {@link org.apache.catalina.WebResourceSet} will
      *                          be added to.
-     * @param base          The absolute path to the directory on the file
-     *                          system from which the resources will be served.
      * @param webAppMount   The path within the web application at which this
      *                          {@link org.apache.catalina.WebResourceSet} will
      *                          be mounted. For example, to add a directory of
      *                          JARs to a web application, the directory would
      *                          be mounted at "/WEB-INF/lib/"
+     * @param base          The absolute path to the directory on the file
+     *                          system from which the resources will be served.
      * @param internalPath  The path within this new {@link
      *                          org.apache.catalina.WebResourceSet} where
      *                          resources will be served from.
      */
-    public DirResourceSet(WebResourceRoot root, String base, String webAppMount,
+    public DirResourceSet(WebResourceRoot root, String webAppMount, String base,
             String internalPath) {
         super(internalPath);
         setRoot(root);
-        setBase(base);
         setWebAppMount(webAppMount);
+        setBase(base);
 
         if (root.getContext().getAddWebinfClassesResources()) {
             File f = new File(base, internalPath);
             f = new File(f, "/WEB-INF/classes/META-INF/resources");
 
             if (f.isDirectory()) {
-                root.createWebResourceSet(ResourceSetType.RESOURCE_JAR,
-                         f.getAbsolutePath(), "/", "/");
+                root.createWebResourceSet(ResourceSetType.RESOURCE_JAR, "/",
+                         f.getAbsolutePath(), null, "/");
             }
         }
 
@@ -92,14 +98,17 @@ public class DirResourceSet extends AbstractFileResourceSet {
         String webAppMount = getWebAppMount();
         WebResourceRoot root = getRoot();
         if (path.startsWith(webAppMount)) {
-            File f = file(path.substring(webAppMount.length()), true);
+            File f = file(path.substring(webAppMount.length()), false);
             if (f == null) {
                 return new EmptyResource(root, path);
             }
-            if (f.isDirectory() && path.charAt(path.length() - 1) != '/') {
-                path = path += '/';
+            if (!f.exists()) {
+                return new EmptyResource(root, path, f);
             }
-            return new FileResource(root, f, path);
+            if (f.isDirectory() && path.charAt(path.length() - 1) != '/') {
+                path = path + '/';
+            }
+            return new FileResource(root, path, f, isReadOnly(), getManifest());
         } else {
             return new EmptyResource(root, path);
         }
@@ -180,6 +189,9 @@ public class DirResourceSet extends AbstractFileResourceSet {
     @Override
     public boolean mkdir(String path) {
         checkPath(path);
+        if (isReadOnly()) {
+            return false;
+        }
         String webAppMount = getWebAppMount();
         if (path.startsWith(webAppMount)) {
             File f = file(path.substring(webAppMount.length()), false);
@@ -201,6 +213,10 @@ public class DirResourceSet extends AbstractFileResourceSet {
                     sm.getString("dirResourceSet.writeNpe"));
         }
 
+        if (isReadOnly()) {
+            return false;
+        }
+
         File dest = null;
         String webAppMount = getWebAppMount();
         if (path.startsWith(webAppMount)) {
@@ -212,18 +228,16 @@ public class DirResourceSet extends AbstractFileResourceSet {
             return false;
         }
 
-        if (dest.exists()) {
-            if (overwrite) {
-                if (!dest.delete()) {
-                    return false;
-                }
-            } else {
-                return false;
-            }
+        if (dest.exists() && !overwrite) {
+            return false;
         }
 
-        try (FileOutputStream fos = new FileOutputStream(dest)) {
-            IOTools.flow(is, fos);
+        try {
+            if (overwrite) {
+                Files.copy(is, dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                Files.copy(is, dest.toPath());
+            }
         } catch (IOException ioe) {
             return false;
         }
@@ -234,8 +248,26 @@ public class DirResourceSet extends AbstractFileResourceSet {
     @Override
     protected void checkType(File file) {
         if (file.isDirectory() == false) {
-            throw new IllegalArgumentException(
-                    "TODO-i18n: base/internalPath is not a directory");
+            throw new IllegalArgumentException(sm.getString("dirResourceSet.notDirectory",
+                    getBase(), File.separator, getInternalPath()));
+        }
+    }
+
+    //-------------------------------------------------------- Lifecycle methods
+    @Override
+    protected void initInternal() throws LifecycleException {
+        super.initInternal();
+        // Is this an exploded web application?
+        if (getWebAppMount().equals("")) {
+            // Look for a manifest
+            File mf = file("META-INF/MANIFEST.MF", true);
+            if (mf != null && mf.isFile()) {
+                try (FileInputStream fis = new FileInputStream(mf)) {
+                    setManifest(new Manifest(fis));
+                } catch (IOException e) {
+                    log.warn(sm.getString("dirResourceSet.manifestFail", mf.getAbsolutePath()), e);
+                }
+            }
         }
     }
 }

@@ -27,10 +27,7 @@ import org.apache.tomcat.util.digester.RuleSetBase;
  * <p><strong>RuleSet</strong> for processing the contents of a Realm definition
  * element.  This <code>RuleSet</code> supports Realms such as the
  * <code>CombinedRealm</code> that used nested Realms.</p>
- *
- * @version $Id$
  */
-
 public class RealmRuleSet extends RuleSetBase {
 
 
@@ -86,29 +83,21 @@ public class RealmRuleSet extends RuleSetBase {
      */
     @Override
     public void addRuleInstances(Digester digester) {
-
-        String pattern = prefix;
-
+        StringBuilder pattern = new StringBuilder(prefix);
         for (int i = 0; i < MAX_NESTED_REALM_LEVELS; i++) {
-
             if (i > 0) {
-                pattern += "/";
+                pattern.append('/');
             }
-            pattern += "Realm";
-
-            digester.addObjectCreate(pattern,
-                                     null, // MUST be specified in the element,
-                                     "className");
-            digester.addSetProperties(pattern);
-            if (i == 0) {
-                digester.addSetNext(pattern,
-                                    "setRealm",
-                                    "org.apache.catalina.Realm");
-            } else {
-                digester.addSetNext(pattern,
-                                    "addRealm",
-                                    "org.apache.catalina.Realm");
-            }
+            pattern.append("Realm");
+            addRuleInstances(digester, pattern.toString(), i == 0 ? "setRealm" : "addRealm");
         }
+    }
+
+    private void addRuleInstances(Digester digester, String pattern, String methodName) {
+        digester.addObjectCreate(pattern, null /* MUST be specified in the element */,
+                "className");
+        digester.addSetProperties(pattern);
+        digester.addSetNext(pattern, methodName, "org.apache.catalina.Realm");
+        digester.addRuleSet(new CredentialHandlerRuleSet(pattern + "/"));
     }
 }

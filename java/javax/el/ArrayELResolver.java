@@ -20,6 +20,7 @@ package javax.el;
 import java.beans.FeatureDescriptor;
 import java.lang.reflect.Array;
 import java.util.Iterator;
+import java.util.Objects;
 
 public class ArrayELResolver extends ELResolver {
 
@@ -35,9 +36,7 @@ public class ArrayELResolver extends ELResolver {
 
     @Override
     public Class<?> getType(ELContext context, Object base, Object property) {
-        if (context == null) {
-            throw new NullPointerException();
-        }
+        Objects.requireNonNull(context);
 
         if (base != null && base.getClass().isArray()) {
             context.setPropertyResolved(base, property);
@@ -55,9 +54,7 @@ public class ArrayELResolver extends ELResolver {
 
     @Override
     public Object getValue(ELContext context, Object base, Object property) {
-        if (context == null) {
-            throw new NullPointerException();
-        }
+        Objects.requireNonNull(context);
 
         if (base != null && base.getClass().isArray()) {
             context.setPropertyResolved(base, property);
@@ -74,9 +71,7 @@ public class ArrayELResolver extends ELResolver {
     @Override
     public void setValue(ELContext context, Object base, Object property,
             Object value) {
-        if (context == null) {
-            throw new NullPointerException();
-        }
+        Objects.requireNonNull(context);
 
         if (base != null && base.getClass().isArray()) {
             context.setPropertyResolved(base, property);
@@ -88,9 +83,8 @@ public class ArrayELResolver extends ELResolver {
 
             int idx = coerce(property);
             checkBounds(base, idx);
-            if (value != null &&
-                    !base.getClass().getComponentType().isAssignableFrom(
-                            value.getClass())) {
+            if (value != null && !Util.isAssignableFrom(value.getClass(),
+                    base.getClass().getComponentType())) {
                 throw new ClassCastException(Util.message(context,
                         "objectNotAssignable", value.getClass().getName(),
                         base.getClass().getComponentType().getName()));
@@ -101,9 +95,7 @@ public class ArrayELResolver extends ELResolver {
 
     @Override
     public boolean isReadOnly(ELContext context, Object base, Object property) {
-        if (context == null) {
-            throw new NullPointerException();
-        }
+        Objects.requireNonNull(context);
 
         if (base != null && base.getClass().isArray()) {
             context.setPropertyResolved(base, property);

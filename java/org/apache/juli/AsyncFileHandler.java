@@ -37,26 +37,30 @@ import java.util.logging.LogRecord;
  * </ul>
  *
  * <p>See the System Properties page in the configuration reference of Tomcat.</p>
- *
- * @author Filip Hanik
- *
  */
 public class AsyncFileHandler extends FileHandler {
 
-    public static final int OVERFLOW_DROP_LAST = 1;
-    public static final int OVERFLOW_DROP_FIRST = 2;
-    public static final int OVERFLOW_DROP_FLUSH = 3;
+    public static final int OVERFLOW_DROP_LAST    = 1;
+    public static final int OVERFLOW_DROP_FIRST   = 2;
+    public static final int OVERFLOW_DROP_FLUSH   = 3;
     public static final int OVERFLOW_DROP_CURRENT = 4;
 
+    public static final int DEFAULT_OVERFLOW_DROP_TYPE = 1;
+    public static final int DEFAULT_MAX_RECORDS        = 10000;
+    public static final int DEFAULT_LOGGER_SLEEP_TIME  = 1000;
+
     public static final int OVERFLOW_DROP_TYPE = Integer.parseInt(
-            System.getProperty("org.apache.juli.AsyncOverflowDropType","1"));
-    public static final int DEFAULT_MAX_RECORDS = Integer.parseInt(
-            System.getProperty("org.apache.juli.AsyncMaxRecordCount","10000"));
+            System.getProperty("org.apache.juli.AsyncOverflowDropType",
+                               Integer.toString(DEFAULT_OVERFLOW_DROP_TYPE)));
+    public static final int MAX_RECORDS = Integer.parseInt(
+            System.getProperty("org.apache.juli.AsyncMaxRecordCount",
+                               Integer.toString(DEFAULT_MAX_RECORDS)));
     public static final int LOGGER_SLEEP_TIME = Integer.parseInt(
-            System.getProperty("org.apache.juli.AsyncLoggerPollInterval","1000"));
+            System.getProperty("org.apache.juli.AsyncLoggerPollInterval",
+                               Integer.toString(DEFAULT_LOGGER_SLEEP_TIME)));
 
     protected static final LinkedBlockingDeque<LogEntry> queue =
-            new LinkedBlockingDeque<>(DEFAULT_MAX_RECORDS);
+            new LinkedBlockingDeque<>(MAX_RECORDS);
 
     protected static final LoggerThread logger = new LoggerThread();
 
@@ -79,7 +83,6 @@ public class AsyncFileHandler extends FileHandler {
     public void close() {
         if (closed) return;
         closed = true;
-        // TODO Auto-generated method stub
         super.close();
     }
 
@@ -87,7 +90,6 @@ public class AsyncFileHandler extends FileHandler {
     protected void open() {
         if(!closed) return;
         closed = false;
-        // TODO Auto-generated method stub
         super.open();
     }
 
@@ -97,6 +99,9 @@ public class AsyncFileHandler extends FileHandler {
         if (!isLoggable(record)) {
             return;
         }
+        // fill source entries, before we hand the record over to another
+        // thread with another class loader
+        record.getSourceMethodName();
         LogEntry entry = new LogEntry(record,this);
         boolean added = false;
         try {

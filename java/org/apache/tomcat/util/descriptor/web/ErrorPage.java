@@ -26,9 +26,7 @@ import org.apache.tomcat.util.buf.UDecoder;
  * deployment descriptor.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class ErrorPage implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -59,7 +57,7 @@ public class ErrorPage implements Serializable {
 
 
     /**
-     * Return the error code.
+     * @return the error code.
      */
     public int getErrorCode() {
 
@@ -90,14 +88,13 @@ public class ErrorPage implements Serializable {
         try {
             this.errorCode = Integer.parseInt(errorCode);
         } catch (NumberFormatException nfe) {
-            this.errorCode = 0;
+            throw new IllegalArgumentException(nfe);
         }
-
     }
 
 
     /**
-     * Return the exception type.
+     * @return the exception type.
      */
     public String getExceptionType() {
 
@@ -119,7 +116,7 @@ public class ErrorPage implements Serializable {
 
 
     /**
-     * Return the location.
+     * @return the location.
      */
     public String getLocation() {
 

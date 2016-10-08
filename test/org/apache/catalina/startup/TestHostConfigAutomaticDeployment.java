@@ -20,11 +20,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -35,6 +31,7 @@ import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleEvent;
 import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.LifecycleState;
+import org.apache.catalina.core.StandardContext;
 import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.util.ContextName;
 
@@ -44,7 +41,7 @@ import org.apache.catalina.util.ContextName;
  */
 public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
 
-    private static final ContextName  APP_NAME = new ContextName("myapp");
+    private static final ContextName  APP_NAME = new ContextName("myapp", false);
     private static final File XML_SOURCE =
             new File("test/deployment/context.xml");
     private static final File WAR_XML_SOURCE =
@@ -63,6 +60,8 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
             new File("test/deployment/broken.war");
     private static final File DIR_XML_SOURCE =
             new File("test/deployment/dirContext");
+    private static final File DIR_XML_SOURCE_META_INF =
+            new File("test/deployment/dirContext/META-INF");
     private static final File DIR_SOURCE =
             new File("test/deployment/dirNoContext");
 
@@ -70,6 +69,7 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
     private static final int EXT = 2;
     private static final int WAR = 3;
     private static final int DIR = 4;
+    private static final int DIR_XML = 5;
 
     private static final int NONE = 1;
     private static final int RELOAD = 2;
@@ -335,28 +335,28 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
     public void testDeploymentWarXmlFFF() throws Exception {
         createWar(WAR_XML_SOURCE, true);
         doTestDeployment(false, false, false,
-                LifecycleState.STARTED, null, false, true, false);
+                LifecycleState.FAILED, null, false, true, false);
     }
 
     @Test
     public void testDeploymentWarXmlFFT() throws Exception {
         createWar(WAR_XML_SOURCE, true);
         doTestDeployment(false, false, true,
-                LifecycleState.STARTED, null, false, true, true);
+                LifecycleState.FAILED, null, false, true, true);
     }
 
     @Test
     public void testDeploymentWarXmlFTF() throws Exception {
         createWar(WAR_XML_SOURCE, true);
         doTestDeployment(false, true, false,
-                LifecycleState.STARTED, null, false, true, false);
+                LifecycleState.FAILED, null, false, true, false);
     }
 
     @Test
     public void testDeploymentWarXmlFTT() throws Exception {
         createWar(WAR_XML_SOURCE, true);
         doTestDeployment(false, true, true,
-                LifecycleState.STARTED, null, false, true, true);
+                LifecycleState.FAILED, null, false, true, true);
     }
 
     @Test
@@ -462,28 +462,28 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
     public void testDeploymentDirXmlFFF() throws Exception {
         createDirInAppbase(true);
         doTestDeployment(false, false, false,
-                LifecycleState.STARTED, null, false, false, true);
+                LifecycleState.FAILED, null, false, false, true);
     }
 
     @Test
     public void testDeploymentDirXmlFFT() throws Exception {
         createDirInAppbase(true);
         doTestDeployment(false, false, true,
-                LifecycleState.STARTED, null, false, false, true);
+                LifecycleState.FAILED, null, false, false, true);
     }
 
     @Test
     public void testDeploymentDirXmlFTF() throws Exception {
         createDirInAppbase(true);
         doTestDeployment(false, true, false,
-                LifecycleState.STARTED, null, false, false, true);
+                LifecycleState.FAILED, null, false, false, true);
     }
 
     @Test
     public void testDeploymentDirXmlFTT() throws Exception {
         createDirInAppbase(true);
         doTestDeployment(false, true, true,
-                LifecycleState.STARTED, null, false, false, true);
+                LifecycleState.FAILED, null, false, false, true);
     }
 
     @Test
@@ -913,6 +913,7 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
         }
         if (!resultWar && !resultDir) {
             if (resultXml) {
+                Assert.assertNotNull(ctxt);
                 Assert.assertEquals(LifecycleState.FAILED, ctxt.getState());
             } else {
                 Assert.assertNull(ctxt);
@@ -1115,35 +1116,39 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
         tomcat.start();
         host.backgroundProcess();
 
-        // Update the last modified time. Add a few seconds to make sure that
-        // the OS reports a change in modification time.
+        // Update the last modified time. Make sure that the OS reports a change
+        // in modification time that HostConfig can detect.
         switch (toModify) {
             case XML:
                 if (xml == null) {
                     Assert.fail();
                 } else {
-                    xml.setLastModified(System.currentTimeMillis() + 5000);
+                    xml.setLastModified(System.currentTimeMillis() -
+                            10 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS);
                 }
                 break;
             case EXT:
                 if (ext == null) {
                     Assert.fail();
                 } else {
-                    ext.setLastModified(System.currentTimeMillis() + 5000);
+                    ext.setLastModified(System.currentTimeMillis() -
+                            10 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS);
                 }
                 break;
             case WAR:
                 if (war == null) {
                     Assert.fail();
                 } else {
-                    war.setLastModified(System.currentTimeMillis() + 5000);
+                    war.setLastModified(System.currentTimeMillis() -
+                            10 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS);
                 }
                 break;
             case DIR:
                 if (dir == null) {
                     Assert.fail();
                 } else {
-                    dir.setLastModified(System.currentTimeMillis() + 5000);
+                    dir.setLastModified(System.currentTimeMillis() -
+                            10 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS);
                 }
                 break;
             default:
@@ -1187,6 +1192,7 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
         }
         if (!resultWar && !resultDir) {
             if (resultXml) {
+                Assert.assertNotNull(newContext);
                 if (!startExternalWar && !startExternalDir) {
                     Assert.assertEquals(LifecycleState.FAILED,
                             newContext.getState());
@@ -1224,21 +1230,25 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
     /*
      * Expected behaviour for the addition of files.
      *
-     * Artifacts present     Artifact   Artifacts remaining
-     * XML  WAR  EXT  DIR     Added      XML  WAR  EXT DIR   Action
-     *  N    Y    N    N       DIR        -    Y    -   A     None
-     *  N    N    N    Y       WAR        -    A    -   R   Redeploy
-     *  Y    N    N    N       DIR        Y    -    -   A     None
-     *  N    N    N    Y       XML        A    -    -   Y   Redeploy
-     *  Y    N    N    N       WAR        Y    A    -   -    Reload
-     *  N    Y    N    N       XML        A    Y    -   -   Redeploy
-     *  Y    Y    N    N       DIR        Y    Y    -   A     None
-     *  Y    N    N    Y       WAR        Y    A    -   N    Reload
-     *  N    Y    N    Y       XML        A    Y    -   Y   Redeploy
-     *  Y    N    Y    N       DIR        Y    -    Y   A     None
-     *  Y    N    Y    N       WAR        Y    A    Y   -     None
-     *  N    N    N    Y       EXT        A    -    A   R   Redeploy
-     *  N    Y    N    N       EXT        A    Y    A   -   Redeploy
+     * Artifacts present   copyXML  deployXML  Artifact   Artifacts remaining
+     * XML  WAR  EXT  DIR                       Added      XML  WAR  EXT DIR   Action
+     *  N    Y    N    N      N        Y         DIR        -    Y    -   A     None
+     *  N    N    N    Y      N        Y         WAR        -    A    -   R   Redeploy
+     *  Y    N    N    N      N        Y         DIR        Y    -    -   A     None
+     *  N    N    N    Y      N        Y         XML        A    -    -   Y   Redeploy
+     *  Y    N    N    N      N        Y         WAR        Y    A    -   -    Reload
+     *  N    Y    N    N      N        Y         XML        A    Y    -   -   Redeploy
+     *  Y    Y    N    N      N        Y         DIR        Y    Y    -   A     None
+     *  Y    N    N    Y      N        Y         WAR        Y    A    -   N    Reload
+     *  N    Y    N    Y      N        Y         XML        A    Y    -   Y   Redeploy
+     *  Y    N    Y    N      N        Y         DIR        Y    -    Y   A     None
+     *  Y    N    Y    N      N        Y         WAR        Y    A    Y   -     None
+     *  N    N    N    Y      N        Y         EXT        A    -    A   R   Redeploy
+     *  N    Y    N    N      N        Y         EXT        A    Y    A   -   Redeploy
+     *
+     *  N    N    N    Y     Y/N       N       DIR+XML      -    -    -   Y   Redeploy (failed)
+     *  N    N    N    Y      Y        Y       DIR+XML      A    -    -   Y   Redeploy
+     *  N    N    N    Y      N        Y       DIR+XML      -    -    -   Y   Redeploy
      *
      * Addition of a file  is treated as if the added file has been modified
      * with the following additional actions:
@@ -1345,10 +1355,48 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
                 true, true, false, XML_COOKIE_NAME, REDEPLOY);
     }
 
+    @Test
+    public void testAdditionDirAddDirXmlTF() throws Exception {
+        doTestAddition(false, false, false, false, true, true, false, DIR_XML,
+                false, false, true, null, REDEPLOY, LifecycleState.FAILED);
+    }
+
+    @Test
+    public void testAdditionDirAddDirXmlFF() throws Exception {
+        doTestAddition(false, false, false, false, true, false, false, DIR_XML,
+                false, false, true, null, REDEPLOY, LifecycleState.FAILED);
+    }
+
+    @Test
+    public void testAdditionDirAddDirXmlTT() throws Exception {
+        doTestAddition(false, false, false, false, true, true, true, DIR_XML,
+                true, false, true, DIR_COOKIE_NAME, REDEPLOY,
+                LifecycleState.STARTED);
+    }
+
+    @Test
+    public void testAdditionDirAddDirXmlFT() throws Exception {
+        doTestAddition(false, false, false, false, true, false, true, DIR_XML,
+                false, false, true, DIR_COOKIE_NAME, REDEPLOY,
+                LifecycleState.STARTED);
+    }
+
     private void doTestAddition(boolean startXml, boolean startExternalWar,
             boolean startExternalDir, boolean startWar, boolean startDir,
             int toAdd, boolean resultXml, boolean resultWar,
             boolean resultDir, String resultCookieName, int resultAction)
+            throws Exception {
+
+        doTestAddition(startXml, startExternalWar, startExternalDir, startWar,
+                startDir, false, true, toAdd, resultXml, resultWar, resultDir,
+                resultCookieName, resultAction, LifecycleState.STARTED);
+    }
+
+    private void doTestAddition(boolean startXml, boolean startExternalWar,
+            boolean startExternalDir, boolean startWar, boolean startDir,
+            boolean copyXML, boolean deployXML, int toAdd, boolean resultXml,
+            boolean resultWar, boolean resultDir, String resultCookieName,
+            int resultAction, LifecycleState state)
             throws Exception {
 
         Tomcat tomcat = getTomcatInstance();
@@ -1375,12 +1423,15 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
             war = createWar(WAR_XML_SOURCE, true);
         }
         if (startDir) {
-            dir = createDirInAppbase(true);
+            dir = createDirInAppbase(toAdd != DIR_XML);
         }
 
         if ((startWar || startExternalWar) && !startDir) {
             host.setUnpackWARs(false);
         }
+
+        host.setCopyXML(copyXML);
+        host.setDeployXML(deployXML);
 
         // Deploy the files we copied
         tomcat.start();
@@ -1416,6 +1467,10 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
                 } else {
                     Assert.fail();
                 }
+                break;
+            case DIR_XML:
+                dir = createDirXmlInAppbase();
+                xml = getXmlInConfigBaseForAppbase();
                 break;
             default:
                 Assert.fail();
@@ -1458,6 +1513,7 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
         }
         if (!resultWar && !resultDir) {
             if (resultXml) {
+                Assert.assertNotNull(newContext);
                 if (!startExternalWar && !startExternalDir) {
                     Assert.assertEquals(LifecycleState.FAILED,
                             newContext.getState());
@@ -1485,8 +1541,7 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
             if (newContext == null) {
                 Assert.fail();
             } else {
-                Assert.assertEquals(
-                        LifecycleState.STARTED, newContext.getState());
+                Assert.assertEquals(state, newContext.getState());
             }
             Assert.assertNotSame(oldContext, newContext);
             // No init or start as that will be in a new context object
@@ -1608,19 +1663,26 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
         File dir = new File(getTomcatInstance().getHost().getAppBaseFile(),
                 APP_NAME.getBaseName());
         if (withXml) {
-            recurrsiveCopy(DIR_XML_SOURCE.toPath(), dir.toPath());
+            recursiveCopy(DIR_XML_SOURCE.toPath(), dir.toPath());
         } else {
-            recurrsiveCopy(DIR_SOURCE.toPath(), dir.toPath());
+            recursiveCopy(DIR_SOURCE.toPath(), dir.toPath());
         }
+        return dir;
+    }
+
+    private File createDirXmlInAppbase() throws IOException {
+        File dir = new File(getTomcatInstance().getHost().getAppBaseFile(),
+                APP_NAME.getBaseName() + "/META-INF");
+        recursiveCopy(DIR_XML_SOURCE_META_INF.toPath(), dir.toPath());
         return dir;
     }
 
     private File createDirInExternal(boolean withXml) throws IOException {
         File ext = new File(external, "external" + ".war");
         if (withXml) {
-            recurrsiveCopy(DIR_XML_SOURCE.toPath(), ext.toPath());
+            recursiveCopy(DIR_XML_SOURCE.toPath(), ext.toPath());
         } else {
-            recurrsiveCopy(DIR_SOURCE.toPath(), ext.toPath());
+            recursiveCopy(DIR_SOURCE.toPath(), ext.toPath());
         }
         return ext;
     }
@@ -1634,18 +1696,28 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
             dest = new File(external, "external" + ".war");
         }
         Files.copy(src.toPath(), dest.toPath());
+        // Make sure that HostConfig thinks the WAR has been modified.
+        dest.setLastModified(
+                System.currentTimeMillis() - 2 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS);
         return dest;
     }
 
     private File createXmlInConfigBaseForAppbase() throws IOException {
-        Host host = getTomcatInstance().getHost();
-        File xml = new File(host.getConfigBaseFile(), APP_NAME + ".xml");
+        File xml = getXmlInConfigBaseForAppbase();
         File parent = xml.getParentFile();
         if (!parent.isDirectory()) {
             Assert.assertTrue(parent.mkdirs());
         }
         Files.copy(XML_SOURCE.toPath(), xml.toPath());
+        // Make sure that HostConfig thinks the xml has been modified.
+        xml.setLastModified(
+                System.currentTimeMillis() - 2 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS);
         return xml;
+    }
+
+    private File getXmlInConfigBaseForAppbase() {
+        Host host = getTomcatInstance().getHost();
+        return new File(host.getConfigBaseFile(), APP_NAME + ".xml");
     }
 
     private File createXmlInConfigBaseForExternal(File ext) throws IOException {
@@ -1673,41 +1745,11 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
             context.append("\" />");
             fos.write(context.toString().getBytes(StandardCharsets.ISO_8859_1));
         }
+        // Make sure that HostConfig thinks the xml has been modified.
+        xml.setLastModified(
+                System.currentTimeMillis() - 2 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS);
         return xml;
     }
-
-    private static void recurrsiveCopy(final Path src, final Path dest)
-            throws IOException {
-
-        Files.walkFileTree(src, new FileVisitor<Path>() {
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir,
-                    BasicFileAttributes attrs) throws IOException {
-                Files.copy(dir, dest.resolve(src.relativize(dir)));
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFile(Path file,
-                    BasicFileAttributes attrs) throws IOException {
-                Files.copy(file, dest.resolve(src.relativize(file)));
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFileFailed(Path file, IOException ioe)
-                    throws IOException {
-                throw ioe;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path dir, IOException ioe)
-                    throws IOException {
-                // NO-OP
-                return FileVisitResult.CONTINUE;
-            }});
-    }
-
 
     private static class StateTracker implements LifecycleListener {
 
@@ -1812,5 +1854,117 @@ public class TestHostConfigAutomaticDeployment extends TomcatBaseTest {
             Assert.assertEquals(WAR_COOKIE_NAME,
                     context.getSessionCookieName());
         }
+    }
+
+
+    @Test
+    public void testSetContextClassName() throws Exception {
+
+        Tomcat tomcat = getTomcatInstance();
+
+        Host host = tomcat.getHost();
+        if (host instanceof StandardHost) {
+            StandardHost standardHost = (StandardHost) host;
+            standardHost.setContextClass(TesterContext.class.getName());
+        }
+
+        // Copy the WAR file
+        File war = new File(host.getAppBaseFile(),
+                APP_NAME.getBaseName() + ".war");
+        Files.copy(WAR_XML_SOURCE.toPath(), war.toPath());
+
+        // Deploy the copied war
+        tomcat.start();
+        host.backgroundProcess();
+
+        // Check the Context class
+        Context ctxt = (Context) host.findChild(APP_NAME.getName());
+
+        Assert.assertTrue(ctxt instanceof TesterContext);
+    }
+
+
+    public static class TesterContext extends StandardContext {
+        // No functional change
+    }
+
+
+    @Test
+    public void testUpdateWarOfflineNoContextFF() throws Exception {
+        doTestUpdateWarOffline(WAR_SOURCE, false, false);
+    }
+
+
+    @Test
+    public void testUpdateWarOfflineNoContextTF() throws Exception {
+        doTestUpdateWarOffline(WAR_SOURCE, true, false);
+    }
+
+
+    @Test
+    public void testUpdateWarOfflineNoContextFT() throws Exception {
+        doTestUpdateWarOffline(WAR_SOURCE, false, true);
+    }
+
+
+    @Test
+    public void testUpdateWarOfflineNoContextTT() throws Exception {
+        doTestUpdateWarOffline(WAR_SOURCE, true, true);
+    }
+
+
+    @Test
+    public void testUpdateWarOfflineContextFF() throws Exception {
+        doTestUpdateWarOffline(WAR_XML_SOURCE, false, false);
+    }
+
+
+    @Test
+    public void testUpdateWarOfflineContextTF() throws Exception {
+        doTestUpdateWarOffline(WAR_XML_SOURCE, true, false);
+    }
+
+
+    @Test
+    public void testUpdateWarOfflineContextFT() throws Exception {
+        doTestUpdateWarOffline(WAR_XML_SOURCE, false, true);
+    }
+
+
+    @Test
+    public void testUpdateWarOfflineContextTT() throws Exception {
+        doTestUpdateWarOffline(WAR_XML_SOURCE, true, true);
+    }
+
+
+    private void doTestUpdateWarOffline(File srcWar, boolean deployOnStartUp, boolean autoDeploy)
+            throws Exception {
+        Tomcat tomcat = getTomcatInstance();
+        StandardHost host = (StandardHost) tomcat.getHost();
+        host.setDeployOnStartup(deployOnStartUp);
+
+        File war = createWar(srcWar, true);
+        // Make the WAR appear to have been created earlier
+        war.setLastModified(war.lastModified() - 2 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS);
+
+        tomcat.addWebapp(APP_NAME.getPath(), war.getAbsolutePath());
+        tomcat.start();
+
+        // Get the last modified timestamp for the expanded dir
+        File dir = new File(host.getAppBase(), APP_NAME.getBaseName());
+        // Make the DIR appear to have been created earlier
+        long lastModified = war.lastModified() - 2 * HostConfig.FILE_MODIFICATION_RESOLUTION_MS;
+        dir.setLastModified(lastModified);
+
+        host.stop();
+        war.setLastModified(System.currentTimeMillis());
+        host.start();
+        if (autoDeploy) {
+            host.backgroundProcess();
+        }
+
+        long newLastModified = dir.lastModified();
+
+        Assert.assertNotEquals("Timestamp hasn't changed", lastModified,  newLastModified);
     }
 }

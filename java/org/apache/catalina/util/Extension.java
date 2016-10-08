@@ -41,9 +41,7 @@ import java.util.StringTokenizer;
  * @author Craig McClanahan
  * @author Justyna Horwat
  * @author Greg Murray
- * @version $Id$
  */
-
 public final class Extension {
 
 
@@ -178,46 +176,44 @@ public final class Extension {
      * <code>false</code>.
      *
      * @param required Extension of the required optional package
+     * @return <code>true</code> if the extension is satisfied
      */
     public boolean isCompatibleWith(Extension required) {
 
         // Extension Name must match
         if (extensionName == null)
-            return (false);
+            return false;
         if (!extensionName.equals(required.getExtensionName()))
-            return (false);
+            return false;
 
         // If specified, available specification version must be >= required
         if (required.getSpecificationVersion() != null) {
             if (!isNewer(specificationVersion,
                          required.getSpecificationVersion()))
-                return (false);
+                return false;
         }
 
         // If specified, Implementation Vendor ID must match
         if (required.getImplementationVendorId() != null) {
             if (implementationVendorId == null)
-                return (false);
+                return false;
             if (!implementationVendorId.equals(required
                     .getImplementationVendorId()))
-                return (false);
+                return false;
         }
 
         // If specified, Implementation version must be >= required
         if (required.getImplementationVersion() != null) {
             if (!isNewer(implementationVersion,
                          required.getImplementationVersion()))
-                return (false);
+                return false;
         }
 
         // This available optional package satisfies the requirements
-        return (true);
+        return true;
 
     }
 
-    /**
-     * Return a String representation of this object.
-     */
     @Override
     public String toString() {
 
@@ -270,9 +266,9 @@ public final class Extension {
         throws NumberFormatException {
 
         if ((first == null) || (second == null))
-            return (false);
+            return false;
         if (first.equals(second))
-            return (true);
+            return true;
 
         StringTokenizer fTok = new StringTokenizer(first, ".", true);
         StringTokenizer sTok = new StringTokenizer(second, ".", true);
@@ -288,16 +284,16 @@ public final class Extension {
             else
                 sVersion = 0;
             if (fVersion < sVersion)
-                return (false);
+                return false;
             else if (fVersion > sVersion)
-                return (true);
+                return true;
             if (fTok.hasMoreTokens())   // Swallow the periods
                 fTok.nextToken();
             if (sTok.hasMoreTokens())
                 sTok.nextToken();
         }
 
-        return (true);  // Exact match
+        return true;  // Exact match
 
     }
 

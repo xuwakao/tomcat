@@ -75,10 +75,7 @@ import java.util.logging.LogRecord;
  *    implementation class name for this Handler. Default value:
  *    <code>java.util.logging.SimpleFormatter</code></li>
  * </ul>
- *
- * @version $Id$
  */
-
 public class FileHandler
     extends Handler {
 
@@ -172,15 +169,14 @@ public class FileHandler
         String tsString = ts.toString().substring(0, 19);
         String tsDate = tsString.substring(0, 10);
 
+        writerLock.readLock().lock();
         try {
-            writerLock.readLock().lock();
             // If the date has changed, switch log files
             if (rotatable && !date.equals(tsDate)) {
+                // Upgrade to writeLock before we switch
+                writerLock.readLock().unlock();
+                writerLock.writeLock().lock();
                 try {
-                    // Update to writeLock before we switch
-                    writerLock.readLock().unlock();
-                    writerLock.writeLock().lock();
-
                     // Make sure another thread hasn't already done this
                     if (!date.equals(tsDate)) {
                         closeWriter();
@@ -188,10 +184,10 @@ public class FileHandler
                         openWriter();
                     }
                 } finally {
-                    writerLock.writeLock().unlock();
-                    // Down grade to read-lock. This ensures the writer remains valid
+                    // Downgrade to read-lock. This ensures the writer remains valid
                     // until the log message is written
                     writerLock.readLock().lock();
+                    writerLock.writeLock().unlock();
                 }
             }
 
@@ -411,8 +407,5 @@ public class FileHandler
         } finally {
             writerLock.writeLock().unlock();
         }
-
     }
-
-
 }

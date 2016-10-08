@@ -16,9 +16,14 @@
  */
 package org.apache.tomcat.websocket.server;
 
-import javax.servlet.ServletContextEvent;
-import javax.websocket.DeploymentException;
-import javax.websocket.server.ServerContainer;
+import java.net.URI;
+import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import javax.websocket.ContainerProvider;
+import javax.websocket.Session;
+import javax.websocket.WebSocketContainer;
 import javax.websocket.server.ServerEndpointConfig;
 
 import org.junit.Assert;
@@ -26,26 +31,25 @@ import org.junit.Test;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleState;
-import org.apache.catalina.filters.TesterServletContext;
 import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
-import org.apache.catalina.startup.TomcatBaseTest;
-import org.apache.tomcat.util.descriptor.web.ApplicationListener;
+import org.apache.tomcat.unittest.TesterServletContext;
 import org.apache.tomcat.websocket.TesterEchoServer;
+import org.apache.tomcat.websocket.TesterMessageCountClient.BasicText;
+import org.apache.tomcat.websocket.WebSocketBaseTest;
+import org.apache.tomcat.websocket.pojo.TesterUtil.SimpleClient;
 
 
-public class TestWsServerContainer extends TomcatBaseTest {
+public class TestWsServerContainer extends WebSocketBaseTest {
 
     @Test
     public void testBug54807() throws Exception {
         Tomcat tomcat = getTomcatInstance();
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
-        ctx.addApplicationListener(new ApplicationListener(
-                Bug54807Config.class.getName(), false));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
+        ctx.addApplicationListener(Bug54807Config.class.getName());
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
-        ctx.addServletMapping("/", "default");
+        ctx.addServletMappingDecoded("/", "default");
 
         tomcat.start();
 
@@ -53,24 +57,49 @@ public class TestWsServerContainer extends TomcatBaseTest {
     }
 
 
-    public static class Bug54807Config extends WsListener {
+    @Test
+    public void testBug58232() throws Exception {
+        Tomcat tomcat = getTomcatInstance();
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
+        ctx.addApplicationListener(Bug54807Config.class.getName());
+        Tomcat.addServlet(ctx, "default", new DefaultServlet());
+        ctx.addServletMappingDecoded("/", "default");
+
+        WebSocketContainer wsContainer =
+                ContainerProvider.getWebSocketContainer();
+
+        tomcat.start();
+
+        Assert.assertEquals(LifecycleState.STARTED, ctx.getState());
+
+        SimpleClient client = new SimpleClient();
+        URI uri = new URI("ws://localhost:" + getPort() + "/echoBasic");
+
+        try (Session session = wsContainer.connectToServer(client, uri);) {
+            CountDownLatch latch = new CountDownLatch(1);
+            BasicText handler = new BasicText(latch);
+            session.addMessageHandler(handler);
+            session.getBasicRemote().sendText("echoBasic");
+
+            boolean latchResult = handler.getLatch().await(10, TimeUnit.SECONDS);
+            Assert.assertTrue(latchResult);
+
+            Queue<String> messages = handler.getMessages();
+            Assert.assertEquals(1, messages.size());
+            for (String message : messages) {
+                Assert.assertEquals("echoBasic", message);
+            }
+        }
+    }
+
+
+    public static class Bug54807Config extends TesterEndpointConfig {
 
         @Override
-        public void contextInitialized(ServletContextEvent sce) {
-            super.contextInitialized(sce);
-
-            ServerContainer sc =
-                    (ServerContainer) sce.getServletContext().getAttribute(
-                            Constants.SERVER_CONTAINER_SERVLET_CONTEXT_ATTRIBUTE);
-
-            ServerEndpointConfig sec = ServerEndpointConfig.Builder.create(
+        protected ServerEndpointConfig getServerEndpointConfig() {
+            return ServerEndpointConfig.Builder.create(
                     TesterEchoServer.Basic.class, "/{param}").build();
-
-            try {
-                sc.addEndpoint(sec);
-            } catch (DeploymentException e) {
-                throw new RuntimeException(e);
-            }
         }
     }
 

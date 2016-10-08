@@ -40,10 +40,7 @@ import java.util.TimeZone;
  *
  * <p>The cache can be created with a parent cache to build a cache hierarchy.
  * Access to the parent cache is threadsafe.</p>
- *
- * @version $Id$
  */
-
 public class DateFormatCache {
 
     private static final String msecPattern = "#";
@@ -98,6 +95,10 @@ public class DateFormatCache {
         return cache.getFormat(time);
     }
 
+    public String getTimeFormat() {
+        return format;
+    }
+
     private class Cache {
 
         /* Second formatted in most recent invocation */
@@ -121,9 +122,6 @@ public class DateFormatCache {
 
         private Cache(Cache parent) {
             cache = new String[cacheSize];
-            for (int i = 0; i < cacheSize; i++) {
-                cache[i] = null;
-            }
             formatter = new SimpleDateFormat(format, Locale.US);
             formatter.setTimeZone(TimeZone.getDefault());
             this.parent = parent;

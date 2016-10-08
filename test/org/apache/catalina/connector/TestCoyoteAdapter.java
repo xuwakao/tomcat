@@ -37,9 +37,21 @@ import org.apache.catalina.startup.SimpleHttpClient;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
 import org.apache.tomcat.util.buf.ByteChunk;
+import org.apache.tomcat.util.buf.MessageBytes;
 
 public class TestCoyoteAdapter extends TomcatBaseTest {
 
+    public static final String TEXT_8K;
+    public static final byte[] BYTES_8K;
+
+    static {
+        StringBuilder sb = new StringBuilder(8192);
+        for (int i = 0; i < 512; i++) {
+            sb.append("0123456789ABCDEF");
+        }
+        TEXT_8K = sb.toString();
+        BYTES_8K = TEXT_8K.getBytes(StandardCharsets.UTF_8);
+    }
     @Test
     public void testPathParmsRootNone() throws Exception {
         pathParamTest("/", "none");
@@ -103,7 +115,7 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
         Context ctx = tomcat.addContext("", docBase.getAbsolutePath());
 
         Tomcat.addServlet(ctx, "servlet", new PathParamServlet());
-        ctx.addServletMapping("/", "servlet");
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -120,12 +132,11 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         Tomcat.addServlet(ctx, "servlet", new PathParamServlet());
-        ctx.addServletMapping("/", "servlet");
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -174,12 +185,11 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("/testapp", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("/testapp", null);
 
         Tomcat.addServlet(ctx, "servlet", new PathParamServlet());
-        ctx.addServletMapping("*.txt", "servlet");
+        ctx.addServletMappingDecoded("*.txt", "servlet");
 
         tomcat.start();
 
@@ -225,13 +235,12 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
 
         tomcat.getConnector().setURIEncoding(encoding);
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("/", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         PathInfoServlet servlet = new PathInfoServlet();
         Tomcat.addServlet(ctx, "servlet", servlet);
-        ctx.addServletMapping("/*", "servlet");
+        ctx.addServletMappingDecoded("/*", "servlet");
 
         tomcat.start();
 
@@ -246,7 +255,7 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
 
         private static final long serialVersionUID = 1L;
 
-        private String pathInfo = null;
+        private volatile String pathInfo = null;
 
         public String getPathInfo() {
             return pathInfo;
@@ -256,7 +265,8 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
         protected void doGet(HttpServletRequest req, HttpServletResponse resp)
                 throws ServletException, IOException {
 
-            // Not thread safe
+            // Not thread safe. Concurrent requests to this servlet will
+            // over-write all the results but the last processed.
             pathInfo = req.getPathInfo();
         }
     }
@@ -267,14 +277,13 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("/", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         AsyncServlet servlet = new AsyncServlet();
         Wrapper w = Tomcat.addServlet(ctx, "async", servlet);
         w.setAsyncSupported(true);
-        ctx.addServletMapping("/async", "async");
+        ctx.addServletMappingDecoded("/async", "async");
 
         tomcat.start();
 
@@ -295,27 +304,62 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
         client.sendRequest();
 
         for (int i = 0; i < 10; i++) {
-            System.out.println(client.readLine());
+            String line = client.readLine();
+            if (line != null && line.length() > 20) {
+                log.info(line.subSequence(0, 20) + "...");
+            }
         }
 
         client.disconnect();
 
         // Wait for server thread to stop
-        while (servlet.getThread().isAlive()) {
-            Thread.sleep(250);
+        Thread t = servlet.getThread();
+        long startTime = System.nanoTime();
+        t.join(5000);
+        long endTime = System.nanoTime();
+        log.info("Waited for servlet thread to stop for "
+                + (endTime - startTime) / 1000000 + " ms");
+
+        Assert.assertTrue(servlet.isCompleted());
+    }
+
+    @Test
+    public void testNormalize01() {
+        doTestNormalize("/foo/../bar", "/bar");
+    }
+
+    private void doTestNormalize(String input, String expected) {
+        MessageBytes mb = MessageBytes.newInstance();
+        byte[] b = input.getBytes(StandardCharsets.UTF_8);
+        mb.setBytes(b, 0, b.length);
+
+        boolean result = CoyoteAdapter.normalize(mb);
+        mb.toString();
+
+        if (expected == null) {
+            Assert.assertFalse(result);
+        } else {
+            Assert.assertTrue(result);
+            Assert.assertEquals(expected, mb.toString());
         }
     }
 
-    private static class AsyncServlet extends HttpServlet {
+
+    private class AsyncServlet extends HttpServlet {
 
         private static final long serialVersionUID = 1L;
 
         // This is a hack that won't work generally as servlets are expected to
         // handle more than one request.
         private Thread t;
+        private volatile boolean completed = false;
 
         public Thread getThread() {
             return t;
+        }
+
+        public boolean isCompleted() {
+            return completed;
         }
 
         @Override
@@ -334,14 +378,30 @@ public class TestCoyoteAdapter extends TomcatBaseTest {
 
                 @Override
                 public void run() {
-                    while (true) {
+                    for (int i = 0; i < 20; i++) {
                         try {
-                            os.write("TEST".getBytes(StandardCharsets.UTF_8));
+                            // Some tests depend on this write failing (e.g.
+                            // because the client has gone away). In some cases
+                            // there may be a large (ish) buffer to fill before
+                            // the write fails.
+                            for (int j = 0 ; j < 8; j++) {
+                                os.write(BYTES_8K);
+                            }
                             os.flush();
                             Thread.sleep(1000);
                         } catch (Exception e) {
-                            asyncCtxt.complete();
-                            break;
+                            log.info("Exception caught " + e);
+                            try {
+                                // Note if request times out before this
+                                // exception is thrown and the complete call
+                                // below is made, the complete call below will
+                                // fail since the timeout will have completed
+                                // the request.
+                                asyncCtxt.complete();
+                                break;
+                            } finally {
+                                completed = true;
+                            }
                         }
                     }
                 }

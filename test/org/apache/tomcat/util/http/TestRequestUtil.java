@@ -23,11 +23,141 @@ import org.junit.Test;
 public class TestRequestUtil {
 
     @Test
-    public void testNormalizeString() {
-        assertEquals("/something",RequestUtil.normalize("//something"));
-        assertEquals("/some/thing",RequestUtil.normalize("some//thing"));
-        assertEquals("/something/",RequestUtil.normalize("something//"));
-        assertEquals("/",RequestUtil.normalize("//"));
+    public void testNormalize01() {
+        doTestNormalize("//something", "/something");
     }
 
+    @Test
+    public void testNormalize02() {
+        doTestNormalize("some//thing", "/some/thing");
+    }
+
+    @Test
+    public void testNormalize03() {
+        doTestNormalize("something//", "/something/");
+    }
+
+    @Test
+    public void testNormalize04() {
+        doTestNormalize("//", "/");
+    }
+
+        @Test
+    public void testNormalize05() {
+        doTestNormalize("//", "/");
+    }
+
+    @Test
+    public void testNormalize06() {
+        doTestNormalize("///", "/");
+    }
+
+    @Test
+    public void testNormalize07() {
+        doTestNormalize("////", "/");
+    }
+
+    @Test
+    public void testNormalize08() {
+        doTestNormalize("/.", "/");
+    }
+
+    @Test
+    public void testNormalize09() {
+        doTestNormalize("/./", "/");
+    }
+
+    @Test
+    public void testNormalize10() {
+        doTestNormalize(".", "/");
+    }
+
+    @Test
+    public void testNormalize11() {
+        doTestNormalize("/..", null);
+    }
+
+    @Test
+    public void testNormalize12() {
+        doTestNormalize("/../", null);
+    }
+
+    @Test
+    public void testNormalize13() {
+        doTestNormalize("..", null);
+    }
+
+    @Test
+    public void testNormalize14() {
+        doTestNormalize("//..", null);
+    }
+
+    @Test
+    public void testNormalize15() {
+        doTestNormalize("//../", null);
+    }
+
+    @Test
+    public void testNormalize16() {
+        doTestNormalize("/./..", null);
+    }
+
+    @Test
+    public void testNormalize17() {
+        doTestNormalize("/./../", null);
+    }
+
+    @Test
+    public void testNormalize18() {
+        doTestNormalize("/a/../..", null);
+    }
+
+    @Test
+    public void testNormalize19() {
+        doTestNormalize("/a/../../", null);
+    }
+
+    @Test
+    public void testNormalize20() {
+        doTestNormalize("/a/..", "/");
+    }
+
+    @Test
+    public void testNormalize21() {
+        doTestNormalize("/a/.", "/a");
+    }
+
+    @Test
+    public void testNormalize22() {
+        doTestNormalize("/a/../", "/");
+    }
+
+    @Test
+    public void testNormalize23() {
+        doTestNormalize("/a/./", "/a/");
+    }
+
+    @Test
+    public void testNormalize24() {
+        doTestNormalize("/a/b/..", "/a");
+    }
+
+    @Test
+    public void testNormalize25() {
+        doTestNormalize("/a/b/.", "/a/b");
+    }
+
+    @Test
+    public void testNormalize26() {
+        doTestNormalize("/a/b/../", "/a/");
+    }
+
+    @Test
+    public void testNormalize27() {
+        doTestNormalize("/a/b/./", "/a/b/");
+    }
+
+    private void doTestNormalize(String input, String expected) {
+        assertEquals(expected,RequestUtil.normalize(input));
+    }
 }

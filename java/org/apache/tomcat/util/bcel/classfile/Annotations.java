@@ -17,58 +17,31 @@
  */
 package org.apache.tomcat.util.bcel.classfile;
 
-import java.io.DataInputStream;
+import java.io.DataInput;
 import java.io.IOException;
 
 /**
  * base class for annotations
- *
- * @version $Id: Annotations
- * @author  <A HREF="mailto:dbrosius@qis.net">D. Brosius</A>
- * @since 5.3
  */
-public abstract class Annotations extends Attribute {
+public class Annotations {
 
-    private static final long serialVersionUID = 1L;
-
-    private AnnotationEntry[] annotation_table;
+    private final AnnotationEntry[] annotation_table;
 
     /**
-     * @param name_index Index pointing to the name <em>Code</em>
-     * @param length Content length in bytes
-     * @param file Input stream
+     * @param input Input stream
      * @param constant_pool Array of constants
      */
-    public Annotations(int name_index, int length, DataInputStream file, ConstantPool constant_pool) throws IOException {
-        this(name_index, length, (AnnotationEntry[]) null, constant_pool);
-        final int annotation_table_length = (file.readUnsignedShort());
+    Annotations(final DataInput input, final ConstantPool constant_pool) throws IOException {
+        final int annotation_table_length = input.readUnsignedShort();
         annotation_table = new AnnotationEntry[annotation_table_length];
         for (int i = 0; i < annotation_table_length; i++) {
-            annotation_table[i] = AnnotationEntry.read(file, constant_pool);
+            annotation_table[i] = new AnnotationEntry(input, constant_pool);
         }
     }
 
 
     /**
-     * @param name_index Index pointing to the name <em>Code</em>
-     * @param length Content length in bytes
-     * @param annotation_table the actual annotations
-     * @param constant_pool Array of constants
-     */
-    public Annotations(int name_index, int length, AnnotationEntry[] annotation_table, ConstantPool constant_pool) {
-        super(name_index, length, constant_pool);
-        setAnnotationTable(annotation_table);
-    }
-
-    /**
-     * @param annotation_table the entries to set in this annotation
-     */
-    public final void setAnnotationTable( AnnotationEntry[] annotation_table ) {
-        this.annotation_table = annotation_table;
-    }
-
-    /**
-     * returns the array of annotation entries in this annotation
+     * @return the array of annotation entries in this annotation
      */
     public AnnotationEntry[] getAnnotationEntries() {
         return annotation_table;

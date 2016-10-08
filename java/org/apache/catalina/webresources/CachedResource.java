@@ -19,6 +19,8 @@ package org.apache.catalina.webresources;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URL;
+import java.security.cert.Certificate;
+import java.util.jar.Manifest;
 
 import org.apache.catalina.WebResource;
 import org.apache.catalina.WebResourceRoot;
@@ -30,11 +32,18 @@ import org.apache.catalina.WebResourceRoot;
  */
 public class CachedResource implements WebResource {
 
+    // Estimate (on high side to be safe) of average size excluding content
+    // based on profiler data.
+    private static final long CACHE_ENTRY_SIZE = 500;
+
+    private final Cache cache;
     private final StandardRoot root;
     private final String webAppPath;
     private final long ttl;
+    private final int objectMaxSizeBytes;
 
     private volatile WebResource webResource;
+    private volatile WebResource[] webResources;
     private volatile long nextCheck;
 
     private volatile Long cachedLastModified = null;
@@ -47,22 +56,33 @@ public class CachedResource implements WebResource {
     private volatile Long cachedContentLength = null;
 
 
-    public CachedResource(StandardRoot root, String path, long ttl) {
+    public CachedResource(Cache cache, StandardRoot root, String path, long ttl,
+            int objectMaxSizeBytes) {
+        this.cache = cache;
         this.root = root;
         this.webAppPath = path;
         this.ttl = ttl;
+        this.objectMaxSizeBytes = objectMaxSizeBytes;
     }
 
-    protected boolean validate() {
+    protected boolean validateResource(boolean useClassLoaderResources) {
         long now = System.currentTimeMillis();
 
         if (webResource == null) {
             synchronized (this) {
                 if (webResource == null) {
-                    webResource = root.getResourceInternal(webAppPath);
+                    webResource = root.getResourceInternal(
+                            webAppPath, useClassLoaderResources);
                     getLastModified();
                     getContentLength();
                     nextCheck = ttl + now;
+                    // exists() is a relatively expensive check for a file so
+                    // use the fact that we know if it exists at this point
+                    if (webResource instanceof EmptyResource) {
+                        cachedExists = Boolean.FALSE;
+                    } else {
+                        cachedExists = Boolean.TRUE;
+                    }
                     return true;
                 }
             }
@@ -72,8 +92,9 @@ public class CachedResource implements WebResource {
             return true;
         }
 
-        if (!webResource.exists() &&
-                root.getResourceInternal(webAppPath).exists()) {
+        WebResource webResourceInternal = root.getResourceInternal(
+                webAppPath, useClassLoaderResources);
+        if (!webResource.exists() && webResourceInternal.exists()) {
             return false;
         }
 
@@ -84,8 +105,37 @@ public class CachedResource implements WebResource {
             return false;
         }
 
+        // Has a resource been inserted / removed in a different resource set
+        if (webResource.getLastModified() != webResourceInternal.getLastModified() ||
+                webResource.getContentLength() != webResourceInternal.getContentLength()) {
+            return false;
+        }
+
         nextCheck = ttl + now;
         return true;
+    }
+
+    protected boolean validateResources(boolean useClassLoaderResources) {
+        long now = System.currentTimeMillis();
+
+        if (webResources == null) {
+            synchronized (this) {
+                if (webResources == null) {
+                    webResources = root.getResourcesInternal(
+                            webAppPath, useClassLoaderResources);
+                    nextCheck = ttl + now;
+                    return true;
+                }
+            }
+        }
+
+        if (now < nextCheck) {
+            return true;
+        }
+
+        // At this point, always expire the entry as re-populating it is likely
+        // to be as expensive as validating it.
+        return false;
     }
 
     protected long getNextCheck() {
@@ -155,7 +205,11 @@ public class CachedResource implements WebResource {
 
     @Override
     public boolean delete() {
-        return webResource.delete();
+        boolean deleteResult = webResource.delete();
+        if (deleteResult) {
+            cache.removeCacheEntry(webAppPath);
+        }
+        return deleteResult;
     }
 
     @Override
@@ -167,8 +221,13 @@ public class CachedResource implements WebResource {
     public long getContentLength() {
         Long cachedContentLength = this.cachedContentLength;
         if (cachedContentLength == null) {
-            cachedContentLength = Long.valueOf(webResource.getContentLength());
-            this.cachedContentLength = cachedContentLength;
+            long result = 0;
+            if (webResource != null) {
+                result = webResource.getContentLength();
+                cachedContentLength = Long.valueOf(result);
+                this.cachedContentLength = cachedContentLength;
+            }
+            return result;
         }
         return cachedContentLength.longValue();
     }
@@ -205,7 +264,7 @@ public class CachedResource implements WebResource {
 
     @Override
     public InputStream getInputStream() {
-        byte[] content = cachedContent;
+        byte[] content = getContent();
         if (content == null) {
             // Can't cache InputStreams
             return webResource.getInputStream();
@@ -217,6 +276,9 @@ public class CachedResource implements WebResource {
     public byte[] getContent() {
         byte[] cachedContent = this.cachedContent;
         if (cachedContent == null) {
+            if (getContentLength() > objectMaxSizeBytes) {
+                return null;
+            }
             cachedContent = webResource.getContent();
             this.cachedContent = cachedContent;
         }
@@ -234,7 +296,41 @@ public class CachedResource implements WebResource {
     }
 
     @Override
+    public URL getCodeBase() {
+        return webResource.getCodeBase();
+    }
+
+    @Override
+    public Certificate[] getCertificates() {
+        return webResource.getCertificates();
+    }
+
+    @Override
+    public Manifest getManifest() {
+        return webResource.getManifest();
+    }
+
+    @Override
     public WebResourceRoot getWebResourceRoot() {
         return webResource.getWebResourceRoot();
+    }
+
+    WebResource getWebResource() {
+        return webResource;
+    }
+
+    WebResource[] getWebResources() {
+        return webResources;
+    }
+
+    // Assume that the cache entry will always include the content unless the
+    // resource content is larger than objectMaxSizeBytes. This isn't always the
+    // case but it makes tracking the current cache size easier.
+    long getSize() {
+        long result = CACHE_ENTRY_SIZE;
+        if (getContentLength() <= objectMaxSizeBytes) {
+            result += getContentLength();
+        }
+        return result;
     }
 }

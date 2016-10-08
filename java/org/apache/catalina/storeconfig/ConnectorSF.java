@@ -21,20 +21,14 @@ import java.io.PrintWriter;
 
 import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.connector.Connector;
+import org.apache.coyote.UpgradeProtocol;
+import org.apache.tomcat.util.net.SSLHostConfig;
 
 /**
  * Store Connector and Listeners
  */
 public class ConnectorSF extends StoreFactoryBase {
 
-    /**
-     * Store Connector description
-     *
-     * @param aWriter
-     * @param indent
-     * @param aConnector
-     * @throws Exception
-     */
     @Override
     public void storeChildren(PrintWriter aWriter, int indent, Object aConnector,
             StoreDescription parentDesc) throws Exception {
@@ -44,6 +38,12 @@ public class ConnectorSF extends StoreFactoryBase {
             // Store nested <Listener> elements
             LifecycleListener listeners[] = connector.findLifecycleListeners();
             storeElementArray(aWriter, indent, listeners);
+            // Store nested <UpgradeProtocol> elements
+            UpgradeProtocol[] upgradeProtocols = connector.findUpgradeProtocols();
+            storeElementArray(aWriter, indent, upgradeProtocols);
+            // Store nested <SSLHostConfig> elements
+            SSLHostConfig[] hostConfigs = connector.findSslHostConfigs();
+            storeElementArray(aWriter, indent, hostConfigs);
         }
     }
 
@@ -51,24 +51,15 @@ public class ConnectorSF extends StoreFactoryBase {
             StoreDescription aDesc) throws Exception {
         aWriter.print("<");
         aWriter.print(aDesc.getTag());
-        storeConnectorAttribtues(aWriter, indent, bean, aDesc);
+        storeConnectorAttributes(aWriter, indent, bean, aDesc);
         aWriter.println(">");
     }
 
-    protected void storeConnectorAttribtues(PrintWriter aWriter, int indent,
+    protected void storeConnectorAttributes(PrintWriter aWriter, int indent,
             Object bean, StoreDescription aDesc) throws Exception {
         if (aDesc.isAttributes()) {
             getStoreAppender().printAttributes(aWriter, indent, false, bean,
                     aDesc);
-            /*
-             * if (bean instanceof Connector) { StoreDescription elementDesc =
-             * getRegistry().findDescription( bean.getClass().getName() +
-             * ".[ProtocolHandler]"); if (elementDesc != null) { ProtocolHandler
-             * protocolHandler = ((Connector) bean) .getProtocolHandler(); if
-             * (protocolHandler != null)
-             * getStoreAppender().printAttributes(aWriter, indent, false,
-             * protocolHandler, elementDesc); } }
-             */
         }
     }
 
@@ -76,7 +67,7 @@ public class ConnectorSF extends StoreFactoryBase {
             StoreDescription aDesc) throws Exception {
         aWriter.print("<");
         aWriter.print(aDesc.getTag());
-        storeConnectorAttribtues(aWriter, indent, bean, aDesc);
+        storeConnectorAttributes(aWriter, indent, bean, aDesc);
         aWriter.println("/>");
     }
 

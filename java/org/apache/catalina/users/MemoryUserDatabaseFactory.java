@@ -45,10 +45,8 @@ import javax.naming.spi.ObjectFactory;
  * </ul>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  * @since 4.1
  */
-
 public class MemoryUserDatabaseFactory implements ObjectFactory {
 
 
@@ -97,7 +95,7 @@ public class MemoryUserDatabaseFactory implements ObjectFactory {
 
         ra = ref.get("readonly");
         if (ra != null) {
-            database.setReadonly(Boolean.valueOf(ra.getContent().toString()).booleanValue());
+            database.setReadonly(Boolean.parseBoolean(ra.getContent().toString()));
         }
 
         // Return the configured database instance

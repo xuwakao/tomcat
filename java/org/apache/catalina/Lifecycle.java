@@ -30,38 +30,30 @@ package org.apache.catalina;
  *  -----------------------------
  *  |                           |
  *  | init()                    |
- * NEW ->-- INITIALIZING        |
- * | |           |              |     ------------------<-----------------------
+ * NEW -»-- INITIALIZING        |
+ * | |           |              |     ------------------«-----------------------
  * | |           |auto          |     |                                        |
  * | |          \|/    start() \|/   \|/     auto          auto         stop() |
- * | |      INITIALIZED -->-- STARTING_PREP -->- STARTING -->- STARTED -->---  |
- * | |         |                                                  |         |  |
- * | |         |                                                  |         |  |
- * | |         |                                                  |         |  |
- * | |destroy()|                                                  |         |  |
- * | -->-----<--       auto                    auto               |         |  |
- * |     |       ---------<----- MUST_STOP ---------------------<--         |  |
- * |     |       |                                                          |  |
- * |    \|/      ---------------------------<--------------------------------  ^
- * |     |       |                                                             |
- * |     |      \|/            auto                 auto              start()  |
- * |     |  STOPPING_PREP ------>----- STOPPING ------>----- STOPPED ---->------
- * |     |                                ^                  |  |  ^
- * |     |               stop()           |                  |  |  |
- * |     |       --------------------------                  |  |  |
- * |     |       |                                  auto     |  |  |
- * |     |       |                  MUST_DESTROY------<-------  |  |
- * |     |       |                    |                         |  |
- * |     |       |                    |auto                     |  |
- * |     |       |    destroy()      \|/              destroy() |  |
- * |     |    FAILED ---->------ DESTROYING ---<-----------------  |
+ * | |      INITIALIZED --»-- STARTING_PREP --»- STARTING --»- STARTED --»---  |
+ * | |         |                                                            |  |
+ * | |destroy()|                                                            |  |
+ * | --»-----«--    ------------------------«--------------------------------  ^
+ * |     |          |                                                          |
+ * |     |         \|/          auto                 auto              start() |
+ * |     |     STOPPING_PREP ----»---- STOPPING ------»----- STOPPED -----»-----
+ * |    \|/                               ^                     |  ^
+ * |     |               stop()           |                     |  |
+ * |     |       --------------------------                     |  |
+ * |     |       |                                              |  |
+ * |     |       |    destroy()                       destroy() |  |
+ * |     |    FAILED ----»------ DESTROYING ---«-----------------  |
  * |     |                        ^     |                          |
  * |     |     destroy()          |     |auto                      |
- * |     -------->-----------------    \|/                         |
+ * |     --------»-----------------    \|/                         |
  * |                                 DESTROYED                     |
  * |                                                               |
  * |                            stop()                             |
- * --->------------------------------>------------------------------
+ * ----»-----------------------------»------------------------------
  *
  * Any state can transition to FAILED.
  *
@@ -79,14 +71,6 @@ package org.apache.catalina;
  * does not start all its sub-components. When the component is stopped, it will
  * try to stop all sub-components - even those it didn't start.
  *
- * MUST_STOP is used to indicate that the {@link #stop()} should be called on
- * the component as soon as {@link #start()} exits. It is typically used when a
- * component has failed to start.
- *
- * MUST_DESTROY is used to indicate that the {@link #stop()} should be called on
- * the component as soon as {@link #stop()} exits. It is typically used when a
- * component is not designed to be restarted.
- *
  * Attempting any other transition will throw {@link LifecycleException}.
  *
  * </pre>
@@ -94,11 +78,7 @@ package org.apache.catalina;
  * methods that trigger the changed. No {@link LifecycleEvent}s are fired if the
  * attempted transition is not valid.
  *
- * TODO: Not all components may transition from STOPPED to STARTING_PREP. These
- *       components should use MUST_DESTROY to signal this.
- *
  * @author Craig R. McClanahan
- * @version $Id$
  */
 public interface Lifecycle {
 
@@ -107,7 +87,7 @@ public interface Lifecycle {
 
 
     /**
-     * The LifecycleEvent type for the "component after init" event.
+     * The LifecycleEvent type for the "component before init" event.
      */
     public static final String BEFORE_INIT_EVENT = "before_init";
 
@@ -202,8 +182,11 @@ public interface Lifecycle {
 
 
     /**
-     * Get the life cycle listeners associated with this life cycle. If this
-     * component has no listeners registered, a zero-length array is returned.
+     * Get the life cycle listeners associated with this life cycle.
+     *
+     * @return An array containing the life cycle listeners associated with this
+     *         life cycle. If this component has no listeners registered, a
+     *         zero-length array is returned.
      */
     public LifecycleListener[] findLifecycleListeners();
 
@@ -316,7 +299,21 @@ public interface Lifecycle {
 
     /**
      * Obtain a textual representation of the current component state. Useful
-     * for JMX.
+     * for JMX. The format of this string may vary between point releases and
+     * should not be relied upon to determine component state. To determine
+     * component state, use {@link #getState()}.
+     *
+     * @return The name of the current component state.
      */
     public String getStateName();
+
+
+    /**
+     * Marker interface used to indicate that the instance should only be used
+     * once. Calling {@link #stop()} on an instance that supports this interface
+     * will automatically call {@link #destroy()} after {@link #stop()}
+     * completes.
+     */
+    public interface SingleUse {
+    }
 }

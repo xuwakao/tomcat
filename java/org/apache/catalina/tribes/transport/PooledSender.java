@@ -24,16 +24,6 @@ import org.apache.catalina.tribes.util.StringManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-/**
- * <p>Title: </p>
- *
- * <p>Description: </p>
- *
- * <p>Company: </p>
- *
- * @author not attributable
- * @version 1.0
- */
 public abstract class PooledSender extends AbstractSender implements MultiPointSender {
 
     private static final Log log = LogFactory.getLog(PooledSender.class);
@@ -170,7 +160,7 @@ public abstract class PooledSender extends AbstractSender implements MultiPointS
         public synchronized DataSender getSender(long timeout) {
             long start = System.currentTimeMillis();
             while ( true ) {
-                if (!isOpen)throw new IllegalStateException("Queue is closed");
+                if (!isOpen)throw new IllegalStateException(sm.getString("pooledSender.closed.queue"));
                 DataSender sender = null;
                 if (notinuse.size() == 0 && inuse.size() < limit) {
                     sender = parent.getNewDataSender();

@@ -30,12 +30,6 @@ import org.apache.catalina.tribes.io.XByteBuffer;
 import org.apache.catalina.tribes.transport.AbstractSender;
 import org.apache.catalina.tribes.transport.MultiPointSender;
 
-/**
- *
- * @author Filip Hanik
- * @version $Id$
- *
- */
 public class MultipointBioSender extends AbstractSender implements MultiPointSender {
     public MultipointBioSender() {
         // NO-OP
@@ -131,8 +125,9 @@ public class MultipointBioSender extends AbstractSender implements MultiPointSen
     }
 
     @Override
-    public void finalize() {
+    public void finalize() throws Throwable {
         try {disconnect(); }catch ( Exception e){/* Ignore */}
+        super.finalize();
     }
 
 

@@ -27,24 +27,21 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Deque;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.catalina.tribes.io.ObjectReader;
 import org.apache.catalina.tribes.transport.AbstractRxTask;
-import org.apache.catalina.tribes.transport.Constants;
 import org.apache.catalina.tribes.transport.ReceiverBase;
 import org.apache.catalina.tribes.transport.RxTaskPool;
+import org.apache.catalina.tribes.util.ExceptionUtils;
 import org.apache.catalina.tribes.util.StringManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-/**
- * @author Filip Hanik
- * @version $Id$
- */
 public class NioReceiver extends ReceiverBase implements Runnable {
 
     private static final Log log = LogFactory.getLog(NioReceiver.class);
@@ -52,8 +49,7 @@ public class NioReceiver extends ReceiverBase implements Runnable {
     /**
      * The string manager for this package.
      */
-    protected static final StringManager sm =
-            StringManager.getManager(Constants.Package);
+    protected static final StringManager sm = StringManager.getManager(NioReceiver.class);
 
     private volatile boolean running = false;
 
@@ -61,7 +57,7 @@ public class NioReceiver extends ReceiverBase implements Runnable {
     private ServerSocketChannel serverChannel = null;
     private DatagramChannel datagramChannel = null;
 
-    protected final LinkedList<Runnable> events = new LinkedList<>();
+    protected final Deque<Runnable> events = new ConcurrentLinkedDeque<>();
 
     public NioReceiver() {
     }
@@ -73,8 +69,10 @@ public class NioReceiver extends ReceiverBase implements Runnable {
     }
 
     /**
-     * start cluster receiver
-     * @throws IOException
+     * Start cluster receiver.
+     *
+     * @throws IOException If the receiver fails to start
+     *
      * @see org.apache.catalina.tribes.ChannelReceiver#start()
      */
     @Override
@@ -83,18 +81,20 @@ public class NioReceiver extends ReceiverBase implements Runnable {
         try {
             setPool(new RxTaskPool(getMaxThreads(),getMinThreads(),this));
         } catch (Exception x) {
-            log.fatal(sm.getString("NioReceiver.threadpool.fail"), x);
+            log.fatal(sm.getString("nioReceiver.threadpool.fail"), x);
             if ( x instanceof IOException ) throw (IOException)x;
             else throw new IOException(x.getMessage());
         }
         try {
             getBind();
             bind();
-            Thread t = new Thread(this, "NioReceiver");
+            String channelName = "";
+            if (getChannel().getName() != null) channelName = "[" + getChannel().getName() + "]";
+            Thread t = new Thread(this, "NioReceiver" + channelName);
             t.setDaemon(true);
             t.start();
         } catch (Exception x) {
-            log.fatal(sm.getString("NioReceiver.start.fail"), x);
+            log.fatal(sm.getString("nioReceiver.start.fail"), x);
             if ( x instanceof IOException ) throw (IOException)x;
             else throw new IOException(x.getMessage());
         }
@@ -117,12 +117,7 @@ public class NioReceiver extends ReceiverBase implements Runnable {
         // Get the associated ServerSocket to bind it with
         ServerSocket serverSocket = serverChannel.socket();
         // create a new Selector for use below
-        synchronized (Selector.class) {
-            // Selector.open() isn't thread safe
-            // http://bugs.sun.com/view_bug.do?bug_id=6427854
-            // Affects 1.6.0_29, fixed in 1.7.0_01
-            this.selector.set(Selector.open());
-        }
+        this.selector.set(Selector.open());
         // set the port the server channel will listen to
         //serverSocket.bind(new InetSocketAddress(getBind(), getTcpListenPort()));
         bind(serverSocket,getPort(),getAutoBind());
@@ -151,28 +146,31 @@ public class NioReceiver extends ReceiverBase implements Runnable {
 
     public void addEvent(Runnable event) {
         Selector selector = this.selector.get();
-        if ( selector != null ) {
-            synchronized (events) {
-                events.add(event);
+        if (selector != null) {
+            events.add(event);
+            if (log.isTraceEnabled()) {
+                log.trace("Adding event to selector:" + event);
             }
-            if ( log.isTraceEnabled() ) log.trace("Adding event to selector:"+event);
-            if ( isListening() ) selector.wakeup();
+            if (isListening()) {
+                selector.wakeup();
+            }
         }
     }
 
     public void events() {
-        if ( events.size() == 0 ) return;
-        synchronized (events) {
-            Runnable r = null;
-            while ( (events.size() > 0) && (r = events.removeFirst()) != null ) {
-                try {
-                    if ( log.isTraceEnabled() ) log.trace("Processing event in selector:"+r);
-                    r.run();
-                } catch ( Exception x ) {
-                    log.error("",x);
+        if (events.isEmpty()) {
+            return;
+        }
+        Runnable r = null;
+        while ((r = events.pollFirst()) != null ) {
+            try {
+                if (log.isTraceEnabled()) {
+                    log.trace("Processing event in selector:" + r);
                 }
+                r.run();
+            } catch (Exception x) {
+                log.error("", x);
             }
-            events.clear();
         }
     }
 
@@ -219,7 +217,7 @@ public class NioReceiver extends ReceiverBase implements Runnable {
                         if (delta > getTimeout() && (!ka.isAccessed())) {
                             if (log.isWarnEnabled())
                                 log.warn(sm.getString(
-                                        "NioReceiver.threadsExhausted",
+                                        "nioReceiver.threadsExhausted",
                                         Integer.valueOf(getTimeout()),
                                         Boolean.valueOf(ka.isCancelled()),
                                         key,
@@ -240,14 +238,13 @@ public class NioReceiver extends ReceiverBase implements Runnable {
 
 
     /**
-     * get data from channel and store in byte array
+     * Get data from channel and store in byte array
      * send it to cluster
-     * @throws IOException
-     * @throws java.nio.channels.ClosedChannelException
+     * @throws IOException IO error
      */
     protected void listen() throws Exception {
         if (doListen()) {
-            log.warn(sm.getString("NioReceiver.alreadyStarted"));
+            log.warn(sm.getString("nioReceiver.alreadyStarted"));
             return;
         }
 
@@ -317,15 +314,10 @@ public class NioReceiver extends ReceiverBase implements Runnable {
             } catch (java.nio.channels.ClosedSelectorException cse) {
                 // ignore is normal at shutdown or stop listen socket
             } catch (java.nio.channels.CancelledKeyException nx) {
-                log.warn(sm.getString("NioReceiver.clientDisconnect"));
+                log.warn(sm.getString("nioReceiver.clientDisconnect"));
             } catch (Throwable t) {
-                if (t instanceof ThreadDeath) {
-                    throw (ThreadDeath) t;
-                }
-                if (t instanceof VirtualMachineError) {
-                    throw (VirtualMachineError) t;
-                }
-                log.error(sm.getString("NioReceiver.requestError"), t);
+                ExceptionUtils.handleThrowable(t);
+                log.error(sm.getString("nioReceiver.requestError"), t);
             }
 
         }
@@ -362,11 +354,11 @@ public class NioReceiver extends ReceiverBase implements Runnable {
                     count ++;
                 }
                 if (running) {
-                    log.warn(sm.getString("NioReceiver.stop.threadRunning"));
+                    log.warn(sm.getString("nioReceiver.stop.threadRunning"));
                 }
                 closeSelector();
             } catch (Exception x) {
-                log.error(sm.getString("NioReceiver.stop.fail"), x);
+                log.error(sm.getString("nioReceiver.stop.fail"), x);
             } finally {
                 this.selector.set(null);
             }
@@ -375,7 +367,7 @@ public class NioReceiver extends ReceiverBase implements Runnable {
 
     private void closeSelector() throws IOException {
         Selector selector = this.selector.getAndSet(null);
-        if (selector==null) return;
+        if (selector == null) return;
         try {
             Iterator<SelectionKey> it = selector.keys().iterator();
             // look at each key in the selected set
@@ -385,11 +377,19 @@ public class NioReceiver extends ReceiverBase implements Runnable {
                 key.attach(null);
                 key.cancel();
             }
-        }catch ( IOException ignore ){
+        } catch (IOException ignore){
             if (log.isWarnEnabled()) {
-                log.warn(sm.getString("NioReceiver.cleanup.fail"), ignore);
+                log.warn(sm.getString("nioReceiver.cleanup.fail"), ignore);
             }
-        }catch ( ClosedSelectorException ignore){}
+        } catch (ClosedSelectorException ignore){
+            // Ignore
+        }
+        try {
+            selector.selectNow();
+        } catch (Throwable t){
+            ExceptionUtils.handleThrowable(t);
+            // Ignore everything else
+        }
         selector.close();
     }
 
@@ -398,6 +398,11 @@ public class NioReceiver extends ReceiverBase implements Runnable {
     /**
      * Register the given channel with the given selector for
      * the given operations of interest
+     * @param selector The selector to use
+     * @param channel The channel
+     * @param ops The operations to register
+     * @param attach Attachment object
+     * @throws Exception IO error with channel
      */
     protected void registerChannel(Selector selector,
                                    SelectableChannel channel,
@@ -419,7 +424,7 @@ public class NioReceiver extends ReceiverBase implements Runnable {
         try {
             listen();
         } catch (Exception x) {
-            log.error(sm.getString("NioReceiver.run.fail"), x);
+            log.error(sm.getString("nioReceiver.run.fail"), x);
         } finally {
             running = false;
         }
@@ -434,6 +439,7 @@ public class NioReceiver extends ReceiverBase implements Runnable {
      *  channel returns an EOF condition, it is closed here, which
      *  automatically invalidates the associated key.  The selector
      *  will then de-register the channel on the next select call.
+     * @throws Exception IO error with channel
      */
     protected void readDataFromSocket(SelectionKey key) throws Exception {
         NioReplicationTask task = (NioReplicationTask) getTaskPool().getRxTask();

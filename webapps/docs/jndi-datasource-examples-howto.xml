@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -52,9 +52,12 @@ to the wider audience, or if you feel we can improve this section in anyway.</p>
 
 <p>
 <b>Please note that JNDI resource configuration changed somewhat between
-Tomcat 5.0.x and Tomcat 5.5.x.</b>  You will most likely need to modify older
+Tomcat 7.x and Tomcat 8.x as they are using different versions of
+Apache Commons DBCP library.</b>  You will most likely need to modify older
 JNDI resource configurations to match the syntax in the example below in order
-to make them work in Tomcat 7.x.x.
+to make them work in Tomcat <version-major/>.
+See <a href="http://tomcat.apache.org/migration.html">Tomcat Migration Guide</a>
+for details.
 </p>
 
 <p>
@@ -106,7 +109,7 @@ a <code>ServletContextListener</code>.
 
 </section>
 
-<section name="Database Connection Pool (DBCP) Configurations">
+<section name="Database Connection Pool (DBCP 2) Configurations">
 
 <p>The default database connection pool implementation in Apache Tomcat
 relies on the libraries from the
@@ -160,15 +163,17 @@ which opened these resources and never closed them.</p>
 
 <p>
 To configure a DBCP DataSource so that abandoned database connections are
-removed and recycled add the following attribute to the
+removed and recycled, add one or both of the following attributes to the
 <code>Resource</code> configuration for your DBCP DataSource:
 </p>
-
-<source>removeAbandoned="true"</source>
-
-<p>
-When available database connections run low DBCP will recover and recycle
-any abandoned database connections it finds. The default is <code>false</code>.
+<source>removeAbandonedOnBorrow=true</source>
+<source>removeAbandonedOnMaintenance=true</source>
+<p> The default for both of these attributes is <code>false</code>.  Note that
+<code>removeAbandonedOnMaintenance</code> has no effect unless pool
+maintenance is enabled by setting <code>timeBetweenEvictionRunsMillis</code>
+to a positive value.  See the
+<a href="http://commons.apache.org/dbcp/configuration.html">
+DBCP documentation</a> for full documentation on these attributes.
 </p>
 
 <p>
@@ -251,7 +256,7 @@ resource to your <a href="config/context.html">Context</a>.</p>
 <p>For example:</p>
 <source><![CDATA[<Context>
 
-    <!-- maxActive: Maximum number of database connections in pool. Make sure you
+    <!-- maxTotal: Maximum number of database connections in pool. Make sure you
          configure your mysqld max_connections large enough to handle
          all of your db connections. Set to -1 for no limit.
          -->
@@ -261,7 +266,7 @@ resource to your <a href="config/context.html">Context</a>.</p>
          and the minEvictableIdleTimeMillis configuration parameter.
          -->
 
-    <!-- maxWait: Maximum time to wait for a database connection to become available
+    <!-- maxWaitMillis: Maximum time to wait for a database connection to become available
          in ms, in this example 10 seconds. An Exception is thrown if
          this timeout is exceeded.  Set to -1 to wait indefinitely.
          -->
@@ -277,7 +282,7 @@ resource to your <a href="config/context.html">Context</a>.</p>
          -->
 
   <Resource name="jdbc/TestDB" auth="Container" type="javax.sql.DataSource"
-               maxActive="100" maxIdle="30" maxWait="10000"
+               maxTotal="100" maxIdle="30" maxWaitMillis="10000"
                username="javauser" password="javadude" driverClassName="com.mysql.jdbc.Driver"
                url="jdbc:mysql://localhost:3306/javatest"/>
 
@@ -325,7 +330,8 @@ select id, foo, bar from testdata
   </body>
 </html>]]></source>
 
-<p>That JSP page makes use of <a href="http://java.sun.com/products/jsp/jstl">JSTL</a>'s
+<p>That JSP page makes use of
+<a href="http://www.oracle.com/technetwork/java/index-jsp-135995.html">JSTL</a>'s
 SQL and Core taglibs. You can get it from
 <a href="http://tomcat.apache.org/taglibs/standard/">Apache Tomcat Taglibs - Standard Tag Library</a>
 project &#x2014; just make sure you get a 1.1.x or later release. Once you have
@@ -374,8 +380,8 @@ user scott.</p>
 <source><![CDATA[<Resource name="jdbc/myoracle" auth="Container"
               type="javax.sql.DataSource" driverClassName="oracle.jdbc.OracleDriver"
               url="jdbc:oracle:thin:@127.0.0.1:1521:mysid"
-              username="scott" password="tiger" maxActive="20" maxIdle="10"
-              maxWait="-1"/>]]></source>
+              username="scott" password="tiger" maxTotal="20" maxIdle="10"
+              maxWaitMillis="-1"/>]]></source>
 
 <h5>2.    web.xml configuration</h5>
 <p>You should ensure that you respect the element ordering defined by the DTD when you
@@ -427,7 +433,7 @@ Clarification would be appreciated here.</i></p>
 <source><![CDATA[<Resource name="jdbc/postgres" auth="Container"
           type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
           url="jdbc:postgresql://127.0.0.1:5432/mydb"
-          username="myuser" password="mypasswd" maxActive="20" maxIdle="10" maxWait="-1"/>]]></source>
+          username="myuser" password="mypasswd" maxTotal="20" maxIdle="10" maxWaitMillis="-1"/>]]></source>
 <h6>2b. Application-specific resource configuration</h6>
 
 <p>
@@ -446,8 +452,8 @@ The Context element should look something like the following.
 <Resource name="jdbc/postgres" auth="Container"
           type="javax.sql.DataSource" driverClassName="org.postgresql.Driver"
           url="jdbc:postgresql://127.0.0.1:5432/mydb"
-          username="myuser" password="mypasswd" maxActive="20" maxIdle="10"
-maxWait="-1"/>
+          username="myuser" password="mypasswd" maxTotal="20" maxIdle="10"
+maxWaitMillis="-1"/>
 </Context>]]></source>
 
 <h5>3. web.xml configuration</h5>
@@ -533,7 +539,7 @@ found. For example, you may be using a classes12.zip file from Oracle Version 8.
 Oracle client. The classeXXXs.zip file and Oracle client software versions must match.
 </li>
 <li>A <code>$PATH</code>, <code>LD_LIBRARY_PATH</code> problem.</li>
-<li>It has been reported that ignoring the driver you have downloded from otn and using
+<li>It has been reported that ignoring the driver you have downloaded from otn and using
 the classes12.zip file from the directory <code>$ORAHOME\jdbc\lib</code> will also work.
 </li>
 </ul>
@@ -577,7 +583,7 @@ than one second.  The remainder will only take a few seconds.  Rarely,
 if ever should a GC take more than 10 seconds.</p>
 
 <p>Make sure that the db connection timeout is set to 10-15 seconds.
-For the DBCP you set this using the parameter <code>maxWait</code>.</p>
+For the DBCP you set this using the parameter <code>maxWaitMillis</code>.</p>
 
 </subsection>
 

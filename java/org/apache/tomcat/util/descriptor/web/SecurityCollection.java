@@ -33,12 +33,29 @@ import org.apache.tomcat.util.buf.UDecoder;
  * this class is synchronized.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class SecurityCollection implements Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    private String encoding = null;
+    public void setEncoding(String encoding) {
+        this.encoding = encoding;
+    }
+    /**
+     * Obtain the encoding of the XML source that was used to populated this
+     * object.
+     *
+     * @return The encoding of the associated XML source or <code>UTF-8</code>
+     *         if the encoding could not be determined
+     */
+    public String getEncoding() {
+        if (encoding == null || encoding.length() == 0) {
+            return "UTF-8";
+        }
+        return encoding;
+    }
+
 
     // ----------------------------------------------------------- Constructors
 
@@ -110,7 +127,7 @@ public class SecurityCollection implements Serializable {
 
 
     /**
-     * Return the description of this web resource collection.
+     * @return the description of this web resource collection.
      */
     public String getDescription() {
 
@@ -132,7 +149,7 @@ public class SecurityCollection implements Serializable {
 
 
     /**
-     * Return the name of this web resource collection.
+     * @return the name of this web resource collection.
      */
     public String getName() {
 
@@ -154,7 +171,7 @@ public class SecurityCollection implements Serializable {
 
 
     /**
-     * Return if this constraint was defined in a deployment descriptor.
+     * @return if this constraint was defined in a deployment descriptor.
      */
     public boolean isFromDescriptor() {
         return isFromDescriptor;
@@ -163,6 +180,7 @@ public class SecurityCollection implements Serializable {
 
     /**
      * Set if this constraint was defined in a deployment descriptor.
+     * @param isFromDescriptor <code>true</code> was declared in a descriptor
      */
     public void setFromDescriptor(boolean isFromDescriptor) {
         this.isFromDescriptor = isFromDescriptor;
@@ -175,6 +193,7 @@ public class SecurityCollection implements Serializable {
     /**
      * Add an HTTP request method to be explicitly part of this web resource
      * collection.
+     * @param method The method
      */
     public void addMethod(String method) {
 
@@ -192,6 +211,7 @@ public class SecurityCollection implements Serializable {
     /**
      * Add an HTTP request method to the methods explicitly excluded from this
      * web resource collection.
+     * @param method The method
      */
     public void addOmittedMethod(String method) {
         if (method == null)
@@ -205,8 +225,12 @@ public class SecurityCollection implements Serializable {
 
     /**
      * Add a URL pattern to be part of this web resource collection.
+     * @param pattern The pattern
      */
     public void addPattern(String pattern) {
+        addPatternDecoded(UDecoder.URLDecode(pattern, "UTF-8"));
+    }
+    public void addPatternDecoded(String pattern) {
 
         if (pattern == null)
             return;
@@ -218,20 +242,19 @@ public class SecurityCollection implements Serializable {
         }
         results[patterns.length] = decodedPattern;
         patterns = results;
-
     }
 
 
     /**
-     * Return <code>true</code> if the specified HTTP request method is
-     * part of this web resource collection.
-     *
+     * Check if the collection applies to the specified method.
      * @param method Request method to check
+     * @return <code>true</code> if the specified HTTP request method is
+     * part of this web resource collection.
      */
     public boolean findMethod(String method) {
 
         if (methods.length == 0 && omittedMethods.length == 0)
-            return (true);
+            return true;
         if (methods.length > 0) {
             for (int i = 0; i < methods.length; i++) {
                 if (methods[i].equals(method))
@@ -250,7 +273,7 @@ public class SecurityCollection implements Serializable {
 
 
     /**
-     * Return the set of HTTP request methods that are part of this web
+     * @return the set of HTTP request methods that are part of this web
      * resource collection, or a zero-length array if no methods have been
      * explicitly included.
      */
@@ -262,7 +285,7 @@ public class SecurityCollection implements Serializable {
 
 
     /**
-     * Return the set of HTTP request methods that are explicitly excluded from
+     * @return the set of HTTP request methods that are explicitly excluded from
      * this web resource collection, or a zero-length array if no request
      * methods are excluded.
      */
@@ -277,20 +300,21 @@ public class SecurityCollection implements Serializable {
      * Is the specified pattern part of this web resource collection?
      *
      * @param pattern Pattern to be compared
+     * @return <code>true</code> if the pattern is part of the collection
      */
     public boolean findPattern(String pattern) {
 
         for (int i = 0; i < patterns.length; i++) {
             if (patterns[i].equals(pattern))
-                return (true);
+                return true;
         }
-        return (false);
+        return false;
 
     }
 
 
     /**
-     * Return the set of URL patterns that are part of this web resource
+     * @return the set of URL patterns that are part of this web resource
      * collection.  If none have been specified, a zero-length array is
      * returned.
      */

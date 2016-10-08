@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 package org.apache.catalina.ha.session;
 
 /**
@@ -23,7 +21,6 @@ package org.apache.catalina.ha.session;
  * a request is executed. These actions will then translate into invocations of methods
  * on the actual session.
  * This class is NOT thread safe. One DeltaRequest per session
- * @author <a href="mailto:fhanik@apache.org">Filip Hanik</a>
  * @version 1.0
  */
 
@@ -34,26 +31,28 @@ import java.io.ObjectOutputStream;
 import java.security.Principal;
 import java.util.LinkedList;
 
+import org.apache.catalina.SessionListener;
 import org.apache.catalina.realm.GenericPrincipal;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.res.StringManager;
 
 
 public class DeltaRequest implements Externalizable {
 
-    public static final org.apache.juli.logging.Log log =
-        org.apache.juli.logging.LogFactory.getLog( DeltaRequest.class );
+    public static final Log log = LogFactory.getLog(DeltaRequest.class);
 
     /**
      * The string manager for this package.
      */
-    protected static final StringManager sm = StringManager
-            .getManager(Constants.Package);
+    protected static final StringManager sm = StringManager.getManager(DeltaRequest.class);
 
     public static final int TYPE_ATTRIBUTE = 0;
     public static final int TYPE_PRINCIPAL = 1;
     public static final int TYPE_ISNEW = 2;
     public static final int TYPE_MAXINTERVAL = 3;
     public static final int TYPE_AUTHTYPE = 4;
+    public static final int TYPE_LISTENER = 5;
 
     public static final int ACTION_SET = 0;
     public static final int ACTION_REMOVE = 1;
@@ -62,6 +61,7 @@ public class DeltaRequest implements Externalizable {
     public static final String NAME_MAXINTERVAL = "__SET__MAXINTERVAL__";
     public static final String NAME_ISNEW = "__SET__ISNEW__";
     public static final String NAME_AUTHTYPE = "__SET__AUTHTYPE__";
+    public static final String NAME_LISTENER = "__SET__LISTENER__";
 
     private String sessionId;
     private LinkedList<AttributeInfo> actions = new LinkedList<>();
@@ -96,23 +96,22 @@ public class DeltaRequest implements Externalizable {
     }
 
     /**
-     * convert principal at SerializablePrincipal for backup nodes.
      * Only support principals from type {@link GenericPrincipal GenericPrincipal}
      * @param p Session principal
      * @see GenericPrincipal
      */
     public void setPrincipal(Principal p) {
         int action = (p==null)?ACTION_REMOVE:ACTION_SET;
-        SerializablePrincipal sp = null;
-        if ( p != null ) {
-            if(p instanceof GenericPrincipal) {
-                sp = SerializablePrincipal.createPrincipal((GenericPrincipal)p);
+        GenericPrincipal gp = null;
+        if (p != null) {
+            if (p instanceof GenericPrincipal) {
+                gp = (GenericPrincipal) p;
                 if(log.isDebugEnabled())
                     log.debug(sm.getString("deltaRequest.showPrincipal", p.getName() , getSessionId()));
             } else
                 log.error(sm.getString("deltaRequest.wrongPrincipalClass",p.getClass().getName()));
         }
-        addAction(TYPE_PRINCIPAL,action,NAME_PRINCIPAL,sp);
+        addAction(TYPE_PRINCIPAL, action, NAME_PRINCIPAL, gp);
     }
 
     public void setNew(boolean n) {
@@ -125,6 +124,14 @@ public class DeltaRequest implements Externalizable {
         addAction(TYPE_AUTHTYPE,action,NAME_AUTHTYPE, authType);
     }
 
+    public void addSessionListener(SessionListener listener) {
+        addAction(TYPE_LISTENER, ACTION_SET, NAME_LISTENER ,listener);
+    }
+
+    public void removeSessionListener(SessionListener listener) {
+        addAction(TYPE_LISTENER, ACTION_REMOVE, NAME_LISTENER ,listener);
+    }
+
     protected void addAction(int type,
                              int action,
                              String name,
@@ -134,7 +141,7 @@ public class DeltaRequest implements Externalizable {
             try {
                 info = actionPool.removeFirst();
             }catch ( Exception x ) {
-                log.error("Unable to remove element:",x);
+                log.error(sm.getString("deltaRequest.removeUnable"),x);
                 info = new AttributeInfo(type, action, name, value);
             }
             info.init(type,action,name,value);
@@ -156,7 +163,7 @@ public class DeltaRequest implements Externalizable {
 
     public void execute(DeltaSession session, boolean notifyListeners) {
         if ( !this.sessionId.equals( session.getId() ) )
-            throw new java.lang.IllegalArgumentException("Session id mismatch, not executing the delta request");
+            throw new java.lang.IllegalArgumentException(sm.getString("deltaRequest.ssid.mismatch"));
         session.access();
         for ( int i=0; i<actions.size(); i++ ) {
             AttributeInfo info = actions.get(i);
@@ -181,9 +188,8 @@ public class DeltaRequest implements Externalizable {
                     break;
                 case TYPE_PRINCIPAL:
                     Principal p = null;
-                    if ( info.getAction() == ACTION_SET ) {
-                        SerializablePrincipal sp = (SerializablePrincipal)info.getValue();
-                        p = sp.getPrincipal();
+                    if (info.getAction() == ACTION_SET) {
+                        p = (Principal) info.getValue();
                     }
                     session.setPrincipal(p,false);
                     break;
@@ -194,8 +200,16 @@ public class DeltaRequest implements Externalizable {
                     }
                     session.setAuthType(authType,false);
                     break;
+                case TYPE_LISTENER:
+                    SessionListener listener = (SessionListener) info.getValue();
+                    if (info.getAction() == ACTION_SET) {
+                        session.addSessionListener(listener,false);
+                    } else {
+                        session.removeSessionListener(listener,false);
+                    }
+                    break;
                 default :
-                    throw new java.lang.IllegalArgumentException("Invalid attribute info type="+info);
+                    throw new java.lang.IllegalArgumentException(sm.getString("deltaRequest.invalidAttributeInfoType", info));
             }//switch
         }//for
         session.endAccess();
@@ -209,7 +223,7 @@ public class DeltaRequest implements Externalizable {
                 info.recycle();
                 actionPool.addLast(info);
             }catch  ( Exception x ) {
-                log.error("Unable to remove element",x);
+                log.error(sm.getString("deltaRequest.removeUnable"),x);
             }
         }
         actions.clear();
@@ -221,7 +235,7 @@ public class DeltaRequest implements Externalizable {
     public void setSessionId(String sessionId) {
         this.sessionId = sessionId;
         if ( sessionId == null ) {
-            new Exception("Session Id is null for setSessionId").fillInStackTrace().printStackTrace();
+            new Exception(sm.getString("deltaRequest.ssid.null")).fillInStackTrace().printStackTrace();
         }
     }
     public int getSize() {
@@ -253,7 +267,7 @@ public class DeltaRequest implements Externalizable {
                 try {
                     info = actionPool.removeFirst();
                 } catch ( Exception x )  {
-                    log.error("Unable to remove element",x);
+                    log.error(sm.getString("deltaRequest.removeUnable"),x);
                     info = new AttributeInfo();
                 }
             }
@@ -286,7 +300,7 @@ public class DeltaRequest implements Externalizable {
      * @see DeltaRequest#writeExternal(java.io.ObjectOutput)
      *
      * @return serialized delta request
-     * @throws IOException
+     * @throws IOException IO error serializing
      */
     protected byte[] serialize() throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();

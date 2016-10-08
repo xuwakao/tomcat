@@ -42,7 +42,9 @@ public class MBeanDumper {
 
     /**
      * The following code to dump MBeans has been copied from JMXProxyServlet.
-     *
+     * @param mbeanServer the MBean server
+     * @param names a set of object names for which to dump the info
+     * @return a string representation of the MBeans
      */
     public static String dumpBeans(MBeanServer mbeanServer, Set<ObjectName> names)
     {
@@ -72,9 +74,9 @@ public class MBeanDumper {
                     if (! attrs[i].isReadable()) continue;
                     String attName=attrs[i].getName();
                     if ("modelerType".equals(attName)) continue;
-                    if (attName.indexOf("=") >=0 ||
-                            attName.indexOf(":") >=0 ||
-                            attName.indexOf(" ") >=0 ) {
+                    if (attName.indexOf('=') >=0 ||
+                            attName.indexOf(':') >=0 ||
+                            attName.indexOf(' ') >=0 ) {
                         continue;
                     }
 

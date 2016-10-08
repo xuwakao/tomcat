@@ -17,23 +17,27 @@
 
 package org.apache.jasper.compiler;
 
-import java.io.InputStream;
+import java.io.IOException;
+import java.net.URL;
 import java.util.Collection;
 import java.util.Hashtable;
-import java.util.Iterator;
 import java.util.Set;
 import java.util.Vector;
 
+import javax.servlet.ServletContext;
 import javax.servlet.jsp.tagext.FunctionInfo;
 import javax.servlet.jsp.tagext.TagFileInfo;
 import javax.servlet.jsp.tagext.TagInfo;
 import javax.servlet.jsp.tagext.TagLibraryInfo;
 
+import org.apache.jasper.Constants;
 import org.apache.jasper.JasperException;
 import org.apache.jasper.JspCompilationContext;
-import org.apache.jasper.util.ExceptionUtils;
-import org.apache.jasper.xmlparser.ParserUtils;
-import org.apache.jasper.xmlparser.TreeNode;
+import org.apache.tomcat.util.descriptor.tld.ImplicitTldRuleSet;
+import org.apache.tomcat.util.descriptor.tld.TaglibXml;
+import org.apache.tomcat.util.descriptor.tld.TldParser;
+import org.apache.tomcat.util.descriptor.tld.TldResourcePath;
+import org.xml.sax.SAXException;
 
 /**
  * Class responsible for generating an implicit tag library containing tag
@@ -59,9 +63,7 @@ class ImplicitTagLibraryInfo extends TagLibraryInfo {
     private final PageInfo pi;
     private final Vector<TagFileInfo> vec;
 
-    /**
-     * Constructor.
-     */
+
     public ImplicitTagLibraryInfo(JspCompilationContext ctxt,
             ParserController pc,
             PageInfo pi,
@@ -97,9 +99,7 @@ class ImplicitTagLibraryInfo extends TagLibraryInfo {
         // Populate mapping of tag names to tag file paths
         Set<String> dirList = ctxt.getResourcePaths(tagdir);
         if (dirList != null) {
-            Iterator<String> it = dirList.iterator();
-            while (it.hasNext()) {
-                String path = it.next();
+            for (String path : dirList) {
                 if (path.endsWith(TAG_FILE_SUFFIX)
                         || path.endsWith(TAGX_FILE_SUFFIX)) {
                     /*
@@ -109,65 +109,49 @@ class ImplicitTagLibraryInfo extends TagLibraryInfo {
                      */
                     String suffix = path.endsWith(TAG_FILE_SUFFIX) ?
                             TAG_FILE_SUFFIX : TAGX_FILE_SUFFIX;
-                    String tagName = path.substring(path.lastIndexOf("/") + 1);
+                    String tagName = path.substring(path.lastIndexOf('/') + 1);
                     tagName = tagName.substring(0,
                             tagName.lastIndexOf(suffix));
                     tagFileMap.put(tagName, path);
                 } else if (path.endsWith(IMPLICIT_TLD)) {
-                    InputStream in = null;
+                    TaglibXml taglibXml;
                     try {
-                        in = ctxt.getResourceAsStream(path);
-                        if (in != null) {
-
-                            // Add implicit TLD to dependency list
-                            if (pi != null) {
-                                pi.addDependant(path, ctxt.getLastModified(path));
-                            }
-
-                            ParserUtils pu = new ParserUtils();
-                            TreeNode tld = pu.parseXMLDocument(uri, in);
-
-                            if (tld.findAttribute("version") != null) {
-                                this.jspversion = tld.findAttribute("version");
-                            }
-
-                            // Process each child element of our <taglib> element
-                            Iterator<TreeNode> list = tld.findChildren();
-
-                            while (list.hasNext()) {
-                                TreeNode element = list.next();
-                                String tname = element.getName();
-
-                                if ("tlibversion".equals(tname) // JSP 1.1
-                                        || "tlib-version".equals(tname)) { // JSP 1.2
-                                    this.tlibversion = element.getBody();
-                                } else if ("jspversion".equals(tname)
-                                        || "jsp-version".equals(tname)) {
-                                    this.jspversion = element.getBody();
-                                } else if ("shortname".equals(tname) || "short-name".equals(tname)) {
-                                    // Ignore
-                                } else {
-                                    // All other elements are invalid
-                                    err.jspError("jsp.error.invalid.implicit", path);
-                                }
-                            }
-                            try {
-                                double version = Double.parseDouble(this.jspversion);
-                                if (version < 2.0) {
-                                    err.jspError("jsp.error.invalid.implicit.version", path);
-                                }
-                            } catch (NumberFormatException e) {
-                                err.jspError("jsp.error.invalid.implicit.version", path);
-                            }
+                        URL url = ctxt.getResource(path);
+                        TldResourcePath resourcePath = new TldResourcePath(url, path);
+                        ServletContext servletContext = ctxt.getServletContext();
+                        boolean validate = Boolean.parseBoolean(
+                                servletContext.getInitParameter(
+                                        Constants.XML_VALIDATION_TLD_INIT_PARAM));
+                        String blockExternalString = servletContext.getInitParameter(
+                                Constants.XML_BLOCK_EXTERNAL_INIT_PARAM);
+                        boolean blockExternal;
+                        if (blockExternalString == null) {
+                            blockExternal = true;
+                        } else {
+                            blockExternal = Boolean.parseBoolean(blockExternalString);
                         }
-                    } finally {
-                        if (in != null) {
-                            try {
-                                in.close();
-                            } catch (Throwable t) {
-                                ExceptionUtils.handleThrowable(t);
-                            }
+                        TldParser parser = new TldParser(true, validate,
+                                new ImplicitTldRuleSet(), blockExternal);
+                        taglibXml = parser.parse(resourcePath);
+                    } catch (IOException | SAXException e) {
+                        err.jspError(e);
+                        // unreached
+                        throw new JasperException(e);
+                    }
+                    this.tlibversion = taglibXml.getTlibVersion();
+                    this.jspversion = taglibXml.getJspVersion();
+                    try {
+                        double version = Double.parseDouble(this.jspversion);
+                        if (version < 2.0) {
+                            err.jspError("jsp.error.invalid.implicit.version", path);
                         }
+                    } catch (NumberFormatException e) {
+                        err.jspError("jsp.error.invalid.implicit.version", path);
+                    }
+
+                    // Add implicit TLD to dependency list
+                    if (pi != null) {
+                        pi.addDependant(path, ctxt.getLastModified(path));
                     }
                 }
             }
@@ -197,7 +181,7 @@ class ImplicitTagLibraryInfo extends TagLibraryInfo {
                 tagInfo = TagFileProcessor.parseTagFileDirectives(pc,
                         shortName,
                         path,
-                        pc.getJspCompilationContext().getTagFileJarResource(path),
+                        null,
                         this);
             } catch (JasperException je) {
                 throw new RuntimeException(je.toString(), je);

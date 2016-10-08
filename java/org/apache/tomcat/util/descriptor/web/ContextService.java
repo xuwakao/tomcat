@@ -27,7 +27,6 @@ import java.util.Iterator;
  * deployment descriptor.
  *
  * @author Fabien Carrion
- * @version $Id$
  */
 public class ContextService extends ResourceBase {
 
@@ -166,7 +165,7 @@ public class ContextService extends ResourceBase {
      * Declares a client dependency on the container to resolving a Service Endpoint Interface
      * to a WSDL port. It optionally associates the Service Endpoint Interface with a
      * particular port-component.
-     *
+     * @return the endpoint names
      */
     public Iterator<String> getServiceendpoints() {
         return this.listProperties();

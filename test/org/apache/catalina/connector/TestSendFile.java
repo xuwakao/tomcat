@@ -62,7 +62,7 @@ public class TestSendFile extends TomcatBaseTest{
             for (int i=0; i<ITERATIONS; i++) {
                 WritingServlet servlet = new WritingServlet(files[i]);
                 Tomcat.addServlet(root, "servlet" + i, servlet);
-                root.addServletMapping("/servlet" + i, "servlet" + i);
+                root.addServletMappingDecoded("/servlet" + i, "servlet" + i);
             }
 
             tomcat.start();
@@ -86,21 +86,21 @@ public class TestSendFile extends TomcatBaseTest{
     }
 
     public File generateFile(String dir, String suffix, int size) throws IOException {
-        String name = "testSendFile-"+System.currentTimeMillis()+suffix+".txt";
-        File f = new File(dir,name);
-        FileWriter fw = new FileWriter(f, false);
-        BufferedWriter w = new BufferedWriter(fw);
-        int defSize = 8192;
-        while (size > 0) {
-            int bytes = Math.min(size, defSize);
-            char[] b = new char[bytes];
-            Arrays.fill(b, 'X');
-            w.write(b);
-            size = size - bytes;
+        String name = "testSendFile-" + System.currentTimeMillis() + suffix + ".txt";
+        File f = new File(dir, name);
+        try (FileWriter fw = new FileWriter(f, false); BufferedWriter w = new BufferedWriter(fw);) {
+            int defSize = 8192;
+            while (size > 0) {
+                int bytes = Math.min(size, defSize);
+                char[] b = new char[bytes];
+                Arrays.fill(b, 'X');
+                w.write(b);
+                size = size - bytes;
+            }
+            w.flush();
         }
-        w.flush();
-        w.close();
-        System.out.println("Created file:"+f.getAbsolutePath()+" with "+f.length()+" bytes.");
+        System.out.println("Created file:" + f.getAbsolutePath() + " with " + f.length()
+                + " bytes.");
         return f;
 
     }
@@ -120,12 +120,10 @@ public class TestSendFile extends TomcatBaseTest{
         protected void doGet(HttpServletRequest req, HttpServletResponse resp)
                 throws ServletException, IOException {
 
-
-
             resp.setContentType("'application/octet-stream");
             resp.setCharacterEncoding("ISO-8859-1");
             resp.setContentLengthLong(f.length());
-            if (req.getAttribute(Globals.SENDFILE_SUPPORTED_ATTR) == Boolean.TRUE) {
+            if (Boolean.TRUE.equals(req.getAttribute(Globals.SENDFILE_SUPPORTED_ATTR))) {
                 req.setAttribute(Globals.SENDFILE_FILENAME_ATTR, f.getAbsolutePath());
                 req.setAttribute(Globals.SENDFILE_FILE_START_ATTR, new Long(0));
                 req.setAttribute(Globals.SENDFILE_FILE_END_ATTR, new Long(f.length()));

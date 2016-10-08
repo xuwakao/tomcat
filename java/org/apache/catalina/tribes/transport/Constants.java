@@ -23,11 +23,8 @@ import org.apache.catalina.tribes.io.XByteBuffer;
 /**
  * Manifest constants for the <code>org.apache.catalina.tribes.transport</code>
  * package.
- * @author Filip Hanik
  * @author Peter Rossbach
- * @version $Id$
  */
-
 public class Constants {
 
     public static final String Package = "org.apache.catalina.tribes.transport";

@@ -19,19 +19,24 @@ package org.apache.tomcat.jni;
 /** Poll
  *
  * @author Mladen Turk
- * @version $Id$
  */
 public class Poll {
 
     /**
-     * Poll options
+     * Poll return values
      */
-    public static final int APR_POLLIN   = 0x001; /** Can read without blocking */
-    public static final int APR_POLLPRI  = 0x002; /** Priority data available */
-    public static final int APR_POLLOUT  = 0x004; /** Can write without blocking */
-    public static final int APR_POLLERR  = 0x010; /** Pending error */
-    public static final int APR_POLLHUP  = 0x020; /** Hangup occurred */
-    public static final int APR_POLLNVAL = 0x040; /** Descriptor invalid */
+    /** Can read without blocking */
+    public static final int APR_POLLIN   = 0x001;
+    /** Priority data available */
+    public static final int APR_POLLPRI  = 0x002;
+    /** Can write without blocking */
+    public static final int APR_POLLOUT  = 0x004;
+    /** Pending error */
+    public static final int APR_POLLERR  = 0x010;
+    /** Hangup occurred */
+    public static final int APR_POLLHUP  = 0x020;
+    /** Descriptor invalid */
+    public static final int APR_POLLNVAL = 0x040;
 
     /**
      * Pollset Flags
@@ -61,12 +66,14 @@ public class Poll {
      * @param flags Optional flags to modify the operation of the pollset.
      * @param ttl Maximum time to live for a particular socket.
      * @return  The pointer in which to return the newly created object
+     * @throws Error Pollset creation failed
      */
     public static native long create(int size, long p, int flags, long ttl)
         throws Error;
     /**
      * Destroy a pollset object
      * @param pollset The pollset to destroy
+     * @return the operation status
      */
     public static native int destroy(long pollset);
 
@@ -75,6 +82,7 @@ public class Poll {
      * @param pollset The pollset to which to add the socket
      * @param sock The sockets to add
      * @param reqevents requested events
+     * @return the operation status
      */
     public static native int add(long pollset, long sock,
                                  int reqevents);
@@ -85,6 +93,7 @@ public class Poll {
      * @param sock The sockets to add
      * @param reqevents requested events
      * @param timeout requested timeout in microseconds (-1 for infinite)
+     * @return the operation status
      */
     public static native int addWithTimeout(long pollset, long sock,
                                             int reqevents, long timeout);
@@ -93,6 +102,7 @@ public class Poll {
      * Remove a descriptor from a pollset
      * @param pollset The pollset from which to remove the descriptor
      * @param sock The socket to remove
+     * @return the operation status
      */
     public static native int remove(long pollset, long sock);
 
@@ -104,8 +114,8 @@ public class Poll {
      *        The descriptor array must be two times the size of pollset.
      *        and are populated as follows:
      * <PRE>
-     * descriptors[2n + 0] -> returned events
-     * descriptors[2n + 1] -> socket
+     * descriptors[2n + 0] -&gt; returned events
+     * descriptors[2n + 1] -&gt; socket
      * </PRE>
      * @param remove Remove signaled descriptors from pollset
      * @return Number of signaled descriptors (output parameter)
@@ -121,7 +131,7 @@ public class Poll {
      *        The descriptor array must be the size of pollset.
      *        and are populated as follows:
      * <PRE>
-     * descriptors[n] -> socket
+     * descriptors[n] -&gt; socket
      * </PRE>
      * @param remove Remove signaled descriptors from pollset
      * @return Number of signaled descriptors (output parameter)
@@ -151,8 +161,8 @@ public class Poll {
      *        The descriptor array must be two times the size of pollset.
      *        and are populated as follows:
      * <PRE>
-     * descriptors[2n + 0] -> returned events
-     * descriptors[2n + 1] -> socket
+     * descriptors[2n + 0] -&gt; returned events
+     * descriptors[2n + 1] -&gt; socket
      * </PRE>
      * @return Number of descriptors (output parameter) in the Poll
      *         or negative APR error code.
@@ -162,7 +172,7 @@ public class Poll {
     /**
      * Make poll() return.
      *
-     * @param   pollset
+     * @param   pollset The pollset to use
      * @return  Negative APR error code
      */
     public static native int interrupt(long pollset);
@@ -170,8 +180,8 @@ public class Poll {
     /**
      * Check if interrupt() is allowed.
      *
-     * @param pollset
-     * @return  <code>true</true> if {@link #interrupt(long)} is allowed, else
+     * @param pollset The pollset to use
+     * @return  <code>true</code> if {@link #interrupt(long)} is allowed, else
      *          <code>false</code>
      */
     public static native boolean wakeable(long pollset);

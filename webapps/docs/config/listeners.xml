@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -112,31 +112,35 @@
       </attribute>
 
       <attribute name="FIPSMode" required="false">
-        <p>Set to <code>on</code> to instruct OpenSSL to go into FIPS mode.
-        FIPS mode <em>requires you to have a FIPS-capable OpenSSL library which
+        <p>Set to <code>on</code> to request that OpenSSL be in FIPS mode
+        (if OpenSSL is already in FIPS mode, it will remain in FIPS mode).
+        Set to <code>enter</code> to force OpenSSL to enter FIPS mode (an error
+        will occur if OpenSSL is already in FIPS mode).
+        Set to <code>require</code> to require that OpenSSL <i>already</i> be
+        in FIPS mode (an error will occur if OpenSSL is not already in FIPS
+        mode).</p>
+        <p>FIPS mode <em>requires you to have a FIPS-capable OpenSSL library which
         you must build yourself</em>.
-        FIPS mode also requires Tomcat native library version 1.1.23 or later,
-        which <em>must be built against the FIPS-compatible OpenSSL</em> library.
-        If this attribute is "on", <b>SSLEngine</b> must be enabled as well.
-        The default value is <code>off</code>.</p>
+        If this attribute is set to any of the above values, the <b>SSLEngine</b>
+        must be enabled as well.</p>
+        <p>The default value is <code>off</code>.</p>
+      </attribute>
+
+      <attribute name="useAprConnector" required="false">
+        <p>This attribute controls the auto-selection of the connector
+        implementation. When the <strong>protocol</strong> is specified as
+        <code>HTTP/1.1</code> or <code>AJP/1.3</code> then if this attribute is
+        <code>true</code> the APR/native connector will be used but if this
+        attribute is false the NIO connector will be used.</p>
+      </attribute>
+
+      <attribute name="useOpenSSL" required="false">
+        <p>This attribute controls the auto-selection of the OpenSSL JSSE
+        implementation. The default is <code>true</code> which will use OpenSSL
+        if the native library is available and a NIO or NIO2 connector is used.</p>
       </attribute>
 
     </attributes>
-
-  </subsection>
-
-  <subsection name="Jasper Listener - org.apache.catalina.core.JasperListener">
-
-    <p>The <strong>Jasper Listener</strong> initializes the Jasper 2 JSP engine
-    before any web applications that may use it are loaded. For more
-    information on the Jasper 2 JSP engine see the
-    <a href="../jasper-howto.html">Jasper How To</a>.</p>
-
-    <p>This listener must only be nested within <a href="server.html">Server</a>
-    elements.</p>
-
-    <p>No additional attributes are supported by the <strong>Jasper Listener
-    </strong>.</p>
 
   </subsection>
 
@@ -174,20 +178,13 @@
 
     <attributes>
 
-      <attribute name="appContextProtection" required="false">
-        <p>Enables protection so that calls to
-        <code>sun.awt.AppContext.getAppContext()</code> triggered by a web
-        application do not result in a memory leak. Note that enabling this
-        protection will trigger a requirement for a graphical environment unless
-        Java is started in head-less mode. The default is <code>false</code>.
-        </p>
-      </attribute>
-
       <attribute name="AWTThreadProtection" required="false">
         <p>Enables protection so that calls to
         <code>java.awt.Toolkit.getDefaultToolkit()</code> triggered by a web
         application do not result in a memory leak.
-        Defaults to <code>false</code> because an AWT thread is launched.</p>
+        Defaults to <code>false</code> because an AWT thread is launched. This
+        protection is disabled if running on Java 9 onwards since the leak has
+        been fixed for Java 9 onwards.</p>
       </attribute>
 
       <attribute name="classesToInitialize" required="false">
@@ -202,7 +199,7 @@
 
       <attribute name="driverManagerProtection" required="false">
         <p>The first use of <code>java.sql.DriverManager</code> will trigger the
-        loading of JDBC Driver in the the current class loader. The web
+        loading of JDBC Driver in the current class loader. The web
         application level memory leak protection can take care of this in most
         cases but triggering the loading here has fewer side-effects. The
         default is <code>true</code>.</p>
@@ -215,14 +212,9 @@
         trigger a call to this method. A side effect of enabling this protection
         is the creation of a thread named "GC Daemon". The protection uses
         reflection to access internal Sun classes and may generate errors on
-        startup on non-Sun JVMs. The default is <code>true</code>.</p>
-      </attribute>
-
-      <attribute name="java2DDisposerProtection" required="false">
-        <p>Enables protection so that loading the
-        <code>sun.java2d.Disposer</code> class by a web application does not
-        result in a memory leak.
-        Defaults to <code>false</code> because a thread is launched.</p>
+        startup on non-Sun JVMs. The default is <code>true</code>. This
+        protection is disabled if running on Java 9 onwards since the leak has
+        been fixed for Java 9 onwards.</p>
       </attribute>
 
       <attribute name="ldapPoolProtection" required="false">
@@ -235,27 +227,8 @@
         class the PoolCleaner thread will be configured with the thread's
         context class loader set to the web application class loader which in
         turn will trigger a memory leak on reload. Defaults to
-        <code>true</code>.</p>
-      </attribute>
-
-      <attribute name="securityLoginConfigurationProtection" required="false">
-        <p>Enables protection so that usage of the
-        <code>javax.security.auth.login.Configuration</code> class by a web
-        application does not provoke a memory leak. The first access of this
-        class will trigger the initializer that will retain a static reference
-        to the context class loader. The protection loads the class with the
-        system class loader to ensure that the static initializer is not
-        triggered by a web application. Defaults to <code>true</code>.</p>
-      </attribute>
-
-      <attribute name="securityPolicyProtection" required="false">
-        <p>Enables protection so that usage of the deprecated
-        <code>javax.security.auth.Policy</code> class by a web application does not
-        result in a memory leak. The first access of this class will trigger the
-        static initializer that will retain a static reference to the context
-        class loader. The protection calls the <code>getPolicy()</code> method
-        of this class to ensure that the static initializer is not triggered by
-        a web application. Defaults to <code>true</code>.</p>
+        <code>true</code>. This protection is disabled if running on Java 9
+        onwards since the leak has been fixed for Java 9 onwards.</p>
       </attribute>
 
       <attribute name="tokenPollerProtection" required="false">
@@ -267,7 +240,9 @@
         deployment when the MessageDigest for generating session IDs is
         initialized. As a result the thread has the Webapp class loader as its
         thread context class loader. Enabling the protection initializes JCA
-        early during Tomcat startup. Defaults to <code>true</code>.</p>
+        early during Tomcat startup. Defaults to <code>true</code>. This
+        protection is disabled if running on Java 9 onwards since the leak has
+        been fixed for Java 9 onwards.</p>
       </attribute>
 
       <attribute name="urlCacheProtection" required="false">
@@ -283,10 +258,28 @@
         <p>Enables protection so that parsing XML files within a web application
         does not result in a memory leak. Note that memory profilers may not
         display the GC root associated with this leak making it particularly
-        hard to diagnose. Defaults to <code>true</code>.</p>
+        hard to diagnose. Defaults to <code>true</code>. This protection is
+        disabled if running on Java 9 onwards since the leak has been fixed for
+        Java 9 onwards.</p>
       </attribute>
 
     </attributes>
+
+    <subsection name="JreMemoryLeakPreventionListener Examples">
+
+      <p>The following is an example of how to configure the
+      <code>classesToInitialize</code> attribute of this listener.</p>
+
+      <p>If this listener was configured in server.xml as:</p>
+
+      <source><![CDATA[  <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener"
+            classesToInitialize="oracle.jdbc.driver.OracleTimeoutThreadPerVM" />]]></source>
+
+      <p>then the <code>OracleTimeoutThreadPerVM</code> class would be loaded
+      and initialized during listener startup instead of during request
+      processing.</p>
+
+    </subsection>
 
   </subsection>
 
@@ -315,7 +308,7 @@
       </attribute>
 
       <attribute name="minimumUmask" required="false">
-        <p>The least rectrictive umask that must be configured before Tomcat
+        <p>The least restrictive umask that must be configured before Tomcat
         will start. If not specified, the default value of <b>0007</b> is used.
         To disable this check, set the attribute to the empty string. The check
         is not performed on Windows platforms.</p>
@@ -325,13 +318,49 @@
 
   </subsection>
 
+  <subsection name="StoreConfig Lifecycle Listener - org.apache.catalina.storeconfig.StoreConfigLifecycleListener">
+
+    <p>The <strong>StoreConfig Lifecycle Listener</strong> configures a
+    StoreConfig MBean that may be used to save the current server configuration
+    in server.xml or the current configuration for a web application in a
+    context.xml file.</p>
+
+    <p>This listener must only be nested within <a href="server.html">Server</a>
+    elements.</p>
+
+    <p>The following additional attributes are supported by the
+    <strong>StoreConfig Lifecycle Listener</strong>:</p>
+
+    <attributes>
+
+      <attribute name="storeConfigClass" required="false">
+        <p>The name of the <code>IStoreConfig</code> implementation to use. If
+        not specified the default of
+        <code>org.apache.catalina.storeconfig.StoreConfig</code> will be
+        used.</p>
+      </attribute>
+
+      <attribute name="storeRegsitry" required="false">
+        <p>The URL of the configuration file that configures how the
+        <code>IStoreConfig</code> is to save the configuration. If not specified
+        the built in resource
+        <code>/org/apache/catalina/storeconfig/server-registry.xml</code> will
+        be used.</p>
+      </attribute>
+
+    </attributes>
+
+  </subsection>
+
   <subsection name="ThreadLocal Leak Prevention Listener - org.apache.catalina.core.ThreadLocalLeakPreventionListener">
 
     <p>The <strong>ThreadLocal Leak Prevention Listener</strong> triggers the
-    renewal of threads in Executor pools when a
+    renewal of threads in <a href="executor.html">Executor</a> pools when a
     <a href="context.html">Context</a> is being stopped to avoid thread-local
     related memory leaks. Active threads will be renewed one by one when they
-    come back to the pool after executing their task.</p>
+    come back to the pool after executing their task. The renewal happens
+    only for contexts that have their <code>renewThreadsWhenStoppingContext</code>
+    attribute set to <code>true</code>.</p>
 
     <p>This listener must only be nested within <a href="server.html">Server</a>
     elements.</p>
@@ -372,7 +401,7 @@
       </attribute>
 
       <attribute name="homeBase" required="false">
-        <p>The base directory containing user home directories.This is effective
+        <p>The base directory containing user home directories. This is effective
         only when <code>org.apache.catalina.startup.HomesUserDatabase</code> is
         used.</p>
       </attribute>
@@ -389,6 +418,41 @@
         attribute is specified, the user to deploy must not match for this
         pattern. If this attribute is not specified, deployment of user will be
         governed by a allow attribute.</p>
+      </attribute>
+
+    </attributes>
+
+  </subsection>
+
+  <subsection name="Version Logging Lifecycle Listener - org.apache.catalina.startup.VersionLoggerListener">
+
+    <p>The <strong>Version Logging Lifecycle Listener</strong> logs Tomcat, Java
+    and operating system information when Tomcat starts.</p>
+
+    <p>This listener must only be nested within <a href="server.html">Server</a>
+    elements and should be the first listener defined.</p>
+
+    <p>The following additional attributes are supported by the <strong>Version
+    Logging Lifecycle Listener</strong>:</p>
+
+    <attributes>
+
+      <attribute name="logArgs" required="false">
+        <p>If <code>true</code>, the command line arguments passed to Java when
+        Tomcat started will be logged. If not specified, the default value of
+        <code>true</code> will be used.</p>
+      </attribute>
+
+      <attribute name="logEnv" required="false">
+        <p>If <code>true</code>, the current environment variables when Tomcat
+        starts will be logged. If not specified, the default value of
+        <code>false</code> will be used.</p>
+      </attribute>
+
+      <attribute name="logProps" required="false">
+        <p>If <code>true</code>, the current Java system properties will be
+        logged. If not specified, the default value of
+        <code>false</code> will be used.</p>
       </attribute>
 
     </attributes>
@@ -427,7 +491,7 @@
         <p>The port to be used by the JMX/RMI registry for the Platform MBeans.
         This replaces the use of the
         <code>com.sun.management.jmxremote.port</code> system property that
-        should not be set when using this valve.</p>
+        should not be set when using this listener.</p>
       </attribute>
 
       <attribute name="rmiServerPortPlatform" required="true">
@@ -435,15 +499,12 @@
       </attribute>
 
       <attribute name="rmiBindAddress" required="false">
-        <p>The address of the interface to be used by JMX/RMI server. Setting
-        this option to <code>true</code> is incompatible with setting the system
-        property <code>com.sun.management.jmxremote.ssl</code> to
-        <code>true</code>.</p>
+        <p>The address of the interface to be used by JMX/RMI server.</p>
       </attribute>
 
       <attribute name="useLocalPorts" required="false">
         <p>Should any clients using these ports be forced to use local ports to
-        connect to the the JMX/RMI server. This is useful when tunnelling
+        connect to the JMX/RMI server. This is useful when tunnelling
         connections over SSH or similar. Defaults to <code>false</code>.</p>
       </attribute>
 

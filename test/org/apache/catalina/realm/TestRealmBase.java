@@ -17,6 +17,7 @@
 package org.apache.catalina.realm;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,10 +30,10 @@ import org.junit.Test;
 import org.apache.catalina.Context;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
-import org.apache.catalina.connector.TesterRequest;
-import org.apache.catalina.connector.TesterResponse;
-import org.apache.catalina.core.TesterContext;
 import org.apache.catalina.startup.TesterMapRealm;
+import org.apache.tomcat.unittest.TesterContext;
+import org.apache.tomcat.unittest.TesterRequest;
+import org.apache.tomcat.unittest.TesterResponse;
 import org.apache.tomcat.util.descriptor.web.SecurityCollection;
 import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
 
@@ -46,6 +47,60 @@ public class TestRealmBase {
     private static final String ROLE2 = "role2";
     private static final String ROLE3 = "role3";
     private static final String ROLE99 = "role99";
+
+    // All digested passwords are the digested form of "password"
+    private static final String PWD_MD5 = "5f4dcc3b5aa765d61d8327deb882cf99";
+    private static final String PWD_SHA = "5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8";
+    private static final String PWD_MD5_PREFIX =
+            "{MD5}X03MO1qnZdYdgyfeuILPmQ==";
+    private static final String PWD_SHA_PREFIX =
+            "{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g=";
+    // Salt added to "password" is "salttoprotectpassword"
+    private static final String PWD_SSHA_PREFIX =
+            "{SSHA}oFLhvfQVqFykEWu8v1pPE6nN0QRzYWx0dG9wcm90ZWN0cGFzc3dvcmQ=";
+
+    @Test
+    public void testDigestMD5() throws Exception {
+        doTestDigestDigestPasswords(PWD, "MD5", PWD_MD5);
+    }
+
+    @Test
+    public void testDigestSHA() throws Exception {
+        doTestDigestDigestPasswords(PWD, "SHA", PWD_SHA);
+    }
+
+    @Test
+    public void testDigestMD5Prefix() throws Exception {
+        doTestDigestDigestPasswords(PWD, "MD5", PWD_MD5_PREFIX);
+    }
+
+    @Test
+    public void testDigestSHAPrefix() throws Exception {
+        doTestDigestDigestPasswords(PWD, "SHA", PWD_SHA_PREFIX);
+    }
+
+    @Test
+    public void testDigestSSHAPrefix() throws Exception {
+        doTestDigestDigestPasswords(PWD, "SHA", PWD_SSHA_PREFIX);
+    }
+
+    private void doTestDigestDigestPasswords(String password,
+            String digest, String digestedPassword) throws Exception {
+        Context context = new TesterContext();
+        TesterMapRealm realm = new TesterMapRealm();
+        realm.setContainer(context);
+        MessageDigestCredentialHandler ch = new MessageDigestCredentialHandler();
+        ch.setAlgorithm(digest);
+        realm.setCredentialHandler(ch);
+        realm.start();
+
+        realm.addUser(USER1, digestedPassword);
+
+        Principal p = realm.authenticate(USER1, password);
+
+        Assert.assertNotNull(p);
+        Assert.assertEquals(USER1, p.getName());
+    }
 
     @Test
     public void testUserWithSingleRole() throws IOException {
@@ -565,7 +620,7 @@ public class TestRealmBase {
         for (String applicationRole : applicationRoles) {
             context.addSecurityRole(applicationRole);
         }
-        request.setContext(context);
+        request.getMappingData().context = context;
 
         // Set up an authenticated user
         // Configure the users in the Realm
@@ -582,7 +637,7 @@ public class TestRealmBase {
     }
 
 
-    /**
+    /*
      * This test case covers the special case in section 13.4.1 of the Servlet
      * 3.1 specification for {@link javax.servlet.annotation.HttpConstraint}.
      */
@@ -605,7 +660,7 @@ public class TestRealmBase {
         deleteConstraint.addAuthRole(ROLE1);
         SecurityCollection deleteCollection = new SecurityCollection();
         deleteCollection.addMethod("DELETE");
-        deleteCollection.addPattern("/*");
+        deleteCollection.addPatternDecoded("/*");
         deleteConstraint.addCollection(deleteCollection);
 
         TesterMapRealm mapRealm = new TesterMapRealm();
@@ -613,10 +668,10 @@ public class TestRealmBase {
         // Set up the mock request and response
         TesterRequest request = new TesterRequest();
         Response response = new TesterResponse();
-        Context context = new TesterContext();
+        Context context = request.getContext();
         context.addSecurityRole(ROLE1);
         context.addSecurityRole(ROLE2);
-        request.setContext(context);
+        request.getMappingData().context = context;
 
         // Create the principals
         List<String> userRoles1 = new ArrayList<>();

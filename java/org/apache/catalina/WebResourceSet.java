@@ -17,6 +17,7 @@
 package org.apache.catalina;
 
 import java.io.InputStream;
+import java.net.URL;
 import java.util.Set;
 
 /**
@@ -73,8 +74,7 @@ public interface WebResourceSet extends Lifecycle {
 
     /**
      * Create a new resource at the requested path using the provided
-     * InputStream. If a resource already exists at the provided path it will
-     * not be overwritten.
+     * InputStream.
      *
      * @param path      The path to be used for the new Resource. It is relative
      *                  to the root of the web application and must start with
@@ -90,4 +90,67 @@ public interface WebResourceSet extends Lifecycle {
     boolean write(String path, InputStream is, boolean overwrite);
 
     void setRoot(WebResourceRoot root);
+
+    /**
+     * Should resources returned by this resource set only be included in any
+     * results when the lookup is explicitly looking for class loader resources.
+     * i.e. should these resources be excluded from look ups that are explicitly
+     * looking for static (non-class loader) resources.
+     *
+     * @return <code>true</code> if these resources should only be used for
+     *         class loader resource lookups, otherwise <code>false</code>
+     */
+    boolean getClassLoaderOnly();
+
+    void setClassLoaderOnly(boolean classLoaderOnly);
+
+    /**
+     * Should resources returned by this resource set only be included in any
+     * results when the lookup is explicitly looking for static (non-class
+     * loader) resources. i.e. should these resources be excluded from look ups
+     * that are explicitly looking for class loader resources.
+     *
+     * @return <code>true</code> if these resources should only be used for
+     *         static (non-class loader) resource lookups, otherwise
+     *         <code>false</code>
+     */
+    boolean getStaticOnly();
+
+    void setStaticOnly(boolean staticOnly);
+
+    /**
+     * Obtain the base URL for this set of resources. One of the uses of this is
+     * to grant read permissions to the resources when running under a security
+     * manager.
+     *
+     * @return The base URL for this set of resources
+     */
+    URL getBaseUrl();
+
+    /**
+     * Configures whether or not this set of resources is read-only.
+     *
+     * @param readOnly <code>true</code> if this set of resources should be
+     *                 configured to be read-only
+     *
+     * @throws IllegalArgumentException if an attempt is made to configure a
+     *         {@link WebResourceSet} that is hard-coded to be read-only as
+     *         writable
+     */
+    void setReadOnly(boolean readOnly);
+
+    /**
+     * Obtains the current value of the read-only setting for this set of
+     * resources.
+     *
+     * @return <code>true</code> if this set of resources is configured to be
+     *         read-only, otherwise <code>false</code>
+     */
+    boolean isReadOnly();
+
+    /**
+     * Implementations may cache some information to improve performance. This
+     * method triggers the clean-up of those resources.
+     */
+    void gc();
 }

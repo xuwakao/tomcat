@@ -26,13 +26,12 @@ import org.apache.tomcat.jdbc.pool.PoolProperties.InterceptorProperty;
  * Abstract class that is to be extended for implementations of interceptors.
  * Everytime an operation is called on the {@link java.sql.Connection} object the
  * {@link #invoke(Object, Method, Object[])} method on the interceptor will be called.
- * Interceptors are useful to change or improve behavior of the connection pool.<br/>
+ * Interceptors are useful to change or improve behavior of the connection pool.<br>
  * Interceptors can receive a set of properties. Each sub class is responsible for parsing the properties during runtime when they
  * are needed or simply override the {@link #setProperties(Map)} method.
  * Properties arrive in a key-value pair of Strings as they were received through the configuration.
  * This method is called once per cached connection object when the object is first configured.
  *
- * @author Filip Hanik
  * @version 1.0
  */
 public abstract class JdbcInterceptor implements InvocationHandler {
@@ -120,7 +119,7 @@ public abstract class JdbcInterceptor implements InvocationHandler {
 
     /**
      * configures the next interceptor in the chain
-     * @param next
+     * @param next The next chain item
      */
     public void setNext(JdbcInterceptor next) {
         this.next = next;
@@ -128,8 +127,8 @@ public abstract class JdbcInterceptor implements InvocationHandler {
 
     /**
      * Performs a string comparison, using references unless the useEquals property is set to true.
-     * @param name1
-     * @param name2
+     * @param name1 The first name
+     * @param name2 The second name
      * @return true if name1 is equal to name2 based on {@link #useEquals}
      */
     public boolean compare(String name1, String name2) {
@@ -144,9 +143,9 @@ public abstract class JdbcInterceptor implements InvocationHandler {
      * Compares a method name (String) to a method (Method)
      * {@link #compare(String,String)}
      * Uses reference comparison unless the useEquals property is set to true
-     * @param methodName
-     * @param method
-     * @return true if the name matches
+     * @param methodName The method name
+     * @param method The method
+     * @return <code>true</code> if the name matches
      */
     public boolean compare(String methodName, Method method) {
         return compare(methodName, method.getName());
@@ -156,7 +155,7 @@ public abstract class JdbcInterceptor implements InvocationHandler {
      * Gets called each time the connection is borrowed from the pool
      * This means that if an interceptor holds a reference to the connection
      * the interceptor can be reused for another connection.
-     * <br/>
+     * <br>
      * This method may be called with null as both arguments when we are closing down the connection.
      * @param parent - the connection pool owning the connection
      * @param con - the pooled connection
@@ -187,7 +186,7 @@ public abstract class JdbcInterceptor implements InvocationHandler {
      * Called during the creation of an interceptor
      * The properties can be set during the configuration of an interceptor
      * Override this method to perform type casts between string values and object properties
-     * @param properties
+     * @param properties The properties
      */
     public void setProperties(Map<String,InterceptorProperty> properties) {
         this.properties = properties;
@@ -209,7 +208,7 @@ public abstract class JdbcInterceptor implements InvocationHandler {
     /**
      * Set to true if string comparisons (for the {@link #compare(String, Method)} and {@link #compare(String, String)} methods) should use the Object.equals(Object) method
      * The default is false
-     * @param useEquals
+     * @param useEquals <code>true</code> if equals will be used for comparisons
      */
     public void setUseEquals(boolean useEquals) {
         this.useEquals = useEquals;

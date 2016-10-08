@@ -22,6 +22,7 @@ import org.apache.catalina.tribes.ChannelMessage;
 import org.apache.catalina.tribes.Member;
 import org.apache.catalina.tribes.group.ChannelInterceptorBase;
 import org.apache.catalina.tribes.membership.Membership;
+import org.apache.catalina.tribes.util.StringManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -31,19 +32,23 @@ import org.apache.juli.logging.LogFactory;
  * <p>Description: Filters membership based on domain.
  * </p>
  *
- * @author Filip Hanik
  * @version 1.0
  */
 public class DomainFilterInterceptor extends ChannelInterceptorBase {
     private static final Log log = LogFactory.getLog(DomainFilterInterceptor.class);
-    protected Membership membership = null;
+    protected static final StringManager sm = StringManager.getManager(DomainFilterInterceptor.class);
+    protected volatile Membership membership = null;
 
     protected byte[] domain = new byte[0];
 
     @Override
     public void messageReceived(ChannelMessage msg) {
-        //should we filter incoming based on domain?
-        super.messageReceived(msg);
+        if (Arrays.equals(domain, msg.getAddress().getDomain())) {
+            super.messageReceived(msg);
+        } else {
+            if (log.isWarnEnabled())
+                log.warn(sm.getString("domainFilterInterceptor.message.refused", msg.getAddress()));
+        }
     }//messageReceived
 
 
@@ -58,7 +63,7 @@ public class DomainFilterInterceptor extends ChannelInterceptorBase {
         if ( notify ) {
             super.memberAdded(member);
         } else {
-            if(log.isInfoEnabled()) log.info("Member was refused to join cluster["+member+"]");
+            if(log.isInfoEnabled()) log.info(sm.getString("domainFilterInterceptor.member.refused", member));
         }
     }
 
@@ -68,7 +73,7 @@ public class DomainFilterInterceptor extends ChannelInterceptorBase {
         boolean notify = false;
         synchronized (membership) {
             notify = Arrays.equals(domain,member.getDomain());
-            membership.removeMember(member);
+            if ( notify ) membership.removeMember(member);
         }
         if ( notify ) super.memberDisappeared(member);
     }

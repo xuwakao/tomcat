@@ -24,6 +24,7 @@ import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -33,6 +34,9 @@ import java.util.concurrent.ConcurrentMap;
  * <code>WeakHashMap</code> this class does not handle dead keys during common
  * access operations, but expects you to call its {@link #maintain()} method
  * periodically. Both keys and values are expected to be not-<code>null</code>.
+ *
+ * @param <K> The type of keys used with the Map instance
+ * @param <V> The type of values used with the Map instance
  */
 public class ManagedConcurrentWeakHashMap<K, V> extends AbstractMap<K, V> implements
         ConcurrentMap<K, V> {
@@ -119,12 +123,6 @@ public class ManagedConcurrentWeakHashMap<K, V> extends AbstractMap<K, V> implem
         return new Key(key, null);
     }
 
-    private static void checkNotNull(Object value) {
-        if (value == null) {
-            throw new NullPointerException();
-        }
-    }
-
     @Override
     public int size() {
         return map.size();
@@ -161,7 +159,7 @@ public class ManagedConcurrentWeakHashMap<K, V> extends AbstractMap<K, V> implem
 
     @Override
     public V put(K key, V value) {
-        checkNotNull(value);
+        Objects.requireNonNull(value);
         return map.put(createStoreKey(key), value);
     }
 
@@ -180,7 +178,7 @@ public class ManagedConcurrentWeakHashMap<K, V> extends AbstractMap<K, V> implem
 
     @Override
     public V putIfAbsent(K key, V value) {
-        checkNotNull(value);
+        Objects.requireNonNull(value);
         Key storeKey = createStoreKey(key);
         V oldValue = map.putIfAbsent(storeKey, value);
         if (oldValue != null) { // ack that key has not been stored
@@ -199,13 +197,13 @@ public class ManagedConcurrentWeakHashMap<K, V> extends AbstractMap<K, V> implem
 
     @Override
     public boolean replace(K key, V oldValue, V newValue) {
-        checkNotNull(newValue);
+        Objects.requireNonNull(newValue);
         return map.replace(createLookupKey(key), oldValue, newValue);
     }
 
     @Override
     public V replace(K key, V value) {
-        checkNotNull(value);
+        Objects.requireNonNull(value);
         return map.replace(createLookupKey(key), value);
     }
 
@@ -256,7 +254,7 @@ public class ManagedConcurrentWeakHashMap<K, V> extends AbstractMap<K, V> implem
 
                             @Override
                             public V setValue(V value) {
-                                checkNotNull(value);
+                                Objects.requireNonNull(value);
                                 return en.setValue(value);
                             }
                         };

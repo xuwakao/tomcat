@@ -30,7 +30,7 @@ import javax.servlet.ServletInputStream;
  *                        with the default encoding and have been moved
  *                        to the request interfaces.
  */
-@SuppressWarnings("dep-ann") // Spec API does not use @Deprecated
+@Deprecated
 public class HttpUtils {
 
     private static final String LSTRING_FILE =
@@ -267,8 +267,7 @@ public class HttpUtils {
         url.append (scheme);                // http, https
         url.append ("://");
         url.append (req.getServerName ());
-        if ((scheme.equals ("http") && port != 80)
-                || (scheme.equals ("https") && port != 443)) {
+        if ((scheme.equals ("http") && port != 80) || (scheme.equals ("https") && port != 443)) {
             url.append (':');
             url.append (req.getServerPort ());
         }

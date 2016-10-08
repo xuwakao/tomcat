@@ -16,6 +16,7 @@
  */
 package org.apache.catalina.tribes.transport;
 
+import org.apache.catalina.tribes.Channel;
 import org.apache.catalina.tribes.ChannelException;
 import org.apache.catalina.tribes.ChannelMessage;
 import org.apache.catalina.tribes.ChannelSender;
@@ -26,11 +27,10 @@ import org.apache.catalina.tribes.transport.nio.PooledParallelSender;
  * Transmit message to other cluster members
  * Actual senders are created based on the replicationMode
  * type
- *
- * @author Filip Hanik
- * @version $Id$
  */
 public class ReplicationTransmitter implements ChannelSender {
+
+    private Channel channel;
 
     public ReplicationTransmitter() {
     }
@@ -76,6 +76,7 @@ public class ReplicationTransmitter implements ChannelSender {
     @Override
     public synchronized void stop() {
         getTransport().disconnect();
+        channel = null;
     }
 
     /**
@@ -108,4 +109,15 @@ public class ReplicationTransmitter implements ChannelSender {
     public synchronized void remove(Member member) {
         getTransport().remove(member);
     }
+
+    @Override
+    public Channel getChannel() {
+        return channel;
+    }
+
+    @Override
+    public void setChannel(Channel channel) {
+        this.channel = channel;
+    }
+
 }

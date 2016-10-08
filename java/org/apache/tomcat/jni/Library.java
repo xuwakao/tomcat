@@ -17,12 +17,12 @@
 
 package org.apache.tomcat.jni;
 
+import java.io.File;
+
 /** Library
  *
  * @author Mladen Turk
- * @version $Id$
  */
-
 public final class Library {
 
     /* Default library names */
@@ -32,45 +32,46 @@ public final class Library {
      */
     private static Library _instance = null;
 
-    private Library()
-        throws Exception
-    {
+    private Library() throws Exception {
         boolean loaded = false;
+        String path = System.getProperty("java.library.path");
+        String [] paths = path.split(File.pathSeparator);
         StringBuilder err = new StringBuilder();
         for (int i = 0; i < NAMES.length; i++) {
             try {
                 System.loadLibrary(NAMES[i]);
                 loaded = true;
-            }
-            catch (Throwable t) {
-                if (t instanceof ThreadDeath) {
-                    throw (ThreadDeath) t;
-                }
-                if (t instanceof VirtualMachineError) {
-                    throw (VirtualMachineError) t;
-                }
+            } catch (ThreadDeath t) {
+                throw t;
+            } catch (VirtualMachineError t) {
+                // Don't use a Java 7 multiple exception catch so we can keep
+                // the JNI code identical between Tomcat 6/7/8/9
+                throw t;
+            } catch (Throwable t) {
                 String name = System.mapLibraryName(NAMES[i]);
-                String path = System.getProperty("java.library.path");
-                String sep = System.getProperty("path.separator");
-                String [] paths = path.split(sep);
-                for (int j=0; j<paths.length; j++) {
+                for (int j = 0; j < paths.length; j++) {
                     java.io.File fd = new java.io.File(paths[j] , name);
                     if (fd.exists()) {
-                        t.printStackTrace();
+                        // File exists but failed to load
+                        throw t;
                     }
                 }
-                if ( i > 0)
+                if (i > 0) {
                     err.append(", ");
+                }
                 err.append(t.getMessage());
             }
-            if (loaded)
+            if (loaded) {
                 break;
+            }
         }
         if (!loaded) {
-            err.append('(');
-            err.append(System.getProperty("java.library.path"));
-            err.append(')');
-            throw new UnsatisfiedLinkError(err.toString());
+            StringBuilder names = new StringBuilder();
+            for (String name : NAMES) {
+                names.append(name);
+                names.append(", ");
+            }
+            throw new LibraryNotFoundError(names.substring(0, names.length() -2), err.toString());
         }
     }
 
@@ -165,10 +166,13 @@ public final class Library {
      * Setup any APR internal data structures.  This MUST be the first function
      * called for any APR library.
      * @param libraryName the name of the library to load
+     *
+     * @return {@code true} if the native code was initialized successfully
+     *         otherwise {@code false}
+     *
+     * @throws Exception if a problem occurred during initialization
      */
-    public static boolean initialize(String libraryName)
-        throws Exception
-    {
+    public static synchronized boolean initialize(String libraryName) throws Exception {
         if (_instance == null) {
             if (libraryName == null)
                 _instance = new Library();

@@ -14,9 +14,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 */
-/* $Id$
- *
- */
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -49,11 +46,14 @@ public class SessionExample extends HttpServlet {
                       HttpServletResponse response)
         throws IOException, ServletException
     {
-        response.setContentType("text/html;charset=UTF-8");
+        response.setContentType("text/html");
+        response.setCharacterEncoding("UTF-8");
 
         PrintWriter out = response.getWriter();
-        out.println("<html>");
+        out.println("<!DOCTYPE html><html>");
         out.println("<head>");
+        out.println("<meta charset=\"UTF-8\" />");
+
 
         String title = RB.getString("sessions.title");
         out.println("<title>" + title + "</title>");

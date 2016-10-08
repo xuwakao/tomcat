@@ -28,9 +28,7 @@ import java.util.Iterator;
  * an <code>&lt;res-env-refy&gt;</code> element in the deployment descriptor.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class ContextTransaction implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -44,7 +42,8 @@ public class ContextTransaction implements Serializable {
     private final HashMap<String, Object> properties = new HashMap<>();
 
     /**
-     * Return a configured property.
+     * @param name The property name
+     * @return a configured property.
      */
     public Object getProperty(String name) {
         return properties.get(name);
@@ -52,13 +51,16 @@ public class ContextTransaction implements Serializable {
 
     /**
      * Set a configured property.
+     * @param name The property name
+     * @param value The property value
      */
     public void setProperty(String name, Object value) {
         properties.put(name, value);
     }
 
     /**
-     * remove a configured property.
+     * Remove a configured property.
+     * @param name The property name
      */
     public void removeProperty(String name) {
         properties.remove(name);
@@ -66,6 +68,7 @@ public class ContextTransaction implements Serializable {
 
     /**
      * List properties.
+     * @return the property names iterator
      */
     public Iterator<String> listProperties() {
         return properties.keySet().iterator();

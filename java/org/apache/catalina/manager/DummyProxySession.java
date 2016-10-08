@@ -89,6 +89,16 @@ public class DummyProxySession implements Session {
     }
 
     @Override
+    public long getIdleTime() {
+        return 0;
+    }
+
+    @Override
+    public long getIdleTimeInternal() {
+        return 0;
+    }
+
+    @Override
     public Manager getManager() {
         return null;
     }
@@ -203,5 +213,10 @@ public class DummyProxySession implements Session {
     public void tellChangedSessionId(String newId, String oldId,
             boolean notifySessionListeners, boolean notifyContainerListeners) {
         // NOOP
+    }
+
+    @Override
+    public boolean isAttributeDistributable(String name, Object value) {
+        return false;
     }
 }

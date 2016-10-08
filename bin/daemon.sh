@@ -17,8 +17,6 @@
 #
 # -----------------------------------------------------------------------------
 # Commons Daemon wrapper script.
-#
-# $Id: daemon.sh 1202058 2011-11-15 06:37:12Z mturk $
 # -----------------------------------------------------------------------------
 #
 # resolve links - $0 may be a softlink
@@ -107,9 +105,9 @@ test ".$CATALINA_HOME" = . && CATALINA_HOME=`cd "$DIRNAME/.." >/dev/null; pwd`
 test ".$CATALINA_BASE" = . && CATALINA_BASE="$CATALINA_HOME"
 test ".$CATALINA_MAIN" = . && CATALINA_MAIN=org.apache.catalina.startup.Bootstrap
 # If not explicitly set, look for jsvc in CATALINA_BASE first then CATALINA_HOME
-if [ -z $JSVC ]; then
+if [ -z "$JSVC" ]; then
     JSVC="$CATALINA_BASE/bin/jsvc"
-    if [ ! -x $JSVC ]; then
+    if [ ! -x "$JSVC" ]; then
         JSVC="$CATALINA_HOME/bin/jsvc"
     fi
 fi
@@ -188,7 +186,6 @@ case "$1" in
       -errfile "&2" \
       -classpath "$CLASSPATH" \
       "$LOGGING_CONFIG" $JAVA_OPTS $CATALINA_OPTS \
-      -Djava.endorsed.dirs="$JAVA_ENDORSED_DIRS" \
       -Dcatalina.base="$CATALINA_BASE" \
       -Dcatalina.home="$CATALINA_HOME" \
       -Djava.io.tmpdir="$CATALINA_TMP" \
@@ -205,7 +202,6 @@ case "$1" in
       -errfile "&1" \
       -classpath "$CLASSPATH" \
       "$LOGGING_CONFIG" $JAVA_OPTS $CATALINA_OPTS \
-      -Djava.endorsed.dirs="$JAVA_ENDORSED_DIRS" \
       -Dcatalina.base="$CATALINA_BASE" \
       -Dcatalina.home="$CATALINA_HOME" \
       -Djava.io.tmpdir="$CATALINA_TMP" \
@@ -217,7 +213,6 @@ case "$1" in
       -stop \
       -pidfile "$CATALINA_PID" \
       -classpath "$CLASSPATH" \
-      -Djava.endorsed.dirs="$JAVA_ENDORSED_DIRS" \
       -Dcatalina.base="$CATALINA_BASE" \
       -Dcatalina.home="$CATALINA_HOME" \
       -Djava.io.tmpdir="$CATALINA_TMP" \

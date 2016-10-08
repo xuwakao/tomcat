@@ -25,14 +25,12 @@ import java.util.Hashtable;
 
 
 /**
- * Concrete implementation of the <strong>UserDatabase</code> interface
+ * Concrete implementation of the <code>UserDatabase</code> interface
  * considers all directories in a directory whose pathname is specified
  * to our constructor to be "home" directories for those users.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public final class HomesUserDatabase
     implements UserDatabase {
 
@@ -133,6 +131,9 @@ public final class HomesUserDatabase
         if (!homeBaseDir.exists() || !homeBaseDir.isDirectory())
             return;
         String homeBaseFiles[] = homeBaseDir.list();
+        if (homeBaseFiles == null) {
+            return;
+        }
 
         for (int i = 0; i < homeBaseFiles.length; i++) {
             File homeDir = new File(homeBaseDir, homeBaseFiles[i]);
@@ -140,9 +141,5 @@ public final class HomesUserDatabase
                 continue;
             homes.put(homeBaseFiles[i], homeDir.toString());
         }
-
-
     }
-
-
 }

@@ -30,6 +30,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.el.lang.ELSupport;
@@ -118,6 +119,13 @@ public class TestELEvaluation {
         assertEquals("#{", evaluateExpression("\\#{"));
         assertEquals("\\${", evaluateExpression("\\\\${"));
         assertEquals("\\#{", evaluateExpression("\\\\#{"));
+
+        // '\' is only an escape for '${' and '#{'.
+        assertEquals("\\$", evaluateExpression("\\$"));
+        assertEquals("${", evaluateExpression("\\${"));
+        assertEquals("\\$a", evaluateExpression("\\$a"));
+        assertEquals("\\a", evaluateExpression("\\a"));
+        assertEquals("\\\\", evaluateExpression("\\\\"));
     }
 
     @Test
@@ -157,9 +165,14 @@ public class TestELEvaluation {
         assertEquals("\"\\", evaluateExpression("${\"\\\"\\\\\"}"));
     }
 
+    @Test
+    public void testMultipleEscaping() throws Exception {
+        assertEquals("''", evaluateExpression("${\"\'\'\"}"));
+    }
+
     private void compareBoth(String msg, int expected, Object o1, Object o2){
-        int i1 = ELSupport.compare(o1, o2);
-        int i2 = ELSupport.compare(o2, o1);
+        int i1 = ELSupport.compare(null, o1, o2);
+        int i2 = ELSupport.compare(null, o2, o1);
         assertEquals(msg,expected, i1);
         assertEquals(msg,expected, -i2);
     }
@@ -193,6 +206,31 @@ public class TestELEvaluation {
             e = el;
         }
         assertNotNull(e);
+    }
+
+    @Test
+    public void testEscape01() {
+        Assert.assertEquals("$${", evaluateExpression("$\\${"));
+    }
+
+    @Test
+    public void testBug49081a() {
+        Assert.assertEquals("$2", evaluateExpression("$${1+1}"));
+    }
+
+    @Test
+    public void testBug49081b() {
+        Assert.assertEquals("#2", evaluateExpression("##{1+1}"));
+    }
+
+    @Test
+    public void testBug49081c() {
+        Assert.assertEquals("#2", evaluateExpression("#${1+1}"));
+    }
+
+    @Test
+    public void testBug49081d() {
+        Assert.assertEquals("$2", evaluateExpression("$#{1+1}"));
     }
 
 

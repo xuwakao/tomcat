@@ -20,8 +20,6 @@ import org.apache.jasper.Constants;
 
 /**
  * Util class for Security related operations.
- *
- * @author Jean-Francois Arcand
  */
 
 public final class SecurityUtil{
@@ -32,6 +30,7 @@ public final class SecurityUtil{
     /**
      * Return the <code>SecurityManager</code> only if Security is enabled AND
      * package protection mechanism is enabled.
+     * @return <code>true</code> if package protection is enabled
      */
     public static boolean isPackageProtectionEnabled(){
         if (packageDefinitionEnabled && Constants.IS_SECURITY_ENABLED){
@@ -47,6 +46,7 @@ public final class SecurityUtil{
      * codes in the request URL that is often reported in error messages.
      *
      * @param message The message string to be filtered
+     * @return the HTML filtered message
      */
     public static String filter(String message) {
 

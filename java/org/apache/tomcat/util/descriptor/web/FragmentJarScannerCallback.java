@@ -20,14 +20,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.JarURLConnection;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.tomcat.Jar;
 import org.apache.tomcat.JarScannerCallback;
-import org.apache.tomcat.util.scan.Jar;
-import org.apache.tomcat.util.scan.JarFactory;
 import org.xml.sax.InputSource;
 
 /**
@@ -39,21 +37,21 @@ public class FragmentJarScannerCallback implements JarScannerCallback {
         "META-INF/web-fragment.xml";
     private final WebXmlParser webXmlParser;
     private final boolean delegate;
+    private final boolean parseRequired;
     private final Map<String,WebXml> fragments = new HashMap<>();
     private boolean ok  = true;
 
-    public FragmentJarScannerCallback(WebXmlParser webXmlParser, boolean delegate) {
+    public FragmentJarScannerCallback(WebXmlParser webXmlParser, boolean delegate,
+            boolean parseRequired) {
         this.webXmlParser = webXmlParser;
         this.delegate = delegate;
+        this.parseRequired = parseRequired;
     }
 
-    @Override
-    public void scan(JarURLConnection jarConn, boolean isWebapp)
-            throws IOException {
 
-        URL url = jarConn.getURL();
-        URL resourceURL = jarConn.getJarFileURL();
-        Jar jar = null;
+    @Override
+    public void scan(Jar jar, String webappPath, boolean isWebapp) throws IOException {
+
         InputStream is = null;
         WebXml fragment = new WebXml();
         fragment.setWebappJar(isWebapp);
@@ -61,9 +59,10 @@ public class FragmentJarScannerCallback implements JarScannerCallback {
 
         try {
             // Only web application JARs are checked for web-fragment.xml
-            // files
-            if (isWebapp) {
-                jar = JarFactory.newInstance(url);
+            // files.
+            // web-fragment.xml files don't need to be parsed if they are never
+            // going to be used.
+            if (isWebapp && parseRequired) {
                 is = jar.getInputStream(FRAGMENT_LOCATION);
             }
 
@@ -72,25 +71,23 @@ public class FragmentJarScannerCallback implements JarScannerCallback {
                 // distributable
                 fragment.setDistributable(true);
             } else {
-                InputSource source = new InputSource(
-                        resourceURL.toString() + "!/" + FRAGMENT_LOCATION);
+                String fragmentUrl = jar.getURL(FRAGMENT_LOCATION);
+                InputSource source = new InputSource(fragmentUrl);
                 source.setByteStream(is);
                 if (!webXmlParser.parseWebXml(source, fragment, true)) {
                     ok = false;
                 }
             }
         } finally {
-            if (jar != null) {
-                jar.close();
-            }
-            fragment.setURL(url);
+            fragment.setURL(jar.getJarFileURL());
             if (fragment.getName() == null) {
                 fragment.setName(fragment.getURL().toString());
             }
-            fragment.setJarName(extractJarFileName(url));
+            fragment.setJarName(extractJarFileName(jar.getJarFileURL()));
             fragments.put(fragment.getName(), fragment);
         }
     }
+
 
     private String extractJarFileName(URL input) {
         String url = input.toString();
@@ -103,23 +100,24 @@ public class FragmentJarScannerCallback implements JarScannerCallback {
         return url.substring(url.lastIndexOf('/') + 1);
     }
 
-    @Override
-    public void scan(File file, boolean isWebapp) throws IOException {
 
-        InputStream stream = null;
+    @Override
+    public void scan(File file, String webappPath, boolean isWebapp) throws IOException {
+
         WebXml fragment = new WebXml();
         fragment.setWebappJar(isWebapp);
         fragment.setDelegate(delegate);
 
+        File fragmentFile = new File(file, FRAGMENT_LOCATION);
         try {
-            File fragmentFile = new File(file, FRAGMENT_LOCATION);
             if (fragmentFile.isFile()) {
-                stream = new FileInputStream(fragmentFile);
-                InputSource source =
-                    new InputSource(fragmentFile.toURI().toURL().toString());
-                source.setByteStream(stream);
-                if (!webXmlParser.parseWebXml(source, fragment, true)) {
-                    ok = false;
+                try (InputStream stream = new FileInputStream(fragmentFile)) {
+                    InputSource source =
+                        new InputSource(fragmentFile.toURI().toURL().toString());
+                    source.setByteStream(stream);
+                    if (!webXmlParser.parseWebXml(source, fragment, true)) {
+                        ok = false;
+                    }
                 }
             } else {
                 // If there is no web.xml, normal folder no impact on

@@ -40,7 +40,11 @@ public class StatementDecoratorInterceptor extends AbstractCreateStatementInterc
 
     private static final Log logger = LogFactory.getLog(StatementDecoratorInterceptor.class);
 
-    private static final String[] EXECUTE_QUERY_TYPES = { "executeQuery" };
+    protected static final String EXECUTE_QUERY  = "executeQuery";
+    protected static final String GET_GENERATED_KEYS = "getGeneratedKeys";
+    protected static final String GET_RESULTSET  = "getResultSet";
+
+    protected static final String[] RESULTSET_TYPES = {EXECUTE_QUERY, GET_GENERATED_KEYS, GET_RESULTSET};
 
     /**
      * the constructors that are used to create statement proxies
@@ -65,7 +69,7 @@ public class StatementDecoratorInterceptor extends AbstractCreateStatementInterc
      * @param clazz
      *            - the interface that the proxy will implement
      * @return - returns a constructor used to create new instances
-     * @throws NoSuchMethodException
+     * @throws NoSuchMethodException Constructor not found
      */
     protected Constructor<?> getConstructor(int idx, Class<?> clazz) throws NoSuchMethodException {
         if (constructors[idx] == null) {
@@ -139,6 +143,9 @@ public class StatementDecoratorInterceptor extends AbstractCreateStatementInterc
      * @param sql           The sql of of the statement
      *
      * @return  A new proxy for the Statement
+     * @throws InstantiationException Couldn't instantiate object
+     * @throws IllegalAccessException Inaccessible constructor
+     * @throws InvocationTargetException Exception thrown from constructor
      */
     protected Object createDecorator(Object proxy, Method method, Object[] args,
                                      Object statement, Constructor<?> constructor, String sql)
@@ -154,18 +161,19 @@ public class StatementDecoratorInterceptor extends AbstractCreateStatementInterc
     }
 
     protected boolean isExecuteQuery(String methodName) {
-        return EXECUTE_QUERY_TYPES[0].equals(methodName);
+        return EXECUTE_QUERY.equals(methodName);
     }
 
     protected boolean isExecuteQuery(Method method) {
         return isExecuteQuery(method.getName());
     }
 
+    protected boolean isResultSet(Method method, boolean process) {
+        return process(RESULTSET_TYPES, method, process);
+    }
+
     /**
-     * Class to measure query execute time
-     *
-     * @author fhanik
-     *
+     * Class to measure query execute time.
      */
     protected class StatementProxy<T extends java.sql.Statement> implements InvocationHandler {
 
@@ -239,7 +247,8 @@ public class StatementDecoratorInterceptor extends AbstractCreateStatementInterc
             if (compare(GETCONNECTION_VAL,method)){
                 return connection;
             }
-            boolean process = isExecuteQuery(method);
+            boolean process = false;
+            process = isResultSet(method, process);
             // check to see if we are about to execute a query
             // if we are executing, get the current time
             Object result = null;
@@ -259,7 +268,7 @@ public class StatementDecoratorInterceptor extends AbstractCreateStatementInterc
                     throw t;
                 }
             }
-            if (process){
+            if (process && result != null) {
                 Constructor<?> cons = getResultSetConstructor();
                 result = cons.newInstance(new Object[]{new ResultSetProxy(actualProxy, result)});
             }

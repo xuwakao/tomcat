@@ -30,9 +30,7 @@ import org.apache.tomcat.util.ExceptionUtils;
  * when integrating Tomcat.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class ServerInfo {
 
 
@@ -60,12 +58,10 @@ public class ServerInfo {
         String built = null;
         String number = null;
 
-        try {
-            InputStream is = ServerInfo.class.getResourceAsStream
-                ("/org/apache/catalina/util/ServerInfo.properties");
-            Properties props = new Properties();
+        Properties props = new Properties();
+        try (InputStream is = ServerInfo.class.getResourceAsStream
+                ("/org/apache/catalina/util/ServerInfo.properties")) {
             props.load(is);
-            is.close();
             info = props.getProperty("server.info");
             built = props.getProperty("server.built");
             number = props.getProperty("server.number");
@@ -73,11 +69,11 @@ public class ServerInfo {
             ExceptionUtils.handleThrowable(t);
         }
         if (info == null)
-            info = "Apache Tomcat 8.0.x-dev";
+            info = "Apache Tomcat 9.0.x-dev";
         if (built == null)
             built = "unknown";
         if (number == null)
-            number = "8.0.x";
+            number = "9.0.x";
 
         serverInfo = info;
         serverBuilt = built;
@@ -89,7 +85,7 @@ public class ServerInfo {
 
 
     /**
-     * Return the server identification for this version of Tomcat.
+     * @return the server identification for this version of Tomcat.
      */
     public static String getServerInfo() {
 
@@ -98,7 +94,7 @@ public class ServerInfo {
     }
 
     /**
-     * Return the server built time for this version of Tomcat.
+     * @return the server built time for this version of Tomcat.
      */
     public static String getServerBuilt() {
 
@@ -107,7 +103,7 @@ public class ServerInfo {
     }
 
     /**
-     * Return the server's version number.
+     * @return the server's version number.
      */
     public static String getServerNumber() {
 

@@ -21,7 +21,6 @@ import org.apache.catalina.tribes.Member;
 
 /**
  * @author Peter Rossbach
- * @version $Id$
  */
 public class SendMessageData {
 
@@ -31,9 +30,9 @@ public class SendMessageData {
 
 
     /**
-     * @param message
-     * @param destination
-     * @param exception
+     * @param message The message to send
+     * @param destination Member destination
+     * @param exception Associated error
      */
     public SendMessageData(Object message, Member destination,
             Exception exception) {
@@ -44,19 +43,19 @@ public class SendMessageData {
     }
 
     /**
-     * @return Returns the destination.
+     * @return the destination.
      */
     public Member getDestination() {
         return destination;
     }
     /**
-     * @return Returns the exception.
+     * @return the exception.
      */
     public Exception getException() {
         return exception;
     }
     /**
-     * @return Returns the message.
+     * @return the message.
      */
     public Object getMessage() {
         return message;

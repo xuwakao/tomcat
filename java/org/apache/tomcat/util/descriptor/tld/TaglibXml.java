@@ -23,7 +23,7 @@ import javax.servlet.jsp.tagext.FunctionInfo;
 
 /**
  * Common representation of a Tag Library Descriptor (TLD) XML file.
- * <p/>
+ * <p>
  * This stores the raw result of parsing an TLD XML file, flattening different
  * version of the descriptors to a common format. This is different to a
  * TagLibraryInfo instance that would be passed to a tag validator in that it
@@ -36,11 +36,11 @@ public class TaglibXml {
     private String shortName;
     private String uri;
     private String info;
-    private Validator validator;
-    private List<Tag> tags;
-    private List<TagFile> tagFiles;
-    private List<String> listeners;
-    private List<FunctionInfo> functions;
+    private ValidatorXml validator;
+    private final List<TagXml> tags = new ArrayList<>();
+    private final List<TagFileXml> tagFiles = new ArrayList<>();
+    private final List<String> listeners = new ArrayList<>();
+    private final List<FunctionInfo> functions = new ArrayList<>();
 
     public String getTlibVersion() {
         return tlibVersion;
@@ -82,40 +82,31 @@ public class TaglibXml {
         this.info = info;
     }
 
-    public Validator getValidator() {
+    public ValidatorXml getValidator() {
         return validator;
     }
 
-    public void setValidator(Validator validator) {
+    public void setValidator(ValidatorXml validator) {
         this.validator = validator;
     }
 
-    public void addTag(Tag tag) {
-        if (tags == null) {
-            tags = new ArrayList<>();
-        }
+    public void addTag(TagXml tag) {
         tags.add(tag);
     }
 
-    public List<Tag> getTags() {
+    public List<TagXml> getTags() {
         return tags;
     }
 
-    public void addTagFile(TagFile tag) {
-        if (tagFiles == null) {
-            tagFiles = new ArrayList<>();
-        }
+    public void addTagFile(TagFileXml tag) {
         tagFiles.add(tag);
     }
 
-    public List<TagFile> getTagFiles() {
+    public List<TagFileXml> getTagFiles() {
         return tagFiles;
     }
 
     public void addListener(String listener) {
-        if (listeners == null) {
-            listeners = new ArrayList<>();
-        }
         listeners.add(listener);
     }
 
@@ -124,9 +115,6 @@ public class TaglibXml {
     }
 
     public void addFunction(String name, String klass, String signature) {
-        if (functions == null) {
-            functions = new ArrayList<>();
-        }
         functions.add(new FunctionInfo(name, klass, signature));
     }
 

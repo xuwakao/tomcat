@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -36,28 +36,41 @@
 <section name="Introduction">
 
   <p>The <strong>JDBC Connection Pool <code>org.apache.tomcat.jdbc.pool</code></strong>
-  is a replacement or an alternative to the <a href="http://commons.apache.org/dbcp/">commons-dbcp</a>
+  is a replacement or an alternative to the <a href="http://commons.apache.org/dbcp/">Apache Commons DBCP</a>
   connection pool.</p>
 
   <p>So why do we need a new connection pool?</p>
 
   <p>Here are a few of the reasons:</p>
     <ol>
-      <li>commons-dbcp is single threaded, in order to be thread safe commons-dbcp locks the entire pool, even during query validation.</li>
-      <li>commons-dbcp is slow - as the number of logical CPUs grow, the performance suffers, the above point shows that there is not support for high concurrency
-          Even with the enormous optimizations of the <code>synchronized</code> statement in Java 6, commons-dbcp still suffers in speed and concurrency.</li>
-      <li>commons-dbcp is complex, over 60 classes. tomcat-jdbc-pool, core is 8 classes, hence modifications for future requirement will require
-          much less changes. This is all you need to run the connection pool itself, the rest is gravy.</li>
-      <li>commons-dbcp uses static interfaces. This means you can't compile it with JDK 1.6, or if you run on JDK 1.6/1.7 you will get
-          <code>NoSuchMethodException</code> for all the methods not implemented, even if the driver supports it.  </li>
-      <li>The commons-dbcp has become fairly stagnant. Sparse updates, releases, and new feature support.</li>
-      <li>It's not worth rewriting over 60 classes, when something as a connection pool can be accomplished with as a much simpler implementation.</li>
-      <li>Tomcat jdbc pool implements a fairness option not available in commons-dbcp and still performs faster than commons-dbcp</li>
-      <li>Tomcat jdbc pool implements the ability retrieve a connection asynchronously, without adding additional threads to the library itself</li>
-      <li>Tomcat jdbc pool is a Tomcat module, it depends on Tomcat JULI, a simplified logging framework used in Tomcat.</li>
-      <li>Retrieve the underlying connection using the <code>javax.sql.PooledConnection</code> interface.</li>
-      <li>Starvation proof. If a pool is empty, and threads are waiting for a connection, when a connection is returned,
-          the pool will awake the correct thread waiting. Most pools will simply starve.</li>
+      <li>Commons DBCP 1.x is single threaded. In order to be thread safe
+          Commons locks the entire pool for short periods during both object
+          allocation and object return. Note that this does not apply to
+          Commons DBCP 2.x.</li>
+      <li>Commons DBCP 1.x can be slow. As the number of logical CPUs grows and
+          the number of concurrent threads attempting to borrow or return
+          objects increases, the performance suffers. For highly concurrent
+          systems the impact can be significant. Note that this does not apply
+          to Commons DBCP 2.x.</li>
+      <li>Commons DBCP is over 60 classes. tomcat-jdbc-pool core is 8 classes,
+          hence modifications for future requirement will require much less
+          changes. This is all you need to run the connection pool itself, the
+          rest is gravy.</li>
+      <li>Commons DBCP uses static interfaces. This means you have to use the
+          right version for a given JRE version or you may see
+          <code>NoSuchMethodException</code> exceptions.</li>
+      <li>It's not worth rewriting over 60 classes, when a connection pool can
+          be accomplished with a much simpler implementation.</li>
+      <li>Tomcat jdbc pool implements the ability retrieve a connection
+          asynchronously, without adding additional threads to the library
+          itself.</li>
+      <li>Tomcat jdbc pool is a Tomcat module, it depends on Tomcat JULI, a
+          simplified logging framework used in Tomcat.</li>
+      <li>Retrieve the underlying connection using the
+          <code>javax.sql.PooledConnection</code> interface.</li>
+      <li>Starvation proof. If a pool is empty, and threads are waiting for a
+          connection, when a connection is returned, the pool will awake the
+          correct thread waiting. Most pools will simply starve.</li>
     </ol>
 
   <p>Features added over other connection pool implementations</p>
@@ -115,7 +128,7 @@
   </subsection>
   <subsection name="Inside the Apache Tomcat Container">
     <p>
-      The Tomcat Connection pool is configured as a resource described in <a href="http://tomcat.apache.org/tomcat-6.0-doc/jndi-datasource-examples-howto.html" target="_blank">The Tomcat JDBC documentation</a>
+      The Tomcat Connection pool is configured as a resource described in <a href="http://tomcat.apache.org/tomcat-8.0-doc/jndi-datasource-examples-howto.html" target="_blank">The Tomcat JDBC documentation</a>
       With the only difference being that you have to specify the <code>factory</code> attribute and set the value to
       <code>org.apache.tomcat.jdbc.pool.DataSourceFactory</code>
     </p>
@@ -154,6 +167,25 @@
       <attribute name="type" required="true">
         <p>Type should always be <code>javax.sql.DataSource</code> or <code>javax.sql.XADataSource</code></p>
         <p>Depending on the type a <code>org.apache.tomcat.jdbc.pool.DataSource</code> or a <code>org.apache.tomcat.jdbc.pool.XADataSource</code> will be created.</p>
+      </attribute>
+    </attributes>
+  </subsection>
+
+  <subsection name="System Properties">
+    <p>System properties are JVM wide, affect all pools created in the JVM</p>
+    <attributes>
+      <attribute name="org.apache.tomcat.jdbc.pool.onlyAttemptCurrentClassLoader" required="false">
+        <p>(boolean) Controls classloading of dynamic classes, such as
+           JDBC drivers, interceptors and validators. If set to
+           <code>false</code>, default value, the pool will first attempt
+           to load using the current loader (i.e. the class loader that
+           loaded the pool classes) and if class loading fails attempt to
+           load using the thread context loader. Set this value to
+           <code>true</code>, if you wish to remain backwards compatible
+           with Apache Tomcat 8.0.8 and earlier, and only attempt the
+           current loader.
+           If not set then the default value is <code>false</code>.
+        </p>
       </attribute>
     </attributes>
   </subsection>
@@ -245,15 +277,26 @@
     <attribute name="testOnBorrow" required="false">
       <p>(boolean) The indication of whether objects will be validated before being borrowed from the pool.
          If the object fails to validate, it will be dropped from the pool, and we will attempt to borrow another.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code> parameter must be set to a non-null string.
+         NOTE - for a true value to have any effect, the <code>validationQuery</code>
+         or <code>validatorClassName</code> parameter must be set to a non-null string.
          In order to have a more efficient validation, see <code>validationInterval</code>.
+         Default value is <code>false</code>
+      </p>
+    </attribute>
+
+    <attribute name="testOnConnect" required="false">
+      <p>(boolean) The indication of whether objects will be validated when a connection is first created.
+         If an object fails to validate, it will be throw <code>SQLException</code>.
+         NOTE - for a true value to have any effect, the <code>validationQuery</code>, <code>initSQL</code>
+         or <code>validatorClassName</code> parameter must be set to a non-null string.
          Default value is <code>false</code>
       </p>
     </attribute>
 
     <attribute name="testOnReturn" required="false">
       <p>(boolean) The indication of whether objects will be validated before being returned to the pool.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code> parameter must be set to a non-null string.
+         NOTE - for a true value to have any effect, the <code>validationQuery</code>
+         or <code>validatorClassName</code> parameter must be set to a non-null string.
          The default value is <code>false</code>.
       </p>
     </attribute>
@@ -261,7 +304,8 @@
     <attribute name="testWhileIdle" required="false">
       <p>(boolean) The indication of whether objects will be validated by the idle object evictor (if any).
          If an object fails to validate, it will be dropped from the pool.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code> parameter must be set to a non-null string.
+         NOTE - for a true value to have any effect, the <code>validationQuery</code>
+         or <code>validatorClassName</code> parameter must be set to a non-null string.
          The default value is <code>false</code> and this property has to be set in order for the
          pool cleaner/test thread is to run (also see <code>timeBetweenEvictionRunsMillis</code>)
       </p>
@@ -426,11 +470,17 @@
     </attribute>
 
     <attribute name="maxAge" required="false">
-      <p>(long) Time in milliseconds to keep this connection. When a connection is returned to the pool,
-         the pool will check to see if the <code>now - time-when-connected > maxAge</code> has been reached,
-         and if so, it closes the connection rather than returning it to the pool.
-         The default value is <code>0</code>, which implies that connections will be left open and no age check
-         will be done upon returning the connection to the pool.</p>
+      <p>(long) Time in milliseconds to keep this connection. This attribute
+         works both when returning connection and when borrowing connection.
+         When a connection is borrowed from the pool, the pool will check to see
+         if the <code>now - time-when-connected > maxAge</code> has been reached
+         , and if so, it reconnects before borrow it. When a connection is
+         returned to the pool, the pool will check to see if the
+         <code>now - time-when-connected > maxAge</code> has been reached, and
+         if so, it closes the connection rather than returning it to the pool.
+         The default value is <code>0</code>, which implies that connections
+         will be left open and no age check will be done upon borrowing from the
+         pool and returning the connection to the pool.</p>
     </attribute>
 
     <attribute name="useEquals" required="false">
@@ -476,7 +526,7 @@
          and reopened with the requested credentials. This way, the pool size is still managed
          on a global level, and not on a per schema level. <br/>
          The default value is <code>false</code>.<br/>
-         This property was added as an enhancement to <a href="https://issues.apache.org/bugzilla/show_bug.cgi?id=50025">bug 50025</a>.
+         This property was added as an enhancement to <a href="https://bz.apache.org/bugzilla/show_bug.cgi?id=50025">bug 50025</a>.
       </p>
     </attribute>
     <attribute name="dataSource" required="false">
@@ -556,7 +606,7 @@
     </p>
   </subsection>
   <subsection name="org.apache.tomcat.jdbc.pool.JdbcInterceptor">
-    <p>Abstract base class for all interceptors, can not be instantiated.</p>
+    <p>Abstract base class for all interceptors, cannot be instantiated.</p>
     <attributes>
       <attribute name="useEquals" required="false">
         <p>(boolean) Set to true if you wish the <code>ProxyConnection</code> class to use <code>String.equals</code> and set to <code>false</code>
@@ -579,6 +629,13 @@
        and closes these statements when the connection is returned to the pool.
     </p>
     <attributes>
+      <attribute name="trace" required="false">
+        <p>(boolean as String) Enable tracing of unclosed statements.
+           When enabled and a connection is closed, and statements are not closed,
+           the interceptor will log all stack traces.
+           The default value is <code>false</code>.
+        </p>
+      </attribute>
     </attributes>
   </subsection>
   <subsection name="org.apache.tomcat.jdbc.pool.interceptor.StatementCache">
@@ -624,8 +681,9 @@
     </p>
     <attributes>
       <attribute name="queryTimeout" required="true">
-        <p>(int as String) The number of seconds to set for the query timeout
-           The default value is <code>1000</code> milliseconds.
+        <p>(int as String) The number of seconds to set for the query timeout.
+           A value less than or equal to zero will disable this feature.
+           The default value is <code>1</code> seconds.
         </p>
       </attribute>
     </attributes>
@@ -641,8 +699,19 @@
         </p>
       </attribute>
       <attribute name="maxQueries" required="false">
-        <p>(int as String) The maximum number of queries to keep track of in order to preserve memory space
+        <p>(int as String) The maximum number of queries to keep track of in order to preserve memory space.
+           A value less than or equal to 0 will disable this feature.
            The default value is <code>1000</code>.
+        </p>
+      </attribute>
+      <attribute name="logSlow" required="false">
+        <p>(boolean as String) Set to <code>true</code> if you wish to log slow queries.
+            The default value is <code>true</code>.
+        </p>
+      </attribute>
+      <attribute name="logFailed" required="false">
+        <p>(boolean as String) Set to <code>true</code> if you wish to log failed queries.
+            The default value is <code>false</code>.
         </p>
       </attribute>
     </attributes>
@@ -683,7 +752,7 @@
 </section>
 
 <section name="Code Example">
-  <p>Other examples of Tomcat configuration for JDBC usage can be found <a href="http://tomcat.apache.org/tomcat-6.0-doc/jndi-datasource-examples-howto.html">in the Tomcat documentation</a>. </p>
+  <p>Other examples of Tomcat configuration for JDBC usage can be found <a href="http://tomcat.apache.org/tomcat-8.0-doc/jndi-datasource-examples-howto.html">in the Tomcat documentation</a>. </p>
   <subsection name="Plain Ol' Java">
     <p>Here is a simple example of how to create and use a data source.</p>
 <source><![CDATA[  import java.sql.Connection;
@@ -890,7 +959,7 @@
 
 <section name="Building">
   <p>We build the JDBC pool code with 1.6, but it is backwards compatible down to 1.5 for runtime environment. For unit test, we use 1.6 and higher</p>
-  <p>Other examples of Tomcat configuration for JDBC usage can be found <a href="http://tomcat.apache.org/tomcat-6.0-doc/jndi-datasource-examples-howto.html">in the Tomcat documentation</a>. </p>
+  <p>Other examples of Tomcat configuration for JDBC usage can be found <a href="http://tomcat.apache.org/tomcat-8.0-doc/jndi-datasource-examples-howto.html">in the Tomcat documentation</a>. </p>
   <subsection name="Building from source">
     <p>Building is pretty simple. The pool has a dependency on <code>tomcat-juli.jar</code> and in case you want the <code>SlowQueryReportJmx</code></p>
 <source><![CDATA[  javac -classpath tomcat-juli.jar \

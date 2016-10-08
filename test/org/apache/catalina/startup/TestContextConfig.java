@@ -73,7 +73,8 @@ public class TestContextConfig extends TomcatBaseTest {
 
         File appDir =  new File("test/webapp-fragments");
         // app dir is relative to server home
-        tomcat.addWebapp(null, "/test", appDir.getAbsolutePath());
+        Context ctx = tomcat.addWebapp(null, "/test", appDir.getAbsolutePath());
+        skipTldsForResourceJars(ctx);
 
         tomcat.start();
 
@@ -82,13 +83,7 @@ public class TestContextConfig extends TomcatBaseTest {
 
     @Test
     public void testBug53574() throws Exception {
-        Tomcat tomcat = getTomcatInstance();
-
-        File appDir = new File("test/webapp");
-        tomcat.addWebapp(null, "/test", appDir.getAbsolutePath());
-
-        tomcat.start();
-
+        getTomcatInstanceTestWebapp(false, true);
         assertPageContains("/test/bug53574", "OK");
     }
 
@@ -117,7 +112,7 @@ public class TestContextConfig extends TomcatBaseTest {
 
         Tomcat.addServlet(context, "TestServlet",
                 "org.apache.catalina.startup.TesterServletWithLifeCycleMethods");
-        context.addServletMapping("/testServlet", "TestServlet");
+        context.addServletMappingDecoded("/testServlet", "TestServlet");
 
         tomcat.enableNaming();
 
@@ -136,14 +131,14 @@ public class TestContextConfig extends TomcatBaseTest {
 
         Tomcat.addServlet(context, "TestServlet",
                 "org.apache.catalina.startup.TesterServletWithAnnotations");
-        context.addServletMapping("/testServlet", "TestServlet");
+        context.addServletMappingDecoded("/testServlet", "TestServlet");
 
         tomcat.enableNaming();
 
         tomcat.start();
 
         assertPageContains("/test/testServlet",
-                "envEntry1: 1 envEntry2: 2 envEntry3: 33 envEntry4: 4");
+                "envEntry1: 1 envEntry2: 2 envEntry3: 33 envEntry4: 4 envEntry5: 55 envEntry6: 66");
     }
 
     @Test
@@ -207,4 +202,5 @@ public class TestContextConfig extends TomcatBaseTest {
             Assert.assertTrue(result, result.indexOf(expectedBody) > -1);
         }
     }
+
 }

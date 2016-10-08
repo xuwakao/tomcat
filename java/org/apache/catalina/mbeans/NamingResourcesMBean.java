@@ -37,9 +37,7 @@ import org.apache.tomcat.util.modeler.Registry;
  * <code>org.apache.catalina.deploy.NamingResourcesImpl</code> component.</p>
  *
  * @author Amy Roh
- * @version $Id$
  */
-
 public class NamingResourcesMBean extends BaseModelMBean {
 
 
@@ -83,6 +81,7 @@ public class NamingResourcesMBean extends BaseModelMBean {
     /**
      * Return the MBean Names of the set of defined environment entries for
      * this web application
+     * @return an array of object names as strings
      */
     public String[] getEnvironments() {
         ContextEnvironment[] envs =
@@ -108,6 +107,7 @@ public class NamingResourcesMBean extends BaseModelMBean {
     /**
      * Return the MBean Names of all the defined resource references for this
      * application.
+     * @return an array of object names as strings
      */
     public String[] getResources() {
 
@@ -134,6 +134,7 @@ public class NamingResourcesMBean extends BaseModelMBean {
     /**
      * Return the MBean Names of all the defined resource link references for
      * this application.
+     * @return an array of object names as strings
      */
     public String[] getResourceLinks() {
 
@@ -165,6 +166,8 @@ public class NamingResourcesMBean extends BaseModelMBean {
      * @param envName New environment entry name
      * @param type The type of the new environment entry
      * @param value The value of the new environment entry
+     * @return the object name of the new environment entry
+     * @throws MalformedObjectNameException if the object name was invalid
      */
     public String addEnvironment(String envName, String type, String value)
         throws MalformedObjectNameException {
@@ -198,6 +201,8 @@ public class NamingResourcesMBean extends BaseModelMBean {
      *
      * @param resourceName New resource reference name
      * @param type New resource reference type
+     * @return the object name of the new resource
+     * @throws MalformedObjectNameException if the object name was invalid
      */
     public String addResource(String resourceName, String type)
         throws MalformedObjectNameException {
@@ -229,6 +234,8 @@ public class NamingResourcesMBean extends BaseModelMBean {
      *
      * @param resourceLinkName New resource link reference name
      * @param type New resource link reference type
+     * @return the object name of the new resource link
+     * @throws MalformedObjectNameException if the object name was invalid
      */
     public String addResourceLink(String resourceLinkName, String type)
         throws MalformedObjectNameException {

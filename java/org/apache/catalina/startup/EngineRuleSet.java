@@ -30,9 +30,7 @@ import org.apache.tomcat.util.digester.RuleSetBase;
  * <code>HostRuleSet</code>.</p>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class EngineRuleSet extends RuleSetBase {
 
 
@@ -95,7 +93,7 @@ public class EngineRuleSet extends RuleSetBase {
                           "engineConfigClass"));
         digester.addSetNext(prefix + "Engine",
                             "setContainer",
-                            "org.apache.catalina.Container");
+                            "org.apache.catalina.Engine");
 
         //Cluster configuration start
         digester.addObjectCreate(prefix + "Engine/Cluster",

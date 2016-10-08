@@ -32,6 +32,7 @@ import java.util.EventListener;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterRegistration;
@@ -54,23 +55,20 @@ import org.apache.tomcat.util.ExceptionUtils;
  * object from the web application.
  *
  * @author Remy Maucherat
- * @author Jean-Francois Arcand
- * @version $Id$
  */
-
 public class ApplicationContextFacade implements ServletContext {
 
     // ---------------------------------------------------------- Attributes
     /**
      * Cache Class object used for reflection.
      */
-    private final HashMap<String,Class<?>[]> classCache;
+    private final Map<String,Class<?>[]> classCache;
 
 
     /**
      * Cache method object.
      */
-    private final HashMap<String,Method> objectCache;
+    private final Map<String,Method> objectCache;
 
 
     // ----------------------------------------------------------- Constructors
@@ -87,7 +85,7 @@ public class ApplicationContextFacade implements ServletContext {
         this.context = context;
 
         classCache = new HashMap<>();
-        objectCache = new HashMap<>();
+        objectCache = new ConcurrentHashMap<>();
         initClassCache();
     }
 
@@ -860,12 +858,8 @@ public class ApplicationContextFacade implements ServletContext {
                    InvocationTargetException {
 
         if (SecurityUtil.isPackageProtectionEnabled()){
-           return AccessController.doPrivileged(new PrivilegedExceptionAction<Object>(){
-                @Override
-                public Object run() throws IllegalAccessException, InvocationTargetException{
-                    return method.invoke(context,  params);
-                }
-            });
+           return AccessController.doPrivileged(
+                   new PrivilegedExecuteMethod(method, context,  params));
         } else {
             return method.invoke(context, params);
         }
@@ -896,5 +890,24 @@ public class ApplicationContextFacade implements ServletContext {
         }
 
         throw realException;
+    }
+
+
+    private static class PrivilegedExecuteMethod implements PrivilegedExceptionAction<Object> {
+
+        private final Method method;
+        private final ApplicationContext context;
+        private final Object[] params;
+
+        public PrivilegedExecuteMethod(Method method, ApplicationContext context, Object[] params) {
+            this.method = method;
+            this.context = context;
+            this.params = params;
+        }
+
+        @Override
+        public Object run() throws Exception {
+            return method.invoke(context, params);
+        }
     }
 }

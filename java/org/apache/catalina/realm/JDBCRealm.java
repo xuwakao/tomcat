@@ -47,9 +47,7 @@ import org.apache.tomcat.util.ExceptionUtils;
 * @author Craig R. McClanahan
 * @author Carson McDonald
 * @author Ignacio Ortega
-* @version $Id$
 */
-
 public class JDBCRealm
     extends RealmBase {
 
@@ -145,8 +143,7 @@ public class JDBCRealm
     // ------------------------------------------------------------- Properties
 
     /**
-     * Return the username to use to connect to the database.
-     *
+     * @return the username to use to connect to the database.
      */
     public String getConnectionName() {
         return connectionName;
@@ -162,8 +159,7 @@ public class JDBCRealm
     }
 
     /**
-     * Return the password to use to connect to the database.
-     *
+     * @return the password to use to connect to the database.
      */
     public String getConnectionPassword() {
         return connectionPassword;
@@ -179,8 +175,7 @@ public class JDBCRealm
     }
 
     /**
-     * Return the URL to use to connect to the database.
-     *
+     * @return the URL to use to connect to the database.
      */
     public String getConnectionURL() {
         return connectionURL;
@@ -196,8 +191,7 @@ public class JDBCRealm
     }
 
     /**
-     * Return the JDBC driver that will be used.
-     *
+     * @return the JDBC driver that will be used.
      */
     public String getDriverName() {
         return driverName;
@@ -213,8 +207,7 @@ public class JDBCRealm
     }
 
     /**
-     * Return the column in the user role table that names a role.
-     *
+     * @return the column in the user role table that names a role.
      */
     public String getRoleNameCol() {
         return roleNameCol;
@@ -230,8 +223,7 @@ public class JDBCRealm
     }
 
     /**
-     * Return the column in the user table that holds the user's credentials.
-     *
+     * @return the column in the user table that holds the user's credentials.
      */
     public String getUserCredCol() {
         return userCredCol;
@@ -247,8 +239,7 @@ public class JDBCRealm
     }
 
     /**
-     * Return the column in the user table that holds the user's name.
-     *
+     * @return the column in the user table that holds the user's name.
      */
     public String getUserNameCol() {
         return userNameCol;
@@ -264,8 +255,7 @@ public class JDBCRealm
     }
 
     /**
-     * Return the table that holds the relation between user's and roles.
-     *
+     * @return the table that holds the relation between user's and roles.
      */
     public String getUserRoleTable() {
         return userRoleTable;
@@ -281,8 +271,7 @@ public class JDBCRealm
     }
 
     /**
-     * Return the table that holds user data..
-     *
+     * @return the table that holds user data..
      */
     public String getUserTable() {
         return userTable;
@@ -313,6 +302,7 @@ public class JDBCRealm
      * @param username Username of the Principal to look up
      * @param credentials Password or other credentials to use in
      *  authenticating this username
+     * @return the associated principal, or <code>null</code> if there is none.
      */
     @Override
     public synchronized Principal authenticate(String username, String credentials) {
@@ -367,35 +357,44 @@ public class JDBCRealm
 
 
     /**
-     * Return the Principal associated with the specified username and
-     * credentials, if there is one; otherwise return <code>null</code>.
+     * Attempt to authenticate the user with the provided credentials.
      *
      * @param dbConnection The database connection to be used
      * @param username Username of the Principal to look up
-     * @param credentials Password or other credentials to use in
-     *  authenticating this username
+     * @param credentials Password or other credentials to use in authenticating
+     *                    this username
+     *
+     * @return Return the Principal associated with the specified username and
+     *         credentials, if there is one; otherwise return <code>null</code>.
      */
     public synchronized Principal authenticate(Connection dbConnection,
                                                String username,
                                                String credentials) {
-
         // No user or no credentials
         // Can't possibly authenticate, don't bother the database then
         if (username == null || credentials == null) {
+            if (containerLog.isTraceEnabled())
+                containerLog.trace(sm.getString("jdbcRealm.authenticateFailure",
+                                                username));
             return null;
         }
 
         // Look up the user's credentials
         String dbCredentials = getPassword(username);
 
-        // Validate the user's credentials
-        boolean validated = false;
-        if (hasMessageDigest()) {
-            // Hex hashes should be compared case-insensitive
-            validated = (digest(credentials).equalsIgnoreCase(dbCredentials));
-        } else {
-            validated = (digest(credentials).equals(dbCredentials));
+        if (dbCredentials == null) {
+            // User was not found in the database.
+            // Waste a bit of time as not to reveal that the user does not exist.
+            getCredentialHandler().mutate(credentials);
+
+            if (containerLog.isTraceEnabled())
+                containerLog.trace(sm.getString("jdbcRealm.authenticateFailure",
+                                                username));
+            return null;
         }
+
+        // Validate the user's credentials
+        boolean validated = getCredentialHandler().matches(credentials, dbCredentials);
 
         if (validated) {
             if (containerLog.isTraceEnabled())
@@ -405,14 +404,13 @@ public class JDBCRealm
             if (containerLog.isTraceEnabled())
                 containerLog.trace(sm.getString("jdbcRealm.authenticateFailure",
                                                 username));
-            return (null);
+            return null;
         }
 
         ArrayList<String> roles = getRoles(username);
 
         // Create and return a suitable Principal for this user
         return (new GenericPrincipal(username, credentials, roles));
-
     }
 
 
@@ -462,7 +460,7 @@ public class JDBCRealm
      *
      * @param dbConnection The database connection to be used
      * @param username Username for which credentials should be retrieved
-     *
+     * @return the prepared statement
      * @exception SQLException if a database error occurs
      */
     protected PreparedStatement credentials(Connection dbConnection,
@@ -497,7 +495,7 @@ public class JDBCRealm
 
 
     /**
-     * Return a short name for this Realm implementation.
+     * @return a short name for this Realm implementation.
      */
     @Override
     protected String getName() {
@@ -508,15 +506,15 @@ public class JDBCRealm
 
 
     /**
-     * Return the password associated with the given principal's user name.
+     * Get the password for the specified user.
+     * @param username The user name
+     * @return the password associated with the given principal's user name.
      */
     @Override
     protected synchronized String getPassword(String username) {
 
         // Look up the user's credentials
         String dbCredentials = null;
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
 
         // Number of tries is the number of attempts to connect to the database
         // during this login attempt (if we need to open the database)
@@ -532,32 +530,23 @@ public class JDBCRealm
                 // Ensure that we have an open database connection
                 open();
 
-                stmt = credentials(dbConnection, username);
-                rs = stmt.executeQuery();
-                if (rs.next()) {
-                    dbCredentials = rs.getString(1);
+                PreparedStatement stmt = credentials(dbConnection, username);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        dbCredentials = rs.getString(1);
+                    }
+
+                    dbConnection.commit();
+
+                    if (dbCredentials != null) {
+                        dbCredentials = dbCredentials.trim();
+                    }
+
+                    return dbCredentials;
                 }
-
-                dbConnection.commit();
-
-                if (dbCredentials != null) {
-                    dbCredentials = dbCredentials.trim();
-                }
-
-                return dbCredentials;
-
             } catch (SQLException e) {
                 // Log the problem for posterity
                 containerLog.error(sm.getString("jdbcRealm.exception"), e);
-            } finally {
-                if (rs != null) {
-                    try {
-                        rs.close();
-                    } catch(SQLException e) {
-                        containerLog.warn(sm.getString(
-                                "jdbcRealm.abnormalCloseResultSet"));
-                    }
-                }
             }
 
             // Close the connection so that it gets reopened next time
@@ -568,12 +557,13 @@ public class JDBCRealm
             numberOfTries--;
         }
 
-        return (null);
+        return null;
     }
 
-
     /**
-     * Return the Principal associated with the given user name.
+     * Get the principal associated with the specified user.
+     * @param username The user name
+     * @return the Principal associated with the given user name.
      */
     @Override
     protected synchronized Principal getPrincipal(String username) {
@@ -586,7 +576,9 @@ public class JDBCRealm
 
 
     /**
-     * Return the roles associated with the gven user name.
+     * Return the roles associated with the given user name.
+     * @param username The user name
+     * @return an array list of the role names
      */
     protected ArrayList<String> getRoles(String username) {
 
@@ -595,9 +587,6 @@ public class JDBCRealm
             // been defined so don't spend cycles looking
             return null;
         }
-
-        PreparedStatement stmt = null;
-        ResultSet rs = null;
 
         // Number of tries is the number of attempts to connect to the database
         // during this login attempt (if we need to open the database)
@@ -610,46 +599,32 @@ public class JDBCRealm
         int numberOfTries = 2;
         while (numberOfTries>0) {
             try {
-
                 // Ensure that we have an open database connection
                 open();
 
-                try {
+                PreparedStatement stmt = roles(dbConnection, username);
+                try (ResultSet rs = stmt.executeQuery()) {
                     // Accumulate the user's roles
                     ArrayList<String> roleList = new ArrayList<>();
-                    stmt = roles(dbConnection, username);
-                    rs = stmt.executeQuery();
+
                     while (rs.next()) {
                         String role = rs.getString(1);
                         if (null!=role) {
                             roleList.add(role.trim());
                         }
                     }
-                    rs.close();
-                    rs = null;
 
-                    return (roleList);
-
+                    return roleList;
                 } finally {
-                    if (rs!=null) {
-                        try {
-                            rs.close();
-                        } catch(SQLException e) {
-                            containerLog.warn(sm.getString("jdbcRealm.abnormalCloseResultSet"));
-                        }
-                    }
                     dbConnection.commit();
                 }
-
             } catch (SQLException e) {
-
                 // Log the problem for posterity
                 containerLog.error(sm.getString("jdbcRealm.exception"), e);
 
                 // Close the connection so that it gets reopened next time
                 if (dbConnection != null)
                     close(dbConnection);
-
             }
 
             numberOfTries--;
@@ -662,7 +637,7 @@ public class JDBCRealm
     /**
      * Open (if necessary) and return a database connection for use by
      * this Realm.
-     *
+     * @return the opened connection
      * @exception SQLException if a database error occurs
      */
     protected Connection open() throws SQLException {
@@ -705,7 +680,7 @@ public class JDBCRealm
      *
      * @param dbConnection The database connection to be used
      * @param username Username for which roles should be retrieved
-     *
+     * @return the prepared statement
      * @exception SQLException if a database error occurs
      */
     protected synchronized PreparedStatement roles(Connection dbConnection,

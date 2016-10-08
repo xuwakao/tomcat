@@ -27,10 +27,8 @@ import java.security.Principal;
  * environments like JAAS that want to deal with <code>Principals</code>.</p>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  * @since 4.1
  */
-
 public interface Role extends Principal {
 
 
@@ -38,7 +36,7 @@ public interface Role extends Principal {
 
 
     /**
-     * Return the description of this role.
+     * @return the description of this role.
      */
     public String getDescription();
 
@@ -52,7 +50,7 @@ public interface Role extends Principal {
 
 
     /**
-     * Return the role name of this role, which must be unique
+     * @return the role name of this role, which must be unique
      * within the scope of a {@link UserDatabase}.
      */
     public String getRolename();
@@ -68,7 +66,7 @@ public interface Role extends Principal {
 
 
     /**
-     * Return the {@link UserDatabase} within which this Role is defined.
+     * @return the {@link UserDatabase} within which this Role is defined.
      */
     public UserDatabase getUserDatabase();
 

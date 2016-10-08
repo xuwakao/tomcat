@@ -27,7 +27,6 @@ import org.apache.catalina.tribes.group.GroupChannel;
 import org.apache.catalina.tribes.group.interceptors.DomainFilterInterceptor;
 import org.apache.catalina.tribes.group.interceptors.FragmentationInterceptor;
 import org.apache.catalina.tribes.group.interceptors.GzipInterceptor;
-import org.apache.catalina.tribes.group.interceptors.MessageDispatch15Interceptor;
 import org.apache.catalina.tribes.group.interceptors.MessageDispatchInterceptor;
 import org.apache.catalina.tribes.group.interceptors.OrderInterceptor;
 import org.apache.catalina.tribes.group.interceptors.StaticMembershipInterceptor;
@@ -47,7 +46,6 @@ import org.apache.catalina.tribes.transport.ReplicationTransmitter;
  *
  * <p>Company: </p>
  *
- * @author fhanik
  * @version 1.0
  */
 public class ChannelCreator {
@@ -131,7 +129,7 @@ public class ChannelCreator {
                 System.out.println("Setting MessageDispatchInterceptor.maxQueueSize="+asyncsize);
             } else if ("-static".equals(args[i])) {
                 String d = args[++i];
-                String h = d.substring(0,d.indexOf(":"));
+                String h = d.substring(0,d.indexOf(':'));
                 String p = d.substring(h.length()+1);
                 Member m = new MemberImpl(h,Integer.parseInt(p),2000);
                 staticMembers.add(m);
@@ -226,7 +224,7 @@ public class ChannelCreator {
         }
 
         if ( async ) {
-            MessageDispatchInterceptor mi = new MessageDispatch15Interceptor();
+            MessageDispatchInterceptor mi = new MessageDispatchInterceptor();
             mi.setMaxQueueSize(asyncsize);
             channel.addInterceptor(mi);
             System.out.println("Added MessageDispatchInterceptor");

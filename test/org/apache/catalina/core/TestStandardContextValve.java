@@ -16,7 +16,6 @@
  */
 package org.apache.catalina.core;
 
-import java.io.File;
 import java.io.IOException;
 
 import javax.servlet.ServletException;
@@ -43,16 +42,15 @@ public class TestStandardContextValve extends TomcatBaseTest {
         // Set up a container
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        File docBase = new File(System.getProperty("java.io.tmpdir"));
-        Context ctx = tomcat.addContext("", docBase.getAbsolutePath());
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         // Traces order of events across multiple components
         StringBuilder trace = new StringBuilder();
 
         //Add the error page
         Tomcat.addServlet(ctx, "errorPage", new Bug51653ErrorPage(trace));
-        ctx.addServletMapping("/error", "errorPage");
+        ctx.addServletMappingDecoded("/error", "errorPage");
         // And the handling for 404 responses
         ErrorPage errorPage = new ErrorPage();
         errorPage.setErrorCode(Response.SC_NOT_FOUND);
@@ -90,20 +88,19 @@ public class TestStandardContextValve extends TomcatBaseTest {
         // Set up a container
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        File docBase = new File(System.getProperty("java.io.tmpdir"));
-        Context ctx = tomcat.addContext("", docBase.getAbsolutePath());
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         // Traces order of events across multiple components
         StringBuilder trace = new StringBuilder();
 
         // Add the page that generates the error
         Tomcat.addServlet(ctx, "test", new Bug51653ErrorTrigger());
-        ctx.addServletMapping("/test", "test");
+        ctx.addServletMappingDecoded("/test", "test");
 
         // Add the error page
         Tomcat.addServlet(ctx, "errorPage", new Bug51653ErrorPage(trace));
-        ctx.addServletMapping("/error", "errorPage");
+        ctx.addServletMappingDecoded("/error", "errorPage");
         // And the handling for 404 responses
         ErrorPage errorPage = new ErrorPage();
         errorPage.setErrorCode(Response.SC_NOT_FOUND);

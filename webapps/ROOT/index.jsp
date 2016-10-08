@@ -14,8 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 --%>
-<!DOCTYPE html>
-<%@ page session="false" %>
+<%@ page session="false" pageEncoding="UTF-8" contentType="text/html; charset=UTF-8" %>
 <%
 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy");
 request.setAttribute("year", sdf.format(new java.util.Date()));
@@ -23,8 +22,10 @@ request.setAttribute("tomcatUrl", "http://tomcat.apache.org/");
 request.setAttribute("tomcatDocUrl", "/docs/");
 request.setAttribute("tomcatExamplesUrl", "/examples/");
 %>
+<!DOCTYPE html>
 <html lang="en">
     <head>
+        <meta charset="UTF-8" />
         <title><%=request.getServletContext().getServerInfo() %></title>
         <link href="favicon.ico" rel="icon" type="image/x-icon" />
         <link href="favicon.ico" rel="shortcut icon" type="image/x-icon" />
@@ -109,7 +110,7 @@ request.setAttribute("tomcatExamplesUrl", "/examples/");
                         <p>For security, access to the <a href="/manager/html">manager webapp</a> is restricted.
                         Users are defined in:</p>
                         <pre>$CATALINA_HOME/conf/tomcat-users.xml</pre>
-                        <p>In Tomcat 8.0 access to the manager application is split between
+                        <p>In Tomcat @VERSION_MAJOR_MINOR@ access to the manager application is split between
                            different users. &nbsp; <a href="${tomcatDocUrl}manager-howto.html">Read more...</a></p>
                         <br />
                         <h4><a href="${tomcatDocUrl}RELEASE-NOTES.txt">Release Notes</a></h4>
@@ -121,16 +122,16 @@ request.setAttribute("tomcatExamplesUrl", "/examples/");
                 <div id="low-docs" class="">
                     <div class="curved container">
                         <h3>Documentation</h3>
-                        <h4><a href="${tomcatDocUrl}">Tomcat 8.0 Documentation</a></h4>
-                        <h4><a href="${tomcatDocUrl}config/">Tomcat 8.0 Configuration</a></h4>
+                        <h4><a href="${tomcatDocUrl}">Tomcat @VERSION_MAJOR_MINOR@ Documentation</a></h4>
+                        <h4><a href="${tomcatDocUrl}config/">Tomcat @VERSION_MAJOR_MINOR@ Configuration</a></h4>
                         <h4><a href="http://wiki.apache.org/tomcat/FrontPage">Tomcat Wiki</a></h4>
                         <p>Find additional important configuration information in:</p>
                         <pre>$CATALINA_HOME/RUNNING.txt</pre>
                         <p>Developers may be interested in:</p>
                         <ul>
-                            <li><a href="http://tomcat.apache.org/bugreport.html">Tomcat 8.0 Bug Database</a></li>
-                            <li><a href="${tomcatDocUrl}api/index.html">Tomcat 8.0 JavaDocs</a></li>
-                            <li><a href="http://svn.apache.org/repos/asf/tomcat/tc8.0.x/">Tomcat 8.0 SVN Repository</a></li>
+                            <li><a href="http://tomcat.apache.org/bugreport.html">Tomcat @VERSION_MAJOR_MINOR@ Bug Database</a></li>
+                            <li><a href="${tomcatDocUrl}api/index.html">Tomcat @VERSION_MAJOR_MINOR@ JavaDocs</a></li>
+                            <li><a href="http://svn.apache.org/repos/asf/tomcat/tc@VERSION_MAJOR_MINOR@.x/">Tomcat @VERSION_MAJOR_MINOR@ SVN Repository</a></li>
                         </ul>
                     </div>
                 </div>
@@ -140,16 +141,16 @@ request.setAttribute("tomcatExamplesUrl", "/examples/");
                         <h4><a href="${tomcatUrl}faq/">FAQ</a> and <a href="${tomcatUrl}lists.html">Mailing Lists</a></h4>
                         <p>The following mailing lists are available:</p>
                         <ul>
-                            <li id="list-announce"><strong><a href="mailto:announce-subscribe@tomcat.apache.org">announce@tomcat.apache.org</a><br />
+                            <li id="list-announce"><strong><a href="${tomcatUrl}lists.html#tomcat-announce">tomcat-announce</a><br />
                                 Important announcements, releases, security vulnerability notifications. (Low volume).</strong>
                             </li>
-                            <li><a href="mailto:users-subscribe@tomcat.apache.org">users@tomcat.apache.org</a><br />
+                            <li><a href="${tomcatUrl}lists.html#tomcat-users">tomcat-users</a><br />
                                 User support and discussion
                             </li>
-                            <li><a href="mailto:taglibs-user-subscribe@tomcat.apache.org">taglibs-user@tomcat.apache.org</a><br />
+                            <li><a href="${tomcatUrl}lists.html#taglibs-user">taglibs-user</a><br />
                                 User support and discussion for <a href="${tomcatUrl}taglibs/">Apache Taglibs</a>
                             </li>
-                            <li><a href="mailto:dev-subscribe@tomcat.apache.org">dev@tomcat.apache.org</a><br />
+                            <li><a href="${tomcatUrl}lists.html#tomcat-dev">tomcat-dev</a><br />
                                 Development mailing list, including commit messages
                             </li>
                         </ul>

@@ -48,15 +48,16 @@ public class OperationInfo extends FeatureInfo {
 
     protected String impact = "UNKNOWN";
     protected String role = "operation";
-    protected ReadWriteLock parametersLock = new ReentrantReadWriteLock();
+    protected final ReadWriteLock parametersLock = new ReentrantReadWriteLock();
     protected ParameterInfo parameters[] = new ParameterInfo[0];
 
 
     // ------------------------------------------------------------- Properties
 
     /**
-     * The "impact" of this operation, which should be a (case-insensitive)
-     * string value "ACTION", "ACTION_INFO", "INFO", or "UNKNOWN".
+     * @return the "impact" of this operation, which should be
+     *  a (case-insensitive) string value "ACTION", "ACTION_INFO",
+     *  "INFO", or "UNKNOWN".
      */
     public String getImpact() {
         return this.impact;
@@ -71,7 +72,7 @@ public class OperationInfo extends FeatureInfo {
 
 
     /**
-     * The role of this operation ("getter", "setter", "operation", or
+     * @return the role of this operation ("getter", "setter", "operation", or
      * "constructor").
      */
     public String getRole() {
@@ -84,7 +85,7 @@ public class OperationInfo extends FeatureInfo {
 
 
     /**
-     * The fully qualified Java class name of the return type for this
+     * @return the fully qualified Java class name of the return type for this
      * operation.
      */
     public String getReturnType() {
@@ -99,12 +100,12 @@ public class OperationInfo extends FeatureInfo {
     }
 
     /**
-     * The set of parameters for this operation.
+     * @return the set of parameters for this operation.
      */
     public ParameterInfo[] getSignature() {
         Lock readLock = parametersLock.readLock();
+        readLock.lock();
         try {
-            readLock.lock();
             return this.parameters;
         } finally {
             readLock.unlock();
@@ -122,8 +123,8 @@ public class OperationInfo extends FeatureInfo {
     public void addParameter(ParameterInfo parameter) {
 
         Lock writeLock = parametersLock.writeLock();
+        writeLock.lock();
         try {
-            writeLock.lock();
             ParameterInfo results[] = new ParameterInfo[parameters.length + 1];
             System.arraycopy(parameters, 0, results, 0, parameters.length);
             results[parameters.length] = parameter;
@@ -138,6 +139,7 @@ public class OperationInfo extends FeatureInfo {
     /**
      * Create and return a <code>ModelMBeanOperationInfo</code> object that
      * corresponds to the attribute described by this instance.
+     * @return the operation info
      */
     MBeanOperationInfo createOperationInfo() {
 

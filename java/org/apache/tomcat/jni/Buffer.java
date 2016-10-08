@@ -22,9 +22,7 @@ import java.nio.ByteBuffer;
 /** Buffer
  *
  * @author Mladen Turk
- * @version $Id$
  */
-
 public class Buffer {
 
     /**
@@ -60,7 +58,7 @@ public class Buffer {
 
     /**
      * Allocate a new ByteBuffer from already allocated memory.
-     * <br />Allocated memory must be provided from call to the
+     * <br>Allocated memory must be provided from call to the
      * Stdlib.alloc or Stdlib.calloc methods.
      * @param mem The memory to use
      * @param size The amount of memory to use
@@ -70,7 +68,7 @@ public class Buffer {
 
     /**
      * Deallocates or frees a memory block used by ByteBuffer
-     * <br /><b>Warning :</b> Call this method only on ByteBuffers
+     * <br><b>Warning :</b> Call this method only on ByteBuffers
      * that were created by calling Buffer.alloc or Buffer.calloc.
      * @param buf Previously allocated ByteBuffer to be freed.
      */
@@ -79,12 +77,14 @@ public class Buffer {
     /**
      * Returns the memory address of the ByteBuffer.
      * @param buf Previously allocated ByteBuffer.
+     * @return the memory address
      */
     public static native long address(ByteBuffer buf);
 
     /**
      * Returns the allocated memory size of the ByteBuffer.
      * @param buf Previously allocated ByteBuffer.
+     * @return the size
      */
     public static native long size(ByteBuffer buf);
 

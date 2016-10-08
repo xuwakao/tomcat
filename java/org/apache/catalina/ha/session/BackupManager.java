@@ -20,12 +20,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-import org.apache.catalina.Cluster;
 import org.apache.catalina.DistributedManager;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Session;
-import org.apache.catalina.ha.CatalinaCluster;
 import org.apache.catalina.ha.ClusterManager;
 import org.apache.catalina.ha.ClusterMessage;
 import org.apache.catalina.tribes.Channel;
@@ -36,23 +34,19 @@ import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.res.StringManager;
 
 /**
- *@author Filip Hanik
  *@version 1.0
  */
 public class BackupManager extends ClusterManagerBase
         implements MapOwner, DistributedManager {
 
-    private static final Log log = LogFactory.getLog(BackupManager.class);
+    private final Log log = LogFactory.getLog(BackupManager.class);
 
     /**
      * The string manager for this package.
      */
-    protected static final StringManager sm = StringManager.getManager(Constants.Package);
+    protected static final StringManager sm = StringManager.getManager(BackupManager.class);
 
     protected static final long DEFAULT_REPL_TIMEOUT = 15000;//15 seconds
-
-    /** Set to true if we don't want the sessions to expire on shutdown */
-    protected boolean mExpireSessionsOnShutdown = true;
 
     /**
      * The name of this manager
@@ -91,17 +85,6 @@ public class BackupManager extends ClusterManagerBase
     public void messageDataReceived(ClusterMessage msg) {
     }
 
-    public void setExpireSessionsOnShutdown(boolean expireSessionsOnShutdown)
-    {
-        mExpireSessionsOnShutdown = expireSessionsOnShutdown;
-    }
-
-    public boolean getExpireSessionsOnShutdown()
-    {
-        return mExpireSessionsOnShutdown;
-    }
-
-
     @Override
     public ClusterMessage requestCompleted(String sessionId) {
         if (!getState().isAvailable()) return null;
@@ -117,7 +100,7 @@ public class BackupManager extends ClusterManagerBase
 //=========================================================================
     @Override
     public void objectMadePrimary(Object key, Object value) {
-        if (value!=null && value instanceof DeltaSession) {
+        if (value instanceof DeltaSession) {
             DeltaSession session = (DeltaSession)value;
             synchronized (session) {
                 session.access();
@@ -156,16 +139,7 @@ public class BackupManager extends ClusterManagerBase
         super.startInternal();
 
         try {
-            if (getCluster() == null) {
-                Cluster cluster = getContext().getCluster();
-                if (cluster instanceof CatalinaCluster) {
-                    setCluster((CatalinaCluster)cluster);
-                } else {
-                    throw new LifecycleException(
-                            sm.getString("backupManager.noCluster", getName()));
-                }
-            }
-            cluster.registerManager(this);
+            if (cluster == null) throw new LifecycleException(sm.getString("backupManager.noCluster", getName()));
             LazyReplicatedMap<String,Session> map = new LazyReplicatedMap<>(
                     this, cluster.getChannel(), rpcTimeout, getMapName(),
                     getClassLoaders(), terminateOnStartFailure);
@@ -209,13 +183,7 @@ public class BackupManager extends ClusterManagerBase
             map.breakdown();
         }
 
-        cluster.removeManager(this);
         super.stopInternal();
-    }
-
-    @Override
-    public void setDistributable(boolean dist) {
-        this.distributable = dist;
     }
 
     @Override
@@ -256,7 +224,6 @@ public class BackupManager extends ClusterManagerBase
     public ClusterManager cloneFromTemplate() {
         BackupManager result = new BackupManager();
         clone(result);
-        result.mExpireSessionsOnShutdown = mExpireSessionsOnShutdown;
         result.mapSendOptions = mapSendOptions;
         result.rpcTimeout = rpcTimeout;
         result.terminateOnStartFailure = terminateOnStartFailure;

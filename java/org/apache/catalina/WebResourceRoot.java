@@ -18,6 +18,7 @@ package org.apache.catalina;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -26,15 +27,15 @@ import java.util.Set;
  * a Resource, the ResourceSets are processed in the following order:
  * <ol>
  * <li>Pre  - Resources defined by the &lt;PreResource&gt; element in the web
- *            application&apos;s context.xml. Resources will be searched in the
- *            order they were specified.</li>
+ *            application's context.xml. Resources will be searched in the order
+ *            they were specified.</li>
  * <li>Main - The main resources for the web application - i.e. the WAR or the
  *            directory containing the expanded WAR</li>
  * <li>JARs - Resource JARs as defined by the Servlet specification. JARs will
  *            be searched in the order they were added to the ResourceRoot.</li>
  * <li>Post - Resources defined by the &lt;PostResource&gt; element in the web
- *            application&apos;s context.xml. Resources will be searched in the
- *            order they were specified.</li>
+ *            application's context.xml. Resources will be searched in the order
+ *            they were specified.</li>
  * </ol>
  * The following conventions should be noted:
  * <ul>
@@ -75,7 +76,7 @@ import java.util.Set;
  * including:
  * - which ResourceSet to write to
  * - unexpected behaviour when deleting a resource from one ResourceSet since
- *   that may unmask a resource in a lower priority ResouceSet so what was a
+ *   that may unmask a resource in a lower priority ResourceSet so what was a
  *   delete looks like a replace with the user having no idea where the 'new'
  *   resource came from
  * - how to handle PUT when the target is read-only but it could be written to
@@ -96,7 +97,7 @@ public interface WebResourceRoot extends Lifecycle {
     WebResource getResource(String path);
 
     /**
-     * Obtain the object(s) that represent the resource at the given path. Note
+     * Obtain the objects that represent the resource at the given path. Note
      * that the resource at that path may not exist. If the path does not
      * exist, the WebResource returned will be associated with the main
      * WebResourceSet. This will include all matches even if the resource would
@@ -106,9 +107,42 @@ public interface WebResourceRoot extends Lifecycle {
      * @param path  The path for the resource of interest relative to the root
      *              of the web application. It must start with '/'.
      *
-     * @return  The object that represents the resource at the given path
+     * @return  The objects that represents the resource at the given path
      */
     WebResource[] getResources(String path);
+
+    /**
+     * Obtain the object that represents the class loader resource at the given
+     * path. WEB-INF/classes is always searched prior to searching JAR files in
+     * WEB-INF/lib. The search order for JAR files will be consistent across
+     * subsequent calls to this method until the web application is reloaded. No
+     * guarantee is made as to what the search order for JAR files may be.
+     *
+     * @param path  The path of the class loader resource of interest relative
+     *              to the the root of class loader resources for this web
+     *              application.
+     *
+     * @return  The object that represents the class loader resource at the
+     *          given path
+     */
+    WebResource getClassLoaderResource(String path);
+
+    /**
+     * Obtain the objects that represent the class loader resource at the given
+     * path. Note that the resource at that path may not exist. If the path does
+     * not exist, the WebResource returned will be associated with the main
+     * WebResourceSet. This will include all matches even if the resource would
+     * not normally be accessible (e.g. because it was overridden by another
+     * resource)
+     *
+     * @param path  The path for the class loader resource of interest relative
+     *              to the root of the class loader resources for the web
+     *              application. It must start with '/'.
+     *
+     * @return  The objects that represents the class loader resources at the
+     *          given path
+     */
+    WebResource[] getClassLoaderResources(String path);
 
     /**
      * Obtain the list of the names of all of the files and directories located
@@ -179,15 +213,15 @@ public interface WebResourceRoot extends Lifecycle {
      * based on the provided parameters.
      *
      * @param type          The type of {@link WebResourceSet} to create
-     * @param url           The URL of the resource (must locate a JAR, file or
-     *                          directory)
      * @param webAppMount   The path within the web application that the
      *                          resources should be published at. It must start
      *                          with '/'.
+     * @param url           The URL of the resource (must locate a JAR, file or
+     *                          directory)
      * @param internalPath  The path within the resource where the content is to
      *                          be found. It must start with '/'.
      */
-    void createWebResourceSet(ResourceSetType type, URL url, String webAppMount,
+    void createWebResourceSet(ResourceSetType type, String webAppMount, URL url,
             String internalPath);
 
     /**
@@ -195,25 +229,31 @@ public interface WebResourceRoot extends Lifecycle {
      * based on the provided parameters.
      *
      * @param type          The type of {@link WebResourceSet} to create
-     * @param base          The location of the resources
      * @param webAppMount   The path within the web application that the
      *                          resources should be published at. It must start
      *                          with '/'.
-     * @param internalPath  The path within the resource where the content is to
-     *                          be found. It must start with '/'.
+     * @param base          The location of the resources
+     * @param archivePath   The path within the resource to the archive where
+     *                          the content is to be found. If there is no
+     *                          archive then this should be <code>null</code>.
+     * @param internalPath  The path within the archive (or the resource if the
+     *                          archivePath is <code>null</code> where the
+     *                          content is to be found. It must start with '/'.
      */
-    void createWebResourceSet(ResourceSetType type, String base,
-            String webAppMount, String internalPath);
+    void createWebResourceSet(ResourceSetType type, String webAppMount,
+            String base, String archivePath, String internalPath);
 
 
     /**
      * Adds the provided WebResourceSet to this web application as a 'Pre'
      * resource.
+     *
+     * @param webResourceSet the resource set to use
      */
     void addPreResources(WebResourceSet webResourceSet);
 
     /**
-     * Get the list of WebResourceSet configured to this web application
+     * @return the list of WebResourceSet configured to this web application
      * as a 'Pre' resource.
      */
     WebResourceSet[] getPreResources();
@@ -221,11 +261,13 @@ public interface WebResourceRoot extends Lifecycle {
     /**
      * Adds the provided WebResourceSet to this web application as a 'Jar'
      * resource.
+     *
+     * @param webResourceSet the resource set to use
      */
     void addJarResources(WebResourceSet webResourceSet);
 
     /**
-     * Get the list of WebResourceSet configured to this web application
+     * @return the list of WebResourceSet configured to this web application
      * as a 'Jar' resource.
      */
     WebResourceSet[] getJarResources();
@@ -233,22 +275,26 @@ public interface WebResourceRoot extends Lifecycle {
     /**
      * Adds the provided WebResourceSet to this web application as a 'Post'
      * resource.
+     *
+     * @param webResourceSet the resource set to use
      */
     void addPostResources(WebResourceSet webResourceSet);
 
     /**
-     * Get the list of WebResourceSet configured to this web application
+     * @return the list of WebResourceSet configured to this web application
      * as a 'Post' resource.
      */
     WebResourceSet[] getPostResources();
 
     /**
-     * Obtain the web application this WebResourceRoot is associated with.
+     * @return the web application this WebResourceRoot is associated with.
      */
     Context getContext();
 
     /**
      * Set the web application this WebResourceRoot is associated with.
+     *
+     * @param context the associated context
      */
     void setContext(Context context);
 
@@ -275,7 +321,7 @@ public interface WebResourceRoot extends Lifecycle {
     void setCachingAllowed(boolean cachingAllowed);
 
     /**
-     * Get whether or not caching is permitted for this web application.
+     * @return <code>true</code> if caching is permitted for this web application.
      */
     boolean isCachingAllowed();
 
@@ -308,30 +354,86 @@ public interface WebResourceRoot extends Lifecycle {
     long getCacheMaxSize();
 
     /**
-     * Set the maximum permitted size for a single object in the cache.
+     * Set the maximum permitted size for a single object in the cache. Note
+     * that the maximum size in bytes may not exceed {@link Integer#MAX_VALUE}.
      *
-     * @param cacheMaxObjectSize    Maximum size for a single cached object in
+     * @param cacheObjectMaxSize    Maximum size for a single cached object in
      *                              kilobytes
      */
-    void setCacheMaxObjectSize(long cacheMaxObjectSize);
+    void setCacheObjectMaxSize(int cacheObjectMaxSize);
 
     /**
-     * Get the maximum permitted size for a single object in the cache.
+     * Get the maximum permitted size for a single object in the cache. Note
+     * that the maximum size in bytes may not exceed {@link Integer#MAX_VALUE}.
      *
      * @return  Maximum size for a single cached object in kilobytes
      */
-    long getCacheMaxObjectSize();
+    int getCacheObjectMaxSize();
+
+    /**
+     * Controls whether the track locked files feature is enabled. If enabled,
+     * all calls to methods that return objects that lock a file and need to be
+     * closed to release that lock (e.g. {@link WebResource#getInputStream()}
+     * will perform a number of additional tasks.
+     * <ul>
+     *   <li>The stack trace at the point where the method was called will be
+     *       recorded and associated with the returned object.</li>
+     *   <li>The returned object will be wrapped so that the point where close()
+     *       (or equivalent) is called to release the resources can be detected.
+     *       Tracking of the object will cease once the resources have been
+     *       released.</li>
+     *   <li>All remaining locked resources on web application shutdown will be
+     *       logged and then closed.</li>
+     * </ul>
+     *
+     * @param trackLockedFiles {@code true} to enable it, {@code false} to
+     *                         disable it
+     */
+    void setTrackLockedFiles(boolean trackLockedFiles);
+
+    /**
+     * Has the track locked files feature been enabled?
+     *
+     * @return {@code true} if it has been enabled, otherwise {@code false}
+     */
+    boolean getTrackLockedFiles();
 
     /**
      * This method will be invoked by the context on a periodic basis and allows
      * the implementation a method that executes periodic tasks, such as purging
      * expired cache entries.
      */
-    public void backgroundProcess();
+    void backgroundProcess();
 
-    public static enum ResourceSetType {
+    /**
+     * Add a specified resource to track to be able to later release
+     * resources on stop.
+     * @param trackedResource the resource that will be tracked
+     */
+    void registerTrackedResource(TrackedWebResource trackedResource);
+
+    /**
+     * Stop tracking specified resource, once it no longer needs to free resources.
+     * @param trackedResource the resource that was tracked
+     */
+    void deregisterTrackedResource(TrackedWebResource trackedResource);
+
+    /**
+     * @return the set of {@link WebResourceSet#getBaseUrl()} for all
+     * {@link WebResourceSet}s used by this root.
+     */
+    List<URL> getBaseUrls();
+
+    /**
+     * Implementations may cache some information to improve performance. This
+     * method triggers the clean-up of those resources.
+     */
+    void gc();
+
+    static enum ResourceSetType {
         PRE,
         RESOURCE_JAR,
-        POST
+        POST,
+        CLASSES_JAR
     }
 }

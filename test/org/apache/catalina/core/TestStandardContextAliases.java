@@ -32,6 +32,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import org.apache.catalina.Context;
 import org.apache.catalina.WebResourceRoot;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
@@ -44,25 +45,27 @@ public class TestStandardContextAliases extends TomcatBaseTest {
     public void testDirContextAliases() throws Exception {
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        StandardContext ctx = (StandardContext)
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
         File lib = new File("webapps/examples/WEB-INF/lib");
         ctx.setResources(new StandardRoot(ctx));
         ctx.getResources().createWebResourceSet(
-                WebResourceRoot.ResourceSetType.POST, lib.getAbsolutePath(),
-                "/WEB-INF/lib", "/");
+                WebResourceRoot.ResourceSetType.POST, "/WEB-INF/lib",
+                lib.getAbsolutePath(), null, "/");
 
 
         Tomcat.addServlet(ctx, "test", new TestServlet());
-        ctx.addServletMapping("/", "test");
+        ctx.addServletMappingDecoded("/", "test");
 
         tomcat.start();
 
         ByteChunk res = getUrl("http://localhost:" + getPort() + "/");
 
         String result = res.toString();
+        if (result == null) {
+            result = "";
+        }
 
         assertTrue(result.indexOf("00-PASS") > -1);
         assertTrue(result.indexOf("01-PASS") > -1);
@@ -86,12 +89,12 @@ public class TestStandardContextAliases extends TomcatBaseTest {
             ServletContext context = getServletContext();
 
             // Check resources individually
-            URL url = context.getResource("/WEB-INF/lib/jstl.jar");
+            URL url = context.getResource("/WEB-INF/lib/taglibs-standard-spec-1.2.5.jar");
             if (url != null) {
                 resp.getWriter().write("00-PASS\n");
             }
 
-            url = context.getResource("/WEB-INF/lib/standard.jar");
+            url = context.getResource("/WEB-INF/lib/taglibs-standard-impl-1.2.5.jar");
             if (url != null) {
                 resp.getWriter().write("01-PASS\n");
             }
@@ -102,10 +105,10 @@ public class TestStandardContextAliases extends TomcatBaseTest {
                 return;
             }
 
-            if (!libs.contains("/WEB-INF/lib/jstl.jar")) {
+            if (!libs.contains("/WEB-INF/lib/taglibs-standard-spec-1.2.5.jar")) {
                 return;
             }
-            if (!libs.contains("/WEB-INF/lib/standard.jar")) {
+            if (!libs.contains("/WEB-INF/lib/taglibs-standard-impl-1.2.5.jar")) {
                 return;
             }
 

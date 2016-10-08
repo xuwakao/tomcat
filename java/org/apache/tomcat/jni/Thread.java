@@ -20,13 +20,11 @@ package org.apache.tomcat.jni;
 /** Thread
  *
  * @author Mladen Turk
- * @version $Id$
  */
-
 public class Thread {
 
     /**
-     * Get the current thread ID handle.
+     * @return the current thread ID handle.
      */
     public static native long current();
 

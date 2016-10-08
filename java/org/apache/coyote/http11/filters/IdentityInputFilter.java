@@ -18,19 +18,25 @@
 package org.apache.coyote.http11.filters;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.coyote.InputBuffer;
 import org.apache.coyote.Request;
 import org.apache.coyote.http11.InputFilter;
 import org.apache.tomcat.util.buf.ByteChunk;
+import org.apache.tomcat.util.net.ApplicationBufferHandler;
+import org.apache.tomcat.util.res.StringManager;
 
 /**
  * Identity input filter.
  *
  * @author Remy Maucherat
  */
-public class IdentityInputFilter implements InputFilter {
+public class IdentityInputFilter implements InputFilter, ApplicationBufferHandler {
+
+    private static final StringManager sm = StringManager.getManager(
+            IdentityInputFilter.class.getPackage().getName());
 
 
     // -------------------------------------------------------------- Constants
@@ -71,46 +77,47 @@ public class IdentityInputFilter implements InputFilter {
 
 
     /**
-     * Chunk used to read leftover bytes.
+     * ByteBuffer used to read leftover bytes.
      */
-    protected final ByteChunk endChunk = new ByteChunk();
+    protected ByteBuffer tempRead;
+
+
+    private final int maxSwallowSize;
+
+
+    public IdentityInputFilter(int maxSwallowSize) {
+        this.maxSwallowSize = maxSwallowSize;
+    }
 
 
     // ---------------------------------------------------- InputBuffer Methods
 
-    /**
-     * Read bytes.
-     *
-     * @return If the filter does request length control, this value is
-     * significant; it should be the number of bytes consumed from the buffer,
-     * up until the end of the current request body, or the buffer length,
-     * whichever is greater. If the filter does not do request body length
-     * control, the returned value should be -1.
-     */
     @Override
-    public int doRead(ByteChunk chunk, Request req)
-        throws IOException {
+    public int doRead(ApplicationBufferHandler handler) throws IOException {
 
         int result = -1;
 
         if (contentLength >= 0) {
             if (remaining > 0) {
-                int nRead = buffer.doRead(chunk, req);
+                int nRead = buffer.doRead(handler);
                 if (nRead > remaining) {
                     // The chunk is longer than the number of bytes remaining
                     // in the body; changing the chunk length to the number
                     // of bytes remaining
-                    chunk.setBytes(chunk.getBytes(), chunk.getStart(),
-                                   (int) remaining);
+                    handler.getByteBuffer().limit(handler.getByteBuffer().position() + (int) remaining);
                     result = (int) remaining;
                 } else {
                     result = nRead;
                 }
-                remaining = remaining - nRead;
+                if (nRead > 0) {
+                    remaining = remaining - nRead;
+                }
             } else {
                 // No more bytes left to be read : return -1 and clear the
                 // buffer
-                chunk.recycle();
+                if (handler.getByteBuffer() != null) {
+                    handler.getByteBuffer().position(0).limit(0);
+                }
                 result = -1;
             }
         }
@@ -133,18 +140,26 @@ public class IdentityInputFilter implements InputFilter {
     }
 
 
-    /**
-     * End the current request.
-     */
     @Override
-    public long end()
-        throws IOException {
+    public long end() throws IOException {
+
+        final boolean maxSwallowSizeExceeded = (maxSwallowSize > -1 && remaining > maxSwallowSize);
+        long swallowed = 0;
 
         // Consume extra bytes.
         while (remaining > 0) {
-            int nread = buffer.doRead(endChunk, null);
+
+            int nread = buffer.doRead(this);
+            tempRead = null;
             if (nread > 0 ) {
+                swallowed += nread;
                 remaining = remaining - nread;
+                if (maxSwallowSizeExceeded && swallowed > maxSwallowSize) {
+                    // Note: We do not fail early so the client has a chance to
+                    // read the response before the connection is closed. See:
+                    // http://httpd.apache.org/docs/2.0/misc/fin_wait_2.html#appendix
+                    throw new IOException(sm.getString("inputFilter.maxSwallow"));
+                }
             } else { // errors are handled higher up.
                 remaining = 0;
             }
@@ -181,7 +196,6 @@ public class IdentityInputFilter implements InputFilter {
     public void recycle() {
         contentLength = -1;
         remaining = 0;
-        endChunk.recycle();
     }
 
 
@@ -199,6 +213,24 @@ public class IdentityInputFilter implements InputFilter {
     public boolean isFinished() {
         // Only finished if a content length is defined and there is no data
         // remaining
-        return contentLength > -1 && remaining == 0;
+        return contentLength > -1 && remaining <= 0;
+    }
+
+
+    @Override
+    public void setByteBuffer(ByteBuffer buffer) {
+        tempRead = buffer;
+    }
+
+
+    @Override
+    public ByteBuffer getByteBuffer() {
+        return tempRead;
+    }
+
+
+    @Override
+    public void expand(int size) {
+        // no-op
     }
 }

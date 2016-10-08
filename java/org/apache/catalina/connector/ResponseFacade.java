@@ -38,8 +38,6 @@ import org.apache.tomcat.util.res.StringManager;
  * All methods are delegated to the wrapped response.
  *
  * @author Remy Maucherat
- * @author Jean-Francois Arcand
- * @version $Id$
  */
 @SuppressWarnings("deprecation")
 public class ResponseFacade
@@ -108,8 +106,7 @@ public class ResponseFacade
     /**
      * The string manager for this package.
      */
-    protected static final StringManager sm =
-        StringManager.getManager(Constants.Package);
+    protected static final StringManager sm = StringManager.getManager(ResponseFacade.class);
 
 
     /**
@@ -222,28 +219,21 @@ public class ResponseFacade
 
     @Override
     public void setContentLength(int len) {
-
         if (isCommitted()) {
             return;
         }
-
         response.setContentLength(len);
-
     }
 
 
-    /**
-     * TODO SERVLET 3.1
-     */
     @Override
     public void setContentLengthLong(long length) {
         if (isCommitted()) {
             return;
         }
-
         response.setContentLengthLong(length);
-
     }
+
 
     @Override
     public void setContentType(String type) {

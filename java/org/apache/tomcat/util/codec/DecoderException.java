@@ -19,8 +19,6 @@ package org.apache.tomcat.util.codec;
 /**
  * Thrown when there is a failure condition during the decoding process. This exception is thrown when a {@link Decoder}
  * encounters a decoding specific exception such as invalid data, or characters outside of the expected range.
- *
- * @version $Id$
  */
 public class DecoderException extends Exception {
 
@@ -32,7 +30,7 @@ public class DecoderException extends Exception {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Constructs a new exception with {@code null} as its detail message. The cause is not initialized, and may
+     * Constructs a new exception with <code>null</code> as its detail message. The cause is not initialized, and may
      * subsequently be initialized by a call to {@link #initCause}.
      *
      * @since 1.4
@@ -61,7 +59,7 @@ public class DecoderException extends Exception {
      * @param message
      *            The detail message which is saved for later retrieval by the {@link #getMessage()} method.
      * @param cause
-     *            The cause which is saved for later retrieval by the {@link #getCause()} method. A {@code null}
+     *            The cause which is saved for later retrieval by the {@link #getCause()} method. A <code>null</code>
      *            value is permitted, and indicates that the cause is nonexistent or unknown.
      * @since 1.4
      */
@@ -75,7 +73,7 @@ public class DecoderException extends Exception {
      * This constructor is useful for exceptions that are little more than wrappers for other throwables.
      *
      * @param cause
-     *            The cause which is saved for later retrieval by the {@link #getCause()} method. A {@code null}
+     *            The cause which is saved for later retrieval by the {@link #getCause()} method. A <code>null</code>
      *            value is permitted, and indicates that the cause is nonexistent or unknown.
      * @since 1.4
      */

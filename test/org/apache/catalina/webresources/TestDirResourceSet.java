@@ -17,21 +17,44 @@
 package org.apache.catalina.webresources;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.catalina.WebResourceRoot;
 import org.apache.catalina.WebResourceSet;
+import org.apache.catalina.startup.ExpandWar;
+import org.apache.catalina.startup.TomcatBaseTest;
 
 public class TestDirResourceSet extends AbstractTestResourceSet {
 
+    private static Path tempDir;
+    private static File dir1;
+
+    @BeforeClass
+    public static void before() throws IOException {
+        tempDir = Files.createTempDirectory("test", new FileAttribute[0]);
+        dir1 = new File(tempDir.toFile(), "dir1");
+        TomcatBaseTest.recursiveCopy(new File("test/webresources/dir1").toPath(), dir1.toPath());
+    }
+
+    @AfterClass
+    public static void after() {
+        ExpandWar.delete(tempDir.toFile());
+    }
+
+
     @Override
     public WebResourceRoot getWebResourceRoot() {
-        File f = new File(getBaseDir());
         TesterWebResourceRoot root = new TesterWebResourceRoot();
         WebResourceSet webResourceSet =
-                new DirResourceSet(new TesterWebResourceRoot(),
-                        f.getAbsolutePath(), "/", "/");
+                new DirResourceSet(root, "/", getBaseDir().getAbsolutePath(), "/");
+        webResourceSet.setReadOnly(false);
         root.setMainResources(webResourceSet);
         return root;
     }
@@ -42,8 +65,8 @@ public class TestDirResourceSet extends AbstractTestResourceSet {
     }
 
     @Override
-    public String getBaseDir() {
-        return "test/webresources/dir1";
+    public File getBaseDir() {
+        return dir1;
     }
 
     @Override
@@ -51,5 +74,20 @@ public class TestDirResourceSet extends AbstractTestResourceSet {
     public void testNoArgConstructor() {
         @SuppressWarnings("unused")
         Object obj = new DirResourceSet();
+    }
+
+    @Override
+    protected String getNewDirName() {
+        return "test-dir-01";
+    }
+
+    @Override
+    protected String getNewFileNameNull() {
+        return "test-null-01";
+    }
+
+    @Override
+    protected String getNewFileName() {
+        return "test-file-01";
     }
 }

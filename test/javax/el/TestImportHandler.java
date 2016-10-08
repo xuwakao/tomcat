@@ -16,6 +16,8 @@
  */
 package javax.el;
 
+import java.util.ArrayList;
+
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -52,16 +54,71 @@ public class TestImportHandler {
     /**
      * Conflict on resolution.
      */
-    @Test(expected=ELException.class)
+    @Test
     public void testResolveClass03() {
         ImportHandler handler = new ImportHandler();
 
         handler.importPackage("org.apache.tomcat.util");
-        handler.importPackage("org.apache.jasper.util");
+        handler.importPackage("org.apache.jasper.runtime");
 
-        handler.resolveClass("ExceptionUtils");
+        for (int i = 1; i <= 3; i++) {
+            try {
+                Class<?> clazz = handler.resolveClass("ExceptionUtils");
+                Assert.fail("Expected ELException but got [" + clazz.getName()
+                        + "] on iteration " + i);
+            } catch (ELException ex) {
+                // Expected
+            }
+        }
     }
 
+
+    /**
+     * Multiple package imports with a single match.
+     * https://bz.apache.org/bugzilla/show_bug.cgi?id=57113
+     */
+    @Test
+    public void testResolveClass04() {
+        ImportHandler handler = new ImportHandler();
+
+        handler.importPackage("java.util");
+        handler.importPackage("java.net");
+
+        Class<?> clazz = handler.resolveClass("ArrayList");
+
+        Assert.assertEquals(ArrayList.class, clazz);
+    }
+
+
+    /**
+     * Attempting to resolve something that isn't a simple class name
+     * https://bz.apache.org/bugzilla/show_bug.cgi?id=57132
+     */
+    @Test
+    public void testResolveClass05() {
+        ImportHandler handler = new ImportHandler();
+
+        handler.importPackage("java.nio");
+
+        Class<?> clazz = handler.resolveClass("charset.StandardCharsets");
+
+        Assert.assertNull(clazz);
+    }
+
+    /**
+     * Attempting to resolve something that isn't a simple class name
+     * https://bz.apache.org/bugzilla/show_bug.cgi?id=57132
+     */
+    @Test
+    public void testResolveClass06() {
+        ImportHandler handler = new ImportHandler();
+
+        handler.importPackage("java.nio");
+
+        Class<?> clazz = handler.resolveClass(null);
+
+        Assert.assertNull(clazz);
+    }
 
     /**
      * Import a valid class.
@@ -81,34 +138,61 @@ public class TestImportHandler {
     /**
      * Import an invalid class.
      */
-    @Test(expected=ELException.class)
+    @Test
     public void testImportClass02() {
         ImportHandler handler = new ImportHandler();
-
         handler.importClass("org.apache.tomcat.util.res.StringManagerX");
+        Class<?> result = handler.resolveClass("StringManagerX");
+        Assert.assertNull(result);
     }
 
 
     /**
      * Import conflicting classes
      */
-    @Test(expected=ELException.class)
+    @Test
     public void testImportClass03() {
         ImportHandler handler = new ImportHandler();
 
         handler.importClass("org.apache.tomcat.util.ExceptionUtils");
-        handler.importClass("org.apache.jasper.util.ExceptionUtils");
+        for (int i = 1; i <= 3; i++) {
+            try {
+                handler.importClass("org.apache.jasper.util.ExceptionUtils");
+                Assert.fail("Expected ELException but got none on iteration "
+                        + i);
+            } catch (ELException ex) {
+                // Expected
+            }
+        }
+    }
+
+
+    /**
+     * Import duplicate classes (i.e. the same class twice).
+     */
+    @Test
+    public void testImportClass04() {
+        ImportHandler handler = new ImportHandler();
+
+        handler.importClass("org.apache.tomcat.util.res.StringManager");
+        handler.importClass("org.apache.tomcat.util.res.StringManager");
+
+        Class<?> result = handler.resolveClass("StringManager");
+
+        Assert.assertEquals(StringManager.class, result);
     }
 
 
     /**
      * Import an invalid package.
      */
-    @Test(expected=ELException.class)
-    public void testImportPackage01() {
+    @Test
+    public void testImportPackage01_57574() {
         ImportHandler handler = new ImportHandler();
 
         handler.importPackage("org.apache.tomcat.foo");
+
+        // No exception is expected
     }
 
 
@@ -156,11 +240,34 @@ public class TestImportHandler {
     /**
      * Import an invalid static field - conflict.
      */
-    @Test(expected=ELException.class)
+    @Test
     public void testImportStatic04() {
         ImportHandler handler = new ImportHandler();
 
         handler.importStatic("org.apache.tomcat.util.buf.Constants.Package");
-        handler.importStatic("org.apache.tomcat.util.scan.Constants.Package");
+        for (int i = 1; i <= 3; i++) {
+            try {
+                handler.importStatic("org.apache.tomcat.util.scan.Constants.Package");
+                Assert.fail("Expected ELException but got none on iteration "
+                        + i);
+            } catch (ELException ex) {
+                // Expected
+            }
+        }
+    }
+
+
+    /**
+     * Package imports with conflicts due to non-public classes should not
+     * conflict.
+     */
+    @Test
+    public void testBug57135() {
+        ImportHandler importHandler = new ImportHandler();
+
+        importHandler.importPackage("util.a");
+        importHandler.importPackage("util.b");
+
+        importHandler.resolveClass("Foo");
     }
 }

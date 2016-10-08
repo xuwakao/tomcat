@@ -101,13 +101,15 @@ public class TestChunkedInputFilter extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
-        EchoHeaderServlet servlet = new EchoHeaderServlet();
+        // Configure allowed trailer headers
+        tomcat.getConnector().setProperty("allowedTrailerHeaders", "X-Trailer1,X-Trailer2");
+
+        EchoHeaderServlet servlet = new EchoHeaderServlet(expectPass);
         Tomcat.addServlet(ctx, "servlet", servlet);
-        ctx.addServletMapping("/", "servlet");
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -165,12 +167,11 @@ public class TestChunkedInputFilter extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
-        Tomcat.addServlet(ctx, "servlet", new EchoHeaderServlet());
-        ctx.addServletMapping("/", "servlet");
+        Tomcat.addServlet(ctx, "servlet", new EchoHeaderServlet(false));
+        ctx.addServletMappingDecoded("/", "servlet");
 
         // Limit the size of the trailing header
         tomcat.getConnector().setProperty("maxTrailerSize", "10");
@@ -229,12 +230,11 @@ public class TestChunkedInputFilter extends TomcatBaseTest {
         tomcat.getConnector().setProperty(
                 "maxExtensionSize", Integer.toString(EXT_SIZE_LIMIT));
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
-        Tomcat.addServlet(ctx, "servlet", new EchoHeaderServlet());
-        ctx.addServletMapping("/", "servlet");
+        Tomcat.addServlet(ctx, "servlet", new EchoHeaderServlet(ok));
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -278,12 +278,11 @@ public class TestChunkedInputFilter extends TomcatBaseTest {
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
-        // Must have a real docBase - just use temp
-        Context ctx =
-            tomcat.addContext("", System.getProperty("java.io.tmpdir"));
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
 
-        Tomcat.addServlet(ctx, "servlet", new EchoHeaderServlet());
-        ctx.addServletMapping("/", "servlet");
+        Tomcat.addServlet(ctx, "servlet", new EchoHeaderServlet(true));
+        ctx.addServletMappingDecoded("/", "servlet");
 
         tomcat.start();
 
@@ -311,10 +310,134 @@ public class TestChunkedInputFilter extends TomcatBaseTest {
         assertEquals("nullnull7nullnull", client.getResponseBody());
     }
 
+    @Test
+    public void testChunkSizeZero() throws Exception {
+        doTestChunkSize(true, true, "", 10, 0);
+    }
+
+    @Test
+    public void testChunkSizeAbsent() throws Exception {
+        doTestChunkSize(false, false, SimpleHttpClient.CRLF, 10, 0);
+    }
+
+    @Test
+    public void testChunkSizeTwentyFive() throws Exception {
+        doTestChunkSize(true, true, "19" + SimpleHttpClient.CRLF
+                + "Hello World!Hello World!!" + SimpleHttpClient.CRLF, 40, 25);
+    }
+
+    @Test
+    public void testChunkSizeEightDigit() throws Exception {
+        doTestChunkSize(true, true, "0000000C" + SimpleHttpClient.CRLF
+                + "Hello World!" + SimpleHttpClient.CRLF, 20, 12);
+    }
+
+    @Test
+    public void testChunkSizeNineDigit() throws Exception {
+        doTestChunkSize(false, false, "00000000C" + SimpleHttpClient.CRLF
+                + "Hello World!" + SimpleHttpClient.CRLF, 20, 12);
+    }
+
+    @Test
+    public void testChunkSizeLong() throws Exception {
+        doTestChunkSize(true, false, "7fFFffFF" + SimpleHttpClient.CRLF
+                + "Hello World!" + SimpleHttpClient.CRLF, 10, 10);
+    }
+
+    @Test
+    public void testChunkSizeIntegerMinValue() throws Exception {
+        doTestChunkSize(false, false, "80000000" + SimpleHttpClient.CRLF
+                + "Hello World!" + SimpleHttpClient.CRLF, 10, 10);
+    }
+
+    @Test
+    public void testChunkSizeMinusOne() throws Exception {
+        doTestChunkSize(false, false, "ffffffff" + SimpleHttpClient.CRLF
+                + "Hello World!" + SimpleHttpClient.CRLF, 10, 10);
+    }
+
+    /**
+     * @param expectPass
+     *            If the servlet is expected to process the request
+     * @param expectReadWholeBody
+     *            If the servlet is expected to fully read the body and reliably
+     *            deliver a response
+     * @param chunks
+     *            Text of chunks
+     * @param readLimit
+     *            Do not read more than this many bytes
+     * @param expectReadCount
+     *            Expected count of read bytes
+     * @throws Exception
+     *             Unexpected
+     */
+    private void doTestChunkSize(boolean expectPass,
+            boolean expectReadWholeBody, String chunks, int readLimit,
+            int expectReadCount) throws Exception {
+        // Setup Tomcat instance
+        Tomcat tomcat = getTomcatInstance();
+
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
+
+        BodyReadServlet servlet = new BodyReadServlet(expectPass, readLimit);
+        Tomcat.addServlet(ctx, "servlet", servlet);
+        ctx.addServletMappingDecoded("/", "servlet");
+
+        tomcat.start();
+
+        String request = "POST /echo-params.jsp HTTP/1.1"
+                + SimpleHttpClient.CRLF + "Host: any" + SimpleHttpClient.CRLF
+                + "Transfer-encoding: chunked" + SimpleHttpClient.CRLF
+                + "Content-Type: text/plain" + SimpleHttpClient.CRLF;
+        if (expectPass) {
+            request += "Connection: close" + SimpleHttpClient.CRLF;
+        }
+        request += SimpleHttpClient.CRLF + chunks + "0" + SimpleHttpClient.CRLF
+                + SimpleHttpClient.CRLF;
+
+        TrailerClient client = new TrailerClient(tomcat.getConnector()
+                .getLocalPort());
+        client.setRequest(new String[] { request });
+
+        Exception processException = null;
+        client.connect();
+        try {
+            client.processRequest();
+        } catch (Exception e) {
+            // Socket was probably closed before client had a chance to read
+            // response
+            processException = e;
+        }
+        if (expectPass) {
+            if (expectReadWholeBody) {
+                assertNull(processException);
+            }
+            if (processException == null) {
+                assertTrue(client.getResponseLine(), client.isResponse200());
+                assertEquals(String.valueOf(expectReadCount),
+                        client.getResponseBody());
+            }
+            assertEquals(expectReadCount, servlet.getCountRead());
+        } else {
+            if (processException == null) {
+                assertTrue(client.getResponseLine(), client.isResponse500());
+            }
+            assertEquals(0, servlet.getCountRead());
+            assertTrue(servlet.getExceptionDuringRead());
+        }
+    }
+
     private static class EchoHeaderServlet extends HttpServlet {
         private static final long serialVersionUID = 1L;
 
         private boolean exceptionDuringRead = false;
+
+        private final boolean expectPass;
+
+        public EchoHeaderServlet(boolean expectPass) {
+            this.expectPass = expectPass;
+        }
 
         @Override
         protected void doPost(HttpServletRequest req, HttpServletResponse resp)
@@ -334,10 +457,15 @@ public class TestChunkedInputFilter extends TomcatBaseTest {
                 }
             } catch (IOException ioe) {
                 exceptionDuringRead = true;
+                if (!expectPass) { // as expected
+                    log(ioe.toString());
+                    resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    return;
+                }
                 throw ioe;
             }
 
-            pw.write(Integer.valueOf(count).toString());
+            pw.write(Integer.toString(count));
 
             // Headers should be visible now
             dumpHeader("x-trailer1", req, pw);
@@ -355,6 +483,53 @@ public class TestChunkedInputFilter extends TomcatBaseTest {
                 value = "null";
             }
             pw.write(value);
+        }
+    }
+
+    private static class BodyReadServlet extends HttpServlet {
+        private static final long serialVersionUID = 1L;
+
+        private boolean exceptionDuringRead = false;
+        private int countRead = 0;
+        private final boolean expectPass;
+        private final int readLimit;
+
+        public BodyReadServlet(boolean expectPass, int readLimit) {
+            this.expectPass = expectPass;
+            this.readLimit = readLimit;
+        }
+
+        @Override
+        protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+                throws ServletException, IOException {
+            resp.setContentType("text/plain");
+            PrintWriter pw = resp.getWriter();
+
+            // Read the body - quick and dirty
+            InputStream is = req.getInputStream();
+            try {
+                while (is.read() > -1 && countRead < readLimit) {
+                    countRead++;
+                }
+            } catch (IOException ioe) {
+                exceptionDuringRead = true;
+                if (!expectPass) { // as expected
+                    log(ioe.toString());
+                    resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    return;
+                }
+                throw ioe;
+            }
+
+            pw.write(Integer.toString(countRead));
+        }
+
+        public boolean getExceptionDuringRead() {
+            return exceptionDuringRead;
+        }
+
+        public int getCountRead() {
+            return countRead;
         }
     }
 

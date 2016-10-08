@@ -18,6 +18,8 @@ package org.apache.catalina;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.security.cert.Certificate;
+import java.util.jar.Manifest;
 
 /**
  * Represents a file or directory within a web application. It borrows heavily
@@ -25,18 +27,18 @@ import java.net.URL;
  */
 public interface WebResource {
     /**
-     * See {@link java.io.File#lastModified()}.
+     * @return {@link java.io.File#lastModified()}.
      */
     long getLastModified();
 
     /**
-     * Return the last modified time of this resource in the correct format for
+     * @return the last modified time of this resource in the correct format for
      * the HTTP Last-Modified header as specified by RFC 2616.
      */
     String getLastModifiedHttp();
 
     /**
-     * See {@link java.io.File#exists()}.
+     * @return {@link java.io.File#exists()}.
      */
     boolean exists();
 
@@ -46,46 +48,48 @@ public interface WebResource {
      * additional {@link WebResourceSet}. For example, if an external
      * directory is mapped to /WEB-INF/lib in an otherwise empty web
      * application, /WEB-INF will be represented as a virtual resource.
+     *
+     * @return <code>true</code> for a virtual resource
      */
     boolean isVirtual();
 
     /**
-     * See {@link java.io.File#isDirectory()}.
+     * @return {@link java.io.File#isDirectory()}.
      */
     boolean isDirectory();
 
     /**
-     * See {@link java.io.File#isFile()}.
+     * @return {@link java.io.File#isFile()}.
      */
     boolean isFile();
 
     /**
-     * See {@link java.io.File#delete()}.
+     * @return {@link java.io.File#delete()}.
      */
     boolean delete();
 
     /**
-     * See {@link java.io.File#getName()}.
+     * @return {@link java.io.File#getName()}.
      */
     String getName();
 
     /**
-     * See {@link java.io.File#length()}.
+     * @return {@link java.io.File#length()}.
      */
     long getContentLength();
 
     /**
-     * See {@link java.io.File#getCanonicalPath()}.
+     * @return {@link java.io.File#getCanonicalPath()}.
      */
     String getCanonicalPath();
 
     /**
-     * See {@link java.io.File#canRead()}.
+     * @return {@link java.io.File#canRead()}.
      */
     boolean canRead();
 
     /**
-     * The path of this resource relative to the web application root. If the
+     * @return The path of this resource relative to the web application root. If the
      * resource is a directory, the return value will end in '/'.
      */
     String getWebappPath();
@@ -100,11 +104,13 @@ public interface WebResource {
 
     /**
      * Set the MIME type for this Resource.
+     *
+     * @param mimeType The mime type that will be associated with the resource
      */
     void setMimeType(String mimeType);
 
     /**
-     * Get the MIME type for this Resource.
+     * @return the MIME type for this Resource.
      */
     String getMimeType();
 
@@ -118,25 +124,47 @@ public interface WebResource {
     InputStream getInputStream();
 
     /**
-     * Obtain the cached binary content of this resource.
+     * @return the cached binary content of this resource.
      */
     byte[] getContent();
 
     /**
-     * The time the file was created. If not available, the result of
+     * @return The time the file was created. If not available, the result of
      * {@link #getLastModified()} will be returned.
      */
     long getCreation();
 
     /**
-     * Obtain a URL to access the resource or <code>null</code> if no such URL
+     * @return a URL to access the resource or <code>null</code> if no such URL
      * is available or if the resource does not exist.
      */
     URL getURL();
 
     /**
-     * Obtain a reference to the WebResourceRoot of which this WebResource is a
+     * @return the code base for this resource that will be used when looking up the
+     * assigned permissions for the code base in the security policy file when
+     * running under a security manager.
+     */
+    URL getCodeBase();
+
+    /**
+     * @return a reference to the WebResourceRoot of which this WebResource is a
      * part.
      */
     WebResourceRoot getWebResourceRoot();
+
+    /**
+     * @return the certificates that were used to sign this resource to verify
+     * it or @null if none.
+     *
+     * @see java.util.jar.JarEntry#getCertificates()
+     */
+    Certificate[] getCertificates();
+
+    /**
+     * @return the manifest associated with this resource or @null if none.
+     *
+     * @see java.util.jar.JarFile#getManifest()
+     */
+    Manifest getManifest();
 }

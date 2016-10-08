@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -43,11 +43,15 @@
   <em>Container Managed Security</em> as described in the Servlet
   Specification.</p>
 
-  <p>You may nest a Realm inside any Catalina container
-  <a href="engine.html">Engine</a>, <a href="host.html">Host</a>, or
-  <a href="context.html">Context</a>).  In addition, Realms associated with
-  an Engine or a Host are automatically inherited by lower-level
-  containers, unless explicitly overridden.</p>
+  <p>A Catalina container (<a href="engine.html">Engine</a>,
+  <a href="host.html">Host</a>, or <a href="context.html">Context</a>) may
+  contain no more than one Realm element (although if supported by the Realm
+  this one Realm may itself contain multiple nested Realms). In addition, the
+  Realm associated with an Engine or a Host is automatically inherited by
+  lower-level containers unless the lower level container explicitly defines its
+  own Realm. If no Realm is configured for the Engine, an instance of the
+  <a href="#Null_Realm_-_org.apache.catalina.realm.NullRealm">Null Realm</a>
+  will be configured for the Engine automatically.</p>
 
   <p>For more in-depth information about container managed security in web
   applications, as well as more information on configuring and using the
@@ -136,17 +140,6 @@
         establishing a database connection.</p>
       </attribute>
 
-      <attribute name="digest" required="false">
-        <p>The name of the <code>MessageDigest</code> algorithm used
-        to encode user passwords stored in the database.  If not specified,
-        user passwords are assumed to be stored in clear-text.</p>
-      </attribute>
-
-      <attribute name="digestEncoding" required="false">
-        <p>The charset for encoding digests.  If not specified, the platform
-        default will be used.</p>
-      </attribute>
-
       <attribute name="driverName" required="true">
         <p>Fully qualified Java class name of the JDBC driver to be
         used to connect to the authentication database.</p>
@@ -166,10 +159,17 @@
         name. If not specified, the default is <code>true</code>.</p>
       </attribute>
 
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
+      </attribute>
+
       <attribute name="userCredCol" required="true">
         <p>Name of the column, in the "users" table, which contains
-        the user's credentials (i.e. password).  If a value for the
-        <code>digest</code> attribute is specified, this component
+        the user's credentials (i.e. password).  If a
+        <code>CredentialHandler</code> is specified, this component
         will assume that the passwords have been encoded with the
         specified algorithm.  Otherwise, they will be assumed to be
         in clear text.</p>
@@ -258,12 +258,6 @@
         <p>The name of the JNDI JDBC DataSource for this Realm.</p>
       </attribute>
 
-      <attribute name="digest" required="false">
-        <p>The name of the <code>MessageDigest</code> algorithm used
-        to encode user passwords stored in the database.  If not specified,
-        user passwords are assumed to be stored in clear-text.</p>
-      </attribute>
-
       <attribute name="localDataSource" required="false">
         <p>When the realm is nested inside a Context element, this allows the
         realm to use a DataSource defined for the Context rather than a global
@@ -279,6 +273,13 @@
         a rare case when it can be omitted.</p>
       </attribute>
 
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
+      </attribute>
+
       <attribute name="stripRealmForGss" required="false">
         <p>When processing users authenticated via the GSS-API, this attribute
         controls if any &quot;@...&quot; is removed from the end of the user
@@ -287,8 +288,8 @@
 
       <attribute name="userCredCol" required="true">
         <p>Name of the column, in the "users" table, which contains
-        the user's credentials (i.e. password).  If a value for the
-        <code>digest</code> attribute is specified, this component
+        the user's credentials (i.e. password).  If a
+        <code>CredentialHandler</code> is specified, this component
         will assume that the passwords have been encoded with the
         specified algorithm.  Otherwise, they will be assumed to be
         in clear text.</p>
@@ -392,7 +393,7 @@
       </attribute>
 
       <attribute name="alternateURL" required="false">
-        <p>If a socket connection can not be made to the provider at
+        <p>If a socket connection cannot be made to the provider at
         the <code>connectionURL</code> an attempt will be made to use the
         <code>alternateURL</code>.</p>
       </attribute>
@@ -401,6 +402,13 @@
         <p>A string specifying the type of authentication to use.
         "none", "simple", "strong" or a provider specific definition
         can be used. If no value is given the providers default is used.</p>
+      </attribute>
+
+      <attribute name="cipherSuites" required="false">
+        <p>Specify which cipher suites are allowed when trying to open
+        a secured connection using StartTLS. The allowed cipher suites
+        are specified by a comma separated list. The default is to use the
+        cipher suites of the JVM.</p>
       </attribute>
 
       <attribute name="commonRole" required="false">
@@ -448,13 +456,13 @@
         "finding" and "searching". If not specified, "always" is used.</p>
       </attribute>
 
-      <attribute name="digest" required="false">
-        <p>The digest algorithm to apply to the plaintext password offered
-        by the user before comparing it with the value retrieved from the
-        directory.  Valid values are those accepted for the algorithm name
-        by the <code>java.security.MessageDigest</code> class. If not
-        specified the plaintext password is assumed to be retrieved. Not
-        required unless <code>userPassword</code> is specified</p>
+      <attribute name="hostnameVerifierClassName" required="false">
+        <p>The name of the class to use for hostname verification when
+        using StartTLS for securing the connection to the ldap server.
+        The default constructor will be used to construct an instance of
+        the verifier class. The default is to accept only those hostnames,
+        that are valid according to the peer certificate of the ldap
+        server.</p>
       </attribute>
 
       <attribute name="protocol" required="false">
@@ -551,6 +559,34 @@
         <code>0</code> is used which indicates no limit.</p>
       </attribute>
 
+      <attribute name="spnegoDelegationQop" required="false">
+        <p>When the JNDI Realm is used with the SPNEGO authenticator and
+        <code>useDelegatedCredential</code> is <code>true</code> this attribute
+        controls the QOP (Quality of Protection) that should be used for
+        the connection to the LDAP
+        server after authentication. This value is used to set the
+        <code>javax.security.sasl.qop</code> environment property for the LDAP
+        connection. This attribute should be a comma-separated list of values
+        selected from <code>auth-conf</code>, <code>auth-int</code> and
+        <code>auth</code>. See <a
+        href="http://docs.oracle.com/javase/7/docs/api/javax/security/sasl/Sasl.html#QOP"
+        rel="nofollow">Java documentation</a> for more details.</p>
+        <p>The default value is <code>auth-conf</code>.</p>
+      </attribute>
+
+      <attribute name="sslProtocol" required="false">
+        <p>Specifies which ssl protocol should be used, when connecting with
+        StartTLS. The default is to let the jre decide. If you need even more
+        control, you can specify the <code>SSLSocketFactory</code> to use.</p>
+      </attribute>
+
+      <attribute name="sslSocketFactory" required="false">
+        <p>Specifies which <code>SSLSocketFactory</code> to use when connecting
+        to the ldap server using StartTLS. An instance of the class will be
+        constructed using the default constructor. If none class name is given
+        the default jre <code>SSLSocketFactory</code> will be used.</p>
+      </attribute>
+
       <attribute name="stripRealmForGss" required="false">
         <p>When processing users authenticated via the GSS-API, this attribute
         controls if any &quot;@...&quot; is removed from the end of the user
@@ -564,10 +600,17 @@
         limit.</p>
       </attribute>
 
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
+      </attribute>
+
       <attribute name="useDelegatedCredential" required="false">
-        <p>When the JNIRealm is used with the SPNEGO authenticator, delegated
+        <p>When the JNDIRealm is used with the SPNEGO authenticator, delegated
         credentials for the user may be available. If such credentials are
-        present, this attribute controls whether are not they are used to
+        present, this attribute controls whether or not they are used to
         connect to the directory. If not specified, the default value of
         <code>true</code> is used.</p>
       </attribute>
@@ -637,6 +680,16 @@
         user's entry.</p>
       </attribute>
 
+      <attribute name="userSearchAsUser" required="false">
+        <p> When searching for a user's entry, should the search be performed as
+        the user currently being authenticated? If false,
+        <code>connectionName</code> and <code>connectionPassword</code> will be
+        used if specified, else an anonymous. If not specified, the default
+        value of <code>false</code> is used. Note that when accessing the
+        directory using delegated credentials, this attribute is always ignored
+        and the search is performed using the delegated credentials.</p>
+      </attribute>
+
       <attribute name="userSubtree" required="false">
         <p>Set to <code>true</code> if you want to search the entire
         subtree of the element specified by the <code>userBase</code>
@@ -644,6 +697,12 @@
         <code>false</code> causes only the top level to be searched.
         Not used if you are using the <code>userPattern</code>
         expression.</p>
+      </attribute>
+
+      <attribute name="useStartTls" required="false">
+        <p>Set to <code>true</code> if you want to use StartTLS for securing
+        the connection to the ldap server. The default value is <code>false</code>.
+        </p>
       </attribute>
 
       <attribute name="X509UsernameRetrieverClassName" required="false">
@@ -690,6 +749,13 @@
       <attribute name="resourceName" required="true">
         <p>The name of the global <code>UserDatabase</code> resource
         that this realm will use for user, password and role information.</p>
+      </attribute>
+
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
       </attribute>
 
       <attribute name="X509UsernameRetrieverClassName" required="false">
@@ -740,16 +806,9 @@
         one of those roles.</p>
       </attribute>
 
-      <attribute name="digest" required="false">
-        <p>The digest algorithm used to store passwords in non-plaintext
-        formats. Valid values are those accepted for the algorithm name by the
-        <code>java.security.MessageDigest</code> class. If not specified,
-        passwords are stored in clear text.</p>
-      </attribute>
-
       <attribute name="pathname" required="false">
-        <p>Absolute or relative (to $CATALINA_BASE) pathname to the XML file
-        containing our user information.  See below for details on the
+        <p>URL, absolute path or relative path (to $CATALINA_BASE) for the XML
+        file containing our user information.  See below for details on the
         XML element format required.  If no pathname is specified, the
         default value is <code>conf/tomcat-users.xml</code>.</p>
       </attribute>
@@ -758,6 +817,13 @@
         <p>When processing users authenticated via the GSS-API, this attribute
         controls if any &quot;@...&quot; is removed from the end of the user
         name. If not specified, the default is <code>true</code>.</p>
+      </attribute>
+
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
       </attribute>
 
       <attribute name="X509UsernameRetrieverClassName" required="false">
@@ -780,8 +846,10 @@
     <li>Each <code>&lt;user&gt;</code> element must have the following
         attributes:
         <ul>
-        <li><strong>name</strong> - Username of this user (must be unique
-            within this file).</li>
+        <li><strong>username</strong> - Username of this user (must be unique
+            within this file).<br/>
+            For compatibility, it is allowed to use <strong>name</strong> as an
+            alternative name for this attribute.</li>
         <li><strong>password</strong> - Password of this user (in
             clear text).</li>
         <li><strong>roles</strong> - Comma-delimited list of the role names
@@ -853,7 +921,7 @@
         be searched for using <code>ClassLoader#getResource(String)</code> so it
         is possible for the configuration to be bundled within a web
         application. If not specified, the default JVM global JAAS configuration
-        willbe used.</p>
+        will be used.</p>
       </attribute>
 
       <attribute name="roleClassNames" required="false">
@@ -865,6 +933,13 @@
         <p>When processing users authenticated via the GSS-API, this attribute
         controls if any &quot;@...&quot; is removed from the end of the user
         name. If not specified, the default is <code>true</code>.</p>
+      </attribute>
+
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
       </attribute>
 
       <attribute name="useContextClassLoader" required="false">
@@ -910,13 +985,36 @@
     listed. Authentication against any Realm will be sufficient to authenticate
     the user.</p>
 
-    <p>The CombinedRealm implementation does not support any additional
-    attributes.</p>
-
     <p>See the <a href="../realm-howto.html">Container-Managed Security
     Guide</a> for more information on setting up container managed security
     using the CombinedRealm component.</p>
 
+    <p>The CombinedRealm implementation supports the following additional
+    attributes.</p>
+
+    <attributes>
+
+      <attribute name="allRolesMode" required="false">
+        <p>This attribute controls how the special role name <code>*</code> is
+        handled when processing authorization constraints in web.xml. By
+        default, the specification compliant value of <code>strict</code> is
+        used which means that the user must be assigned one of the roles defined
+        in web.xml. The alternative values are <code>authOnly</code> which means
+        that the user must be authenticated but no check is made for assigned
+        roles and <code>strictAuthOnly</code> which means that the user must be
+        authenticated and no check will be made for assigned roles unless roles
+        are defined in web.xml in which case the user must be assigned at least
+        one of those roles.</p>
+      </attribute>
+
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
+      </attribute>
+
+    </attributes>
   </subsection>
 
 
@@ -947,6 +1045,18 @@
     attributes.</p>
 
     <attributes>
+       <attribute name="allRolesMode" required="false">
+        <p>This attribute controls how the special role name <code>*</code> is
+        handled when processing authorization constraints in web.xml. By
+        default, the specification compliant value of <code>strict</code> is
+        used which means that the user must be assigned one of the roles defined
+        in web.xml. The alternative values are <code>authOnly</code> which means
+        that the user must be authenticated but no check is made for assigned
+        roles and <code>strictAuthOnly</code> which means that the user must be
+        authenticated and no check will be made for assigned roles unless roles
+        are defined in web.xml in which case the user must be assigned at least
+        one of those roles.</p>
+      </attribute>
 
       <attribute name="cacheRemovalWarningTime" required="false">
        <p>If a failed user is removed from the cache because the cache is too
@@ -967,7 +1077,18 @@
 
       <attribute name="lockOutTime" required="false">
        <p>The time (in seconds) a user is locked out for after too many
-       authentication failures. Defaults to 300 (5 minutes).</p>
+       authentication failures. Defaults to 300 (5 minutes). Further
+       authentication failures during the lock out time will cause the lock out
+       timer to reset to zero, effectively extending the lock out time. Valid
+       authentication attempts during the lock out period will not succeed but
+       will also not reset the lock out time.</p>
+      </attribute>
+
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
       </attribute>
 
     </attributes>
@@ -978,20 +1099,48 @@
 
   </subsection>
 
+  <subsection name="Null Realm - org.apache.catalina.realm.NullRealm">
+
+    <p><strong>NullRealm</strong> is a minimal implementation of the Tomcat
+    <code>Realm</code> interface that always returns null when an attempt is
+    made to validate a user name and associated credentials. It is intended to
+    be used as a default Realm implementation when no other Realm is
+    specified.</p>
+
+    <p>The NullRealm implementation supports the following additional
+    attributes.</p>
+
+    <attributes>
+
+      <attribute name="transportGuaranteeRedirectStatus" required="false">
+        <p>The HTTP status code to use when the container needs to issue an HTTP
+           redirect to meet the requirements of a configured transport
+           guarantee. The provided status code is not validated. If not
+           specified, the default value of <code>302</code> is used.</p>
+      </attribute>
+
+    </attributes>
+
+  </subsection>
+
 </section>
 
 
 <section name="Nested Components">
 
-  <h3>CombinedRealm Implementation</h3>
-
-  <p>If you are using the <em>CombinedRealm Implementation</em> or a Realm
-  that extends the CombinedRealm, e.g. the LockOutRealm,
-  <strong>&lt;Realm&gt;</strong> elements may be nested inside it.</p>
-
-  <h3>Other Realm Implementations</h3>
-
-  <p>No other Realm implementation supports nested components.</p>
+  <p>You can nest the following components by nesting the corresponding element
+  inside your <strong>Realm</strong> element:</p>
+  <ul>
+  <li><strong>CombinedRealm Implementation</strong> - If you are using the
+    <em>CombinedRealm Implementation</em> or a Realm
+    that extends the CombinedRealm, e.g. the LockOutRealm, one or more
+    <strong>&lt;Realm&gt;</strong> elements may be nested inside it.</li>
+  <li><a href="credentialhandler.html"><strong>CredentialHandler</strong></a> -
+      You may nest at most one instance of this element inside a Realm. This
+      configures the credential handler that will be used to validate provided
+      credentials with those stored by the Realm. If not specified a default
+      <em>MessageDigestCredentialHandler</em> will be configured.</li>
+  </ul>
 
 </section>
 

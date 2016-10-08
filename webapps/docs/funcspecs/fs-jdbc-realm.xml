@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -25,7 +25,6 @@
   <properties>
     <author email="craigmcc@apache.org">Craig McClanahan</author>
     <title>JDBCRealm</title>
-    <revision>$Id$</revision>
   </properties>
 
 <body>
@@ -64,10 +63,10 @@
     <p>The implementation of this functionality depends on the following
     external specifications:</p>
     <ul>
-    <li><a href="http://java.sun.com/products/jdbc/">Java Database
-        Connectivity</a> (version 2.0 or later)</li>
-    <li><a href="http://java.sun.com/products/jdbc/">Java Database
-        Connectivity Optional Package</a> (version 2.0 or later)</li>
+    <li><a href="http://www.oracle.com/technetwork/java/javase/jdbc/index.html">
+        Java Database Connectivity</a> (version 2.0 or later)</li>
+    <li><a href="http://www.oracle.com/technetwork/java/javase/jdbc/index.html">
+        Java Database Connectivity Optional Package</a> (version 2.0 or later)</li>
     </ul>
 
   </subsection>
@@ -253,7 +252,7 @@
 
 <section name="Testable Assertions">
 
-  <p>In addition the the assertions implied by the functionality requirements
+  <p>In addition to the assertions implied by the functionality requirements
   listed above, the following additional assertions shall be tested to
   validate the behavior of <code>JDBCRealm</code>:</p>
   <ul>

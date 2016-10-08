@@ -51,7 +51,6 @@ import org.apache.tomcat.jdbc.pool.PooledConnection;
 /**
  * Publishes data to JMX and provides notifications
  * when failures happen.
- * @author fhanik
  *
  */
 public class SlowQueryReportJmx extends SlowQueryReport implements NotificationEmitter, SlowQueryReportJmxMBean{
@@ -65,7 +64,7 @@ public class SlowQueryReportJmx extends SlowQueryReport implements NotificationE
     private static final Log log = LogFactory.getLog(SlowQueryReportJmx.class);
 
 
-    protected static ConcurrentHashMap<String,SlowQueryReportJmxMBean> mbeans =
+    protected static final ConcurrentHashMap<String,SlowQueryReportJmxMBean> mbeans =
         new ConcurrentHashMap<>();
 
 
@@ -100,7 +99,7 @@ public class SlowQueryReportJmx extends SlowQueryReport implements NotificationE
 
     protected String poolName = null;
 
-    protected static AtomicLong notifySequence = new AtomicLong(0);
+    protected static final AtomicLong notifySequence = new AtomicLong(0);
 
     protected boolean notifyPool = true;
 
@@ -124,7 +123,6 @@ public class SlowQueryReportJmx extends SlowQueryReport implements NotificationE
 
     @Override
     public void reset(ConnectionPool parent, PooledConnection con) {
-        // TODO Auto-generated method stub
         super.reset(parent, con);
         if (parent!=null) {
             poolName = parent.getName();
@@ -151,7 +149,7 @@ public class SlowQueryReportJmx extends SlowQueryReport implements NotificationE
     @Override
     protected String reportFailedQuery(String query, Object[] args, String name, long start, Throwable t) {
         query = super.reportFailedQuery(query, args, name, start, t);
-        notifyJmx(query,FAILED_QUERY_NOTIFICATION);
+        if (isLogFailed()) notifyJmx(query,FAILED_QUERY_NOTIFICATION);
         return query;
     }
 
@@ -185,7 +183,7 @@ public class SlowQueryReportJmx extends SlowQueryReport implements NotificationE
     @Override
     protected String reportSlowQuery(String query, Object[] args, String name, long start, long delta) {
         query = super.reportSlowQuery(query, args, name, start, delta);
-        notifyJmx(query,SLOW_QUERY_NOTIFICATION);
+        if (isLogSlow()) notifyJmx(query,SLOW_QUERY_NOTIFICATION);
         return query;
     }
 

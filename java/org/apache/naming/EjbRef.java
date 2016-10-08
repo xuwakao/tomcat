@@ -26,9 +26,7 @@ import javax.naming.StringRefAddr;
  * Represents a reference address to an EJB.
  *
  * @author Remy Maucherat
- * @version $Id$
  */
-
 public class EjbRef extends Reference {
 
     private static final long serialVersionUID = 1L;
@@ -80,9 +78,12 @@ public class EjbRef extends Reference {
      * EJB Reference.
      *
      * @param ejbType EJB type
-     * @param home Home interface classname
-     * @param remote Remote interface classname
-     * @param link EJB link
+     * @param home    Home interface classname
+     * @param remote  Remote interface classname
+     * @param link    EJB link
+     * @param factory The possibly null class name of the object's factory.
+     * @param factoryLocation   The possibly null location from which to load
+     *                          the factory (e.g. URL)
      */
     public EjbRef(String ejbType, String home, String remote, String link,
                   String factory, String factoryLocation) {

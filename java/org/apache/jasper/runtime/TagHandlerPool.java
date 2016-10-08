@@ -22,7 +22,6 @@ import javax.servlet.jsp.JspException;
 import javax.servlet.jsp.tagext.Tag;
 
 import org.apache.jasper.Constants;
-import org.apache.jasper.util.ExceptionUtils;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.InstanceManager;
@@ -144,15 +143,7 @@ public class TagHandlerPool {
             }
         }
         // There is no need for other threads to wait for us to release
-        handler.release();
-        try {
-            instanceManager.destroyInstance(handler);
-        } catch (Exception e) {
-            Throwable t = ExceptionUtils.unwrapInvocationTargetException(e);
-            ExceptionUtils.handleThrowable(t);
-            log.warn("Error processing preDestroy on tag instance of " +
-                    handler.getClass().getName(), t);
-        }
+        doRelease(handler);
     }
 
     /**
@@ -161,18 +152,29 @@ public class TagHandlerPool {
      */
     public synchronized void release() {
         for (int i = current; i >= 0; i--) {
-            Tag handler = handlers[i];
-            handler.release();
-            try {
-                instanceManager.destroyInstance(handler);
-            } catch (Exception e) {
-                Throwable t = ExceptionUtils.unwrapInvocationTargetException(e);
-                ExceptionUtils.handleThrowable(t);
-                log.warn("Error processing preDestroy on tag instance of "
-                        + handler.getClass().getName(), t);
-            }
+            doRelease(handlers[i]);
         }
     }
+
+
+    private void doRelease(Tag handler) {
+        try {
+            handler.release();
+        } catch (Throwable t) {
+            ExceptionUtils.handleThrowable(t);
+            log.warn("Error processing release on tag instance of "
+                    + handler.getClass().getName(), t);
+        }
+        try {
+            instanceManager.destroyInstance(handler);
+        } catch (Exception e) {
+            Throwable t = ExceptionUtils.unwrapInvocationTargetException(e);
+            ExceptionUtils.handleThrowable(t);
+            log.warn("Error processing preDestroy on tag instance of "
+                    + handler.getClass().getName(), t);
+        }
+    }
+
 
     protected static String getOption(ServletConfig config, String name,
             String defaultV) {

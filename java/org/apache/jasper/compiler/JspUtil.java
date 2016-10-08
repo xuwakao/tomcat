@@ -14,7 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.jasper.compiler;
 
 import java.io.FileNotFoundException;
@@ -23,13 +22,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.util.Vector;
-import java.util.jar.JarFile;
-import java.util.zip.ZipEntry;
 
 import org.apache.jasper.Constants;
 import org.apache.jasper.JasperException;
 import org.apache.jasper.JspCompilationContext;
+import org.apache.tomcat.Jar;
 import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
 
 /**
  * This class has all the utility method(s). Ideally should move all the bean
@@ -64,7 +63,9 @@ public class JspUtil {
     public static final int CHUNKSIZE = 1024;
 
     /**
-     * Takes a potential expression and converts it into XML form
+     * Takes a potential expression and converts it into XML form.
+     * @param expression The expression to convert
+     * @return XML view
      */
     public static String getExprInXml(String expression) {
         String returnString;
@@ -109,6 +110,11 @@ public class JspUtil {
      * present have valid names. Checks attributes specified as XML-style
      * attributes as well as attributes specified using the jsp:attribute
      * standard action.
+     * @param typeOfTag The tag type
+     * @param n The corresponding node
+     * @param validAttributes The array with the valid attributes
+     * @param err Dispatcher for errors
+     * @throws JasperException An error occurred
      */
     public static void checkAttributes(String typeOfTag, Node n,
             ValidAttribute[] validAttributes, ErrorDispatcher err)
@@ -207,6 +213,8 @@ public class JspUtil {
 
     /**
      * Escape the 5 entities defined by XML.
+     * @param s String to escape
+     * @return XML escaped string
      */
     public static String escapeXml(String s) {
         if (s == null) {
@@ -249,7 +257,7 @@ public class JspUtil {
 
     /**
      * Convert a String value to 'boolean'. Besides the standard conversions
-     * done by Boolean.valueOf(s).booleanValue(), the value "yes" (ignore case)
+     * done by Boolean.parseBoolean(s), the value "yes" (ignore case)
      * is also converted to 'true'. If 's' is null, then 'false' is returned.
      *
      * @param s
@@ -262,7 +270,7 @@ public class JspUtil {
             if (s.equalsIgnoreCase("yes")) {
                 b = true;
             } else {
-                b = Boolean.valueOf(s).booleanValue();
+                b = Boolean.parseBoolean(s);
             }
         }
         return b;
@@ -277,6 +285,10 @@ public class JspUtil {
      * name to the <tt>Class.forName()</tt> method, unless the given string
      * name represents a primitive type, in which case it is converted to a
      * <tt>Class</tt> object by appending ".class" to it (e.g., "int.class").
+     * @param type The class name, array or primitive type
+     * @param loader The class loader
+     * @return the loaded class
+     * @throws ClassNotFoundException Loading class failed
      */
     public static Class<?> toClass(String type, ClassLoader loader)
             throws ClassNotFoundException {
@@ -331,18 +343,18 @@ public class JspUtil {
     /**
      * Produces a String representing a call to the EL interpreter.
      *
+     * @param isTagFile <code>true</code> if the file is a tag file
+     *  rather than a JSP
      * @param expression
      *            a String containing zero or more "${}" expressions
      * @param expectedType
      *            the expected type of the interpreted result
      * @param fnmapvar
      *            Variable pointing to a function map.
-     * @param XmlEscape
-     *            True if the result should do XML escaping
      * @return a String representing a call to the EL interpreter.
      */
     public static String interpreterCall(boolean isTagFile, String expression,
-            Class<?> expectedType, String fnmapvar, boolean XmlEscape) {
+            Class<?> expectedType, String fnmapvar) {
         /*
          * Determine which context object to use.
          */
@@ -388,10 +400,6 @@ public class JspUtil {
             }
         }
 
-        if (primitiveConverterMethod != null) {
-            XmlEscape = false;
-        }
-
         /*
          * Build up the base call to the interpreter.
          */
@@ -414,7 +422,7 @@ public class JspUtil {
                         + "org.apache.jasper.runtime.PageContextImpl.proprietaryEvaluate"
                         + "(" + Generator.quote(expression) + ", " + targetType
                         + ".class, " + "(javax.servlet.jsp.PageContext)" + jspCtxt + ", "
-                        + fnmapvar + ", " + XmlEscape + ")");
+                        + fnmapvar + ")");
 
         /*
          * Add the primitive converter method if we need to.
@@ -652,19 +660,14 @@ public class JspUtil {
         }
     }
 
-    public static InputStream getInputStream(String fname, JarFile jarFile,
+    public static InputStream getInputStream(String fname, Jar jar,
             JspCompilationContext ctxt) throws IOException {
 
         InputStream in = null;
 
-        if (jarFile != null) {
+        if (jar != null) {
             String jarEntryName = fname.substring(1, fname.length());
-            ZipEntry jarEntry = jarFile.getEntry(jarEntryName);
-            if (jarEntry == null) {
-                throw new FileNotFoundException(Localizer.getMessage(
-                        "jsp.error.file.not.found", fname));
-            }
-            in = jarFile.getInputStream(jarEntry);
+            in = jar.getInputStream(jarEntryName);
         } else {
             in = ctxt.getResourceAsStream(fname);
         }
@@ -677,17 +680,31 @@ public class JspUtil {
         return in;
     }
 
+    public static InputSource getInputSource(String fname, Jar jar, JspCompilationContext ctxt)
+        throws IOException {
+        InputSource source;
+        if (jar != null) {
+            String jarEntryName = fname.substring(1, fname.length());
+            source = new InputSource(jar.getInputStream(jarEntryName));
+            source.setSystemId(jar.getURL(jarEntryName));
+        } else {
+            source = new InputSource(ctxt.getResourceAsStream(fname));
+            source.setSystemId(ctxt.getResource(fname).toExternalForm());
+        }
+        return source;
+    }
+
     /**
      * Gets the fully-qualified class name of the tag handler corresponding to
      * the given tag file path.
      *
-     * @param path
-     *            Tag file path
-     * @param err
-     *            Error dispatcher
+     * @param path Tag file path
+     * @param urn The tag identifier
+     * @param err Error dispatcher
      *
      * @return Fully-qualified class name of the tag handler corresponding to
      *         the given tag file path
+     * @throws JasperException Failed to generate a class name for the tag
      */
     public static String getTagHandlerClassName(String path, String urn,
             ErrorDispatcher err) throws JasperException {
@@ -714,7 +731,7 @@ public class JspUtil {
 
         index = path.indexOf(WEB_INF_TAGS);
         if (index != -1) {
-            className = Constants.TAG_FILE_PACKAGE_NAME + ".web";
+            className = Constants.TAG_FILE_PACKAGE_NAME + ".web.";
             begin = index + WEB_INF_TAGS.length();
         } else {
             index = path.indexOf(META_INF_TAGS);
@@ -850,6 +867,8 @@ public class JspUtil {
 
     /**
      * Mangle the specified character to create a legal Java class name.
+     * @param ch The character
+     * @return the replacement charater as a string
      */
     public static final String mangleChar(char ch) {
         char[] result = new char[5];
@@ -862,7 +881,9 @@ public class JspUtil {
     }
 
     /**
-     * Test whether the argument is a Java keyword
+     * Test whether the argument is a Java keyword.
+     * @param key The name
+     * @return <code>true</code> if the name is a java identifier
      */
     public static boolean isJavaKeyword(String key) {
         int i = 0;
@@ -883,18 +904,18 @@ public class JspUtil {
     }
 
     static InputStreamReader getReader(String fname, String encoding,
-            JarFile jarFile, JspCompilationContext ctxt, ErrorDispatcher err)
+            Jar jar, JspCompilationContext ctxt, ErrorDispatcher err)
             throws JasperException, IOException {
 
-        return getReader(fname, encoding, jarFile, ctxt, err, 0);
+        return getReader(fname, encoding, jar, ctxt, err, 0);
     }
 
     static InputStreamReader getReader(String fname, String encoding,
-            JarFile jarFile, JspCompilationContext ctxt, ErrorDispatcher err,
-            int skip) throws JasperException, IOException {
+            Jar jar, JspCompilationContext ctxt, ErrorDispatcher err, int skip)
+            throws JasperException, IOException {
 
         InputStreamReader reader = null;
-        InputStream in = getInputStream(fname, jarFile, ctxt);
+        InputStream in = getInputStream(fname, jar, ctxt);
         for (int i = 0; i < skip; i++) {
             in.read();
         }
@@ -908,11 +929,12 @@ public class JspUtil {
     }
 
     /**
-     * Handles taking input from TLDs 'java.lang.Object' ->
-     * 'java.lang.Object.class' 'int' -> 'int.class' 'void' -> 'Void.TYPE'
-     * 'int[]' -> 'int[].class'
+     * Handles taking input from TLDs 'java.lang.Object' -&gt;
+     * 'java.lang.Object.class' 'int' -&gt; 'int.class' 'void' -&gt; 'Void.TYPE'
+     * 'int[]' -&gt; 'int[].class'
      *
-     * @param type
+     * @param type The type from the TLD
+     * @return the Java type
      */
     public static String toJavaSourceTypeFromTld(String type) {
         if (type == null || "void".equals(type)) {
@@ -925,6 +947,8 @@ public class JspUtil {
      * Class.getName() return arrays in the form "[[[&lt;et&gt;", where et, the
      * element type can be one of ZBCDFIJS or L&lt;classname&gt;;. It is
      * converted into forms that can be understood by javac.
+     * @param type the type to convert
+     * @return the equivalent type in Java sources
      */
     public static String toJavaSourceType(String type) {
 

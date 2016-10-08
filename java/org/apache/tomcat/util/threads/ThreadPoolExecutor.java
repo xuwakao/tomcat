@@ -16,7 +16,6 @@
  */
 package org.apache.tomcat.util.threads;
 
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
@@ -25,8 +24,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.res.StringManager;
 
 /**
@@ -34,7 +31,6 @@ import org.apache.tomcat.util.res.StringManager;
  * {@link #getSubmittedCount()} method, to be used to properly handle the work queue.
  * If a RejectedExecutionHandler is not specified a default one will be configured
  * and that one will always throw a RejectedExecutionException
- * @author fhanik
  *
  */
 public class ThreadPoolExecutor extends java.util.concurrent.ThreadPoolExecutor {
@@ -43,8 +39,6 @@ public class ThreadPoolExecutor extends java.util.concurrent.ThreadPoolExecutor 
      */
     protected static final StringManager sm = StringManager
             .getManager("org.apache.tomcat.util.threads.res");
-
-    private static final Log log = LogFactory.getLog(ThreadPoolExecutor.class);
 
     /**
      * The number of tasks submitted but not yet finished. This includes tasks
@@ -117,16 +111,7 @@ public class ThreadPoolExecutor extends java.util.concurrent.ThreadPoolExecutor 
                                     "threadPoolExecutor.threadStoppedToAvoidPotentialLeak",
                                     Thread.currentThread().getName());
 
-                    Thread.currentThread().setUncaughtExceptionHandler(
-                            new UncaughtExceptionHandler() {
-                                @Override
-                                public void uncaughtException(Thread t,
-                                        Throwable e) {
-                                    // yes, swallow the exception
-                                    log.debug(msg);
-                                }
-                            });
-                    throw new RuntimeException(msg);
+                    throw new StopPooledThreadException(msg);
                 }
             }
         }
@@ -166,6 +151,8 @@ public class ThreadPoolExecutor extends java.util.concurrent.ThreadPoolExecutor 
      * full after that.
      *
      * @param command the runnable task
+     * @param timeout A timeout for the completion of the task
+     * @param unit The timeout time unit
      * @throws RejectedExecutionException if this task cannot be
      * accepted for execution - the queue is full
      * @throws NullPointerException if command or unit is null
@@ -212,18 +199,9 @@ public class ThreadPoolExecutor extends java.util.concurrent.ThreadPoolExecutor 
         // setCorePoolSize(0) wakes idle threads
         this.setCorePoolSize(0);
 
-        // wait a little so that idle threads wake and poll the queue again,
-        // this time always with a timeout (queue.poll() instead of
-        // queue.take())
-        // even if we did not wait enough, TaskQueue.take() takes care of timing
-        // out, so that we are sure that all threads of the pool are renewed in
-        // a limited time, something like
+        // TaskQueue.take() takes care of timing out, so that we are sure that
+        // all threads of the pool are renewed in a limited time, something like
         // (threadKeepAlive + longest request time)
-        try {
-            Thread.sleep(200L);
-        } catch (InterruptedException e) {
-            // yes, ignore
-        }
 
         if (taskQueue != null) {
             // ok, restore the state of the queue and pool

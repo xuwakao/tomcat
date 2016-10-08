@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 
+import org.apache.catalina.Globals;
 import org.apache.catalina.startup.Constants;
 import org.apache.tomcat.util.descriptor.DigesterFactory;
 import org.apache.tomcat.util.digester.Digester;
@@ -36,10 +37,8 @@ import org.xml.sax.InputSource;
  * schema validation.
  *
  * @author Remy Maucherat
- * @version $Id$
  * @since 5.0
  */
-
 public class ValidatorTask extends BaseRedirectorHelperTask {
 
 
@@ -81,7 +80,7 @@ public class ValidatorTask extends BaseRedirectorHelperTask {
         }
 
         File file = new File(path, Constants.ApplicationWebXml);
-        if ((!file.exists()) || (!file.canRead())) {
+        if (!file.canRead()) {
             throw new BuildException("Cannot find web.xml");
         }
 
@@ -90,13 +89,12 @@ public class ValidatorTask extends BaseRedirectorHelperTask {
         Thread.currentThread().setContextClassLoader
             (ValidatorTask.class.getClassLoader());
 
-        Digester digester = DigesterFactory.newDigester(true, true, null);
-        try {
-            file = file.getCanonicalFile();
-            InputStream stream =
-                new BufferedInputStream(new FileInputStream(file));
-            InputSource is =
-                new InputSource(file.toURI().toURL().toExternalForm());
+        // Called through trusted manager interface. If running under a
+        // SecurityManager assume that untrusted applications may be deployed.
+        Digester digester = DigesterFactory.newDigester(
+                true, true, null, Globals.IS_SECURITY_ENABLED);
+        try (InputStream stream = new BufferedInputStream(new FileInputStream(file.getCanonicalFile()));) {
+            InputSource is = new InputSource(file.toURI().toURL().toExternalForm());
             is.setByteStream(stream);
             digester.parse(is);
             handleOutput("web.xml validated");

@@ -57,7 +57,7 @@
         default="true"
         externalAllowed="true"
         externalOnly="true"
-         storeSeparate="true"
+        storeSeparate="true"
         backup="true"
         children="true"
         tagClass="org.apache.catalina.core.StandardContext"
@@ -82,16 +82,16 @@
         <TransientAttribute>ignoreAnnotations</TransientAttribute>
      </Description>
      <Description
-        id="org.apache.catalina.deploy.NamingResources.[GlobalNamingResources]"
+        id="org.apache.catalina.deploy.NamingResourcesImpl.[GlobalNamingResources]"
         tag="GlobalNamingResources"
         standard="true"
         default="false"
         attributes="false"
         children="true"
-        tagClass="org.apache.catalina.deploy.NamingResources"
+        tagClass="org.apache.catalina.deploy.NamingResourcesImpl"
         storeFactoryClass="org.apache.catalina.storeconfig.GlobalNamingResourcesSF">
      </Description>
-      <Description
+     <Description
         tag="Connector"
         standard="true"
         default="true"
@@ -101,7 +101,32 @@
         storeAppenderClass="org.apache.catalina.storeconfig.ConnectorStoreAppender">
         <TransientAttribute>URIEncoding</TransientAttribute>
         <TransientAttribute>maxProcessor</TransientAttribute>
-         <TransientAttribute>minProcessor</TransientAttribute>
+        <TransientAttribute>minProcessor</TransientAttribute>
+     </Description>
+     <Description
+        tag="UpgradeProtocol"
+        standard="false"
+        default="false"
+        tagClass="org.apache.coyote.UpgradeProtocol"
+        children="false"
+        storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
+     </Description>
+     <Description
+        tag="SSLHostConfig"
+        standard="true"
+        default="true"
+        tagClass="org.apache.tomcat.util.net.SSLHostConfig"
+        children="true"
+        storeFactoryClass="org.apache.catalina.storeconfig.SSLHostConfigSF">
+        <TransientAttribute>openSslContext</TransientAttribute>
+     </Description>
+     <Description
+        tag="Certificate"
+        standard="true"
+        default="true"
+        tagClass="org.apache.tomcat.util.net.SSLHostConfigCertificate"
+        children="false"
+        storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
      <Description
         tag="NamingResources"
@@ -109,17 +134,17 @@
         default="false"
         attributes="false"
         children="true"
-        tagClass="org.apache.catalina.deploy.NamingResources"
+        tagClass="org.apache.catalina.deploy.NamingResourcesImpl"
         storeFactoryClass="org.apache.catalina.storeconfig.NamingResourcesSF">
      </Description>
      <Description
         tag="Manager"
         standard="false"
         default="false"
+        children="true"
         tagClass="org.apache.catalina.Manager"
         storeFactoryClass="org.apache.catalina.storeconfig.ManagerSF">
-        <TransientAttribute>entropy</TransientAttribute>
-        <TransientAttribute>distributable</TransientAttribute>
+        <TransientAttribute>domain</TransientAttribute>
     </Description>
     <Description
         tag="Manager"
@@ -128,8 +153,6 @@
         children="true"
         tagClass="org.apache.catalina.session.PersistentManager"
         storeFactoryClass="org.apache.catalina.storeconfig.PersistentManagerSF">
-        <TransientAttribute>entropy</TransientAttribute>
-        <TransientAttribute>distributable</TransientAttribute>
      </Description>
      <Description
         tag="Store"
@@ -158,17 +181,25 @@
         tag="Realm"
         standard="false"
         default="false"
-        children="false"
+        children="true"
         tagClass="org.apache.catalina.Realm"
         storeFactoryClass="org.apache.catalina.storeconfig.RealmSF">
         <TransientAttribute>domain</TransientAttribute>
         <TransientAttribute>realmPath</TransientAttribute>
      </Description>
      <Description
+        tag="CredentialHandler"
+        standard="false"
+        default="false"
+        children="true"
+        tagClass="org.apache.catalina.CredentialHandler"
+        storeFactoryClass="org.apache.catalina.storeconfig.CredentialHandlerSF">
+     </Description>
+     <Description
         tag="Parameter"
         standard="true"
         default="false"
-        tagClass="org.apache.catalina.deploy.ApplicationParameter"
+        tagClass="org.apache.tomcat.util.descriptor.web.ApplicationParameter"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
      <Description
@@ -177,6 +208,7 @@
         default="false"
         tagClass="org.apache.catalina.loader.WebappLoader"
         storeFactoryClass="org.apache.catalina.storeconfig.LoaderSF">
+        <TransientAttribute>domain</TransientAttribute>
      </Description>
      <Description
         tag="Listener"
@@ -191,7 +223,7 @@
        <TransientChild>org.apache.catalina.startup.HostConfig</TransientChild>
        <TransientChild>org.apache.catalina.core.StandardHost$MemoryLeakTrackingListener</TransientChild>
        <TransientChild>org.apache.catalina.mapper.MapperListener</TransientChild>
-       <TransientChild>org.apache.catalina.core.ThreadLocalLeakPreventionListener</TransientChild>
+       <TransientChild>org.apache.catalina.core.StandardEngine$AccessLogListener</TransientChild>
      </Description>
      <Description
         id="org.apache.catalina.core.StandardServer.[ServerLifecycleListener]"
@@ -223,28 +255,28 @@
         tag="Environment"
         standard="true"
         default="false"
-        tagClass="org.apache.catalina.deploy.ContextEnvironment"
+        tagClass="org.apache.tomcat.util.descriptor.web.ContextEnvironment"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
      <Description
         tag="EJB"
         standard="true"
         default="false"
-        tagClass="org.apache.catalina.deploy.ContextEjb"
+        tagClass="org.apache.tomcat.util.descriptor.web.ContextEjb"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
      <Description
         tag="LocalEjb"
         standard="true"
         default="false"
-        tagClass="org.apache.catalina.deploy.ContextLocalEjb"
+        tagClass="org.apache.tomcat.util.descriptor.web.ContextLocalEjb"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
      <Description
         tag="Resource"
         standard="true"
         default="false"
-        tagClass="org.apache.catalina.deploy.ContextResource"
+        tagClass="org.apache.tomcat.util.descriptor.web.ContextResource"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
     <Description
@@ -256,12 +288,12 @@
         storeFactoryClass="org.apache.catalina.storeconfig.WebResourceRootSF">
         <TransientAttribute>allowLinking</TransientAttribute>
         <TransientAttribute>cachingAllowed</TransientAttribute>
-        <TransientAttribute>cacheTTL</TransientAttribute>
+        <TransientAttribute>cacheTtl</TransientAttribute>
         <TransientAttribute>cacheMaxSize</TransientAttribute>
-        <TransientAttribute>cacheMaxObjectSize</TransientAttribute>
-        <TransientAttribute>docBase</TransientAttribute>
-         <TransientAttribute>cached</TransientAttribute>
+        <TransientAttribute>cacheObjectMaxSize</TransientAttribute>
+        <TransientAttribute>cached</TransientAttribute>
         <TransientAttribute>caseSensitive</TransientAttribute>
+        <TransientAttribute>domain</TransientAttribute>
      </Description>
     <Description
         id="org.apache.catalina.WebResourceSet.[PreResources]"
@@ -291,30 +323,22 @@
         tag="ResourceEnvRef"
         standard="true"
         default="false"
-        tagClass="org.apache.catalina.deploy.ContextResourceEnvRef"
+        tagClass="org.apache.tomcat.util.descriptor.web.ContextResourceEnvRef"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
      <Description
         tag="ResourceLink"
         standard="true"
         default="false"
-        tagClass="org.apache.catalina.deploy.ContextResourceLink"
+        tagClass="org.apache.tomcat.util.descriptor.web.ContextResourceLink"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
      <Description
         tag="Transaction"
         standard="true"
         default="false"
-        tagClass="org.apache.catalina.deploy.ContextTransaction"
+        tagClass="org.apache.tomcat.util.descriptor.web.ContextTransaction"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
-     </Description>
-     <Description
-        id="org.apache.catalina.core.StandardContext.[InstanceListener]"
-        tag="InstanceListener"
-        standard="true"
-        default="false"
-        attributes="false"
-        storeFactoryClass="org.apache.catalina.storeconfig.InstanceListenerSF">
      </Description>
      <Description
         id="org.apache.catalina.core.StandardContext.[WrapperLifecycle]"
@@ -361,6 +385,8 @@
         default="false"
         tagClass="org.apache.catalina.tribes.ChannelReceiver"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
+        <TransientAttribute>bind</TransientAttribute>
+        <TransientAttribute>host</TransientAttribute>
      </Description>
      <Description
         tag="Membership"
@@ -411,6 +437,35 @@
         standard="false"
         default="false"
         tagClass="org.apache.catalina.core.StandardThreadExecutor"
+        storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
+     </Description>
+     <Description
+        tag="JarScanner"
+        standard="true"
+        default="false"
+        children="true"
+        tagClass="org.apache.tomcat.util.scan.StandardJarScanner"
+        storeFactoryClass="org.apache.catalina.storeconfig.JarScannerSF">
+     </Description>
+     <Description
+        tag="JarScanFilter"
+        standard="true"
+        default="false"
+        tagClass="org.apache.tomcat.util.scan.StandardJarScanFilter"
+        storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
+     </Description>
+     <Description
+        tag="CookieProcessor"
+        standard="false"
+        default="false"
+        tagClass="org.apache.tomcat.util.http.CookieProcessor"
+        storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
+     </Description>
+     <Description
+        tag="SessionIdGenerator"
+        standard="true"
+        default="false"
+        tagClass="org.apache.catalina.util.StandardSessionIdGenerator"
         storeFactoryClass="org.apache.catalina.storeconfig.StoreFactoryBase">
      </Description>
 </Registry>

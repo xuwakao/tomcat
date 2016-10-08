@@ -16,7 +16,6 @@
  */
 package org.apache.tomcat.jdbc.pool;
 
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.Serializable;
@@ -31,10 +30,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-/**
- * @author Filip Hanik
- *
- */
 public class PoolProperties implements PoolConfiguration, Cloneable, Serializable {
 
     private static final long serialVersionUID = -8519283440854213745L;
@@ -42,7 +37,7 @@ public class PoolProperties implements PoolConfiguration, Cloneable, Serializabl
 
     public static final int DEFAULT_MAX_ACTIVE = 100;
 
-    protected static AtomicInteger poolCounter = new AtomicInteger(0);
+    protected static final AtomicInteger poolCounter = new AtomicInteger(0);
     private volatile Properties dbProperties = new Properties();
     private volatile String url = null;
     private volatile String driverClassName = null;
@@ -73,7 +68,7 @@ public class PoolProperties implements PoolConfiguration, Cloneable, Serializabl
     private volatile String name = "Tomcat Connection Pool["+(poolCounter.addAndGet(1))+"-"+System.identityHashCode(PoolProperties.class)+"]";
     private volatile String password;
     private volatile String username;
-    private volatile long validationInterval = 30000;
+    private volatile long validationInterval = 3000;
     private volatile boolean jmxEnabled = true;
     private volatile String initSQL;
     private volatile boolean testOnConnect =false;
@@ -479,17 +474,17 @@ public class PoolProperties implements PoolConfiguration, Cloneable, Serializabl
                 //always add the trap interceptor to the mix
                 definitions[0] = new InterceptorDefinition(TrapException.class);
                 for (int i=0; i<interceptorValues.length; i++) {
-                    int propIndex = interceptorValues[i].indexOf("(");
-                    int endIndex = interceptorValues[i].indexOf(")");
+                    int propIndex = interceptorValues[i].indexOf('(');
+                    int endIndex = interceptorValues[i].indexOf(')');
                     if (propIndex<0 || endIndex<0 || endIndex <= propIndex) {
                         definitions[i+1] = new InterceptorDefinition(interceptorValues[i].trim());
                     } else {
                         String name = interceptorValues[i].substring(0,propIndex).trim();
                         definitions[i+1] = new InterceptorDefinition(name);
-                        String propsAsString = interceptorValues[i].substring(propIndex+1, interceptorValues[i].length()-1);
+                        String propsAsString = interceptorValues[i].substring(propIndex+1, endIndex);
                         String[] props = propsAsString.split(",");
                         for (int j=0; j<props.length; j++) {
-                            int pidx = props[j].indexOf("=");
+                            int pidx = props[j].indexOf('=');
                             String propName = props[j].substring(0,pidx).trim();
                             String propValue = props[j].substring(pidx+1).trim();
                             definitions[i+1].addProperty(new InterceptorProperty(propName,propValue));
@@ -772,7 +767,11 @@ public class PoolProperties implements PoolConfiguration, Cloneable, Serializabl
 
         try {
             @SuppressWarnings("unchecked")
-            Class<Validator> validatorClass = (Class<Validator>)Class.forName(className);
+            Class<Validator> validatorClass = (Class<Validator>)ClassLoaderUtil.loadClass(
+                className,
+                PoolProperties.class.getClassLoader(),
+                Thread.currentThread().getContextClassLoader()
+            );
             validator = validatorClass.newInstance();
         } catch (ClassNotFoundException e) {
             log.warn("The class "+className+" cannot be found.", e);
@@ -792,7 +791,7 @@ public class PoolProperties implements PoolConfiguration, Cloneable, Serializabl
 
     @Override
     public void setInitSQL(String initSQL) {
-        this.initSQL = initSQL;
+        this.initSQL = initSQL!=null && initSQL.trim().length()>0 ? initSQL : null;
     }
 
     /**
@@ -958,16 +957,24 @@ public class PoolProperties implements PoolConfiguration, Cloneable, Serializabl
         @SuppressWarnings("unchecked")
         public Class<? extends JdbcInterceptor> getInterceptorClass() throws ClassNotFoundException {
             if (clazz==null) {
-                if (getClassName().indexOf(".")<0) {
+                if (getClassName().indexOf('.')<0) {
                     if (log.isDebugEnabled()) {
                         log.debug("Loading interceptor class:"+PoolConfiguration.PKG_PREFIX+getClassName());
                     }
-                    clazz = Class.forName(PoolConfiguration.PKG_PREFIX+getClassName(), true, this.getClass().getClassLoader());
+                    clazz = ClassLoaderUtil.loadClass(
+                        PoolConfiguration.PKG_PREFIX+getClassName(),
+                        PoolProperties.class.getClassLoader(),
+                        Thread.currentThread().getContextClassLoader()
+                    );
                 } else {
                     if (log.isDebugEnabled()) {
                         log.debug("Loading interceptor class:"+getClassName());
                     }
-                    clazz = Class.forName(getClassName(), true, this.getClass().getClassLoader());
+                    clazz = ClassLoaderUtil.loadClass(
+                        getClassName(),
+                        PoolProperties.class.getClassLoader(),
+                        Thread.currentThread().getContextClassLoader()
+                    );
                 }
             }
             return (Class<? extends JdbcInterceptor>)clazz;
@@ -1137,6 +1144,9 @@ public class PoolProperties implements PoolConfiguration, Cloneable, Serializabl
      */
     @Override
     public void setDataSource(Object ds) {
+        if (ds instanceof DataSourceProxy) {
+            throw new IllegalArgumentException("Layered pools are not allowed.");
+        }
         this.dataSource = ds;
     }
 

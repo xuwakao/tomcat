@@ -40,8 +40,8 @@ public final class UDecoder {
 
     private static final Log log = LogFactory.getLog(UDecoder.class);
 
-    private static final boolean ALLOW_ENCODED_SLASH =
-        Boolean.valueOf(System.getProperty("org.apache.tomcat.util.buf.UDecoder.ALLOW_ENCODED_SLASH", "false")).booleanValue();
+    public static final boolean ALLOW_ENCODED_SLASH =
+        Boolean.parseBoolean(System.getProperty("org.apache.tomcat.util.buf.UDecoder.ALLOW_ENCODED_SLASH", "false"));
 
     private static class DecodeException extends CharConversionException {
         private static final long serialVersionUID = 1L;
@@ -71,7 +71,11 @@ public final class UDecoder {
     {
     }
 
-    /** URLDecode, will modify the source.
+    /**
+     * URLDecode, will modify the source.
+     * @param mb The URL encoded bytes
+     * @param query <code>true</code> if this is a query string
+     * @throws IOException Invalid %xx URL encoding
      */
     public void convert( ByteChunk mb, boolean query )
         throws IOException
@@ -129,7 +133,11 @@ public final class UDecoder {
     // -------------------- Additional methods --------------------
     // XXX What do we do about charset ????
 
-    /** In-buffer processing - the buffer will be modified
+    /**
+     * In-buffer processing - the buffer will be modified.
+     * @param mb The URL encoded chars
+     * @param query <code>true</code> if this is a query string
+     * @throws IOException Invalid %xx URL encoding
      */
     public void convert( CharChunk mb, boolean query )
         throws IOException
@@ -183,7 +191,11 @@ public final class UDecoder {
         mb.setEnd( idx );
     }
 
-    /** URLDecode, will modify the source
+    /**
+     * URLDecode, will modify the source
+     * @param mb The URL encoded String, bytes or chars
+     * @param query <code>true</code> if this is a query string
+     * @throws IOException Invalid %xx URL encoding
      */
     public void convert(MessageBytes mb, boolean query)
         throws IOException
@@ -212,8 +224,12 @@ public final class UDecoder {
         }
     }
 
-    // XXX Old code, needs to be replaced !!!!
-    //
+    /**
+     * %xx decoding of a string. FIXME: this is inefficient.
+     * @param str The URL encoded string
+     * @param query <code>true</code> if this is a query string
+     * @return the decoded string
+     */
     public final String convert(String str, boolean query)
     {
         if (str == null) {
@@ -284,7 +300,7 @@ public final class UDecoder {
      * servers. It is assumed the string is not a query string.
      *
      * @param str The url-encoded string
-     *
+     * @return the decoded string
      * @exception IllegalArgumentException if a '%' character is not followed
      * by a valid 2-digit hexadecimal number
      */
@@ -300,6 +316,7 @@ public final class UDecoder {
      * @param str The url-encoded string
      * @param enc The encoding to use; if null, the default encoding is used. If
      * an unsupported encoding is specified null will be returned
+     * @return the decoded string
      * @exception IllegalArgumentException if a '%' character is not followed
      * by a valid 2-digit hexadecimal number
      */
@@ -315,6 +332,7 @@ public final class UDecoder {
      * @param enc The encoding to use; if null, the default encoding is used. If
      * an unsupported encoding is specified null will be returned
      * @param isQuery Is this a query string being processed
+     * @return the decoded string
      * @exception IllegalArgumentException if a '%' character is not followed
      * by a valid 2-digit hexadecimal number
      */
@@ -329,6 +347,7 @@ public final class UDecoder {
         try {
             if (enc == null) {
                 bytes = str.getBytes(StandardCharsets.ISO_8859_1);
+                enc = "ISO-8859-1";
             } else {
                 bytes = str.getBytes(B2CConverter.getCharset(enc));
             }
@@ -350,6 +369,7 @@ public final class UDecoder {
      * @param enc The encoding to use; if null, the default encoding is used. If
      * an unsupported encoding is specified null will be returned
      * @param isQuery Is this a query string being processed
+     * @return the decoded string
      * @exception IllegalArgumentException if a '%' character is not followed
      * by a valid 2-digit hexadecimal number
      */
@@ -368,7 +388,7 @@ public final class UDecoder {
             } else if (b == '%') {
                 if (ix + 2 > len) {
                     throw new IllegalArgumentException(
-                            sm.getString("requestUtil.urlDecode.missingDigit"));
+                            sm.getString("uDecoder.urlDecode.missingDigit"));
                 }
                 b = (byte) ((convertHexDigit(bytes[ix++]) << 4)
                             + convertHexDigit(bytes[ix++]));

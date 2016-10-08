@@ -35,7 +35,7 @@ import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.collections.SynchronizedQueue;
 import org.apache.tomcat.util.collections.SynchronizedStack;
-import org.apache.tomcat.util.net.NioEndpoint.KeyAttachment;
+import org.apache.tomcat.util.net.NioEndpoint.NioSocketWrapper;
 
 public class NioBlockingSelector {
 
@@ -90,7 +90,7 @@ public class NioBlockingSelector {
         if (reference == null) {
             reference = new KeyReference();
         }
-        KeyAttachment att = (KeyAttachment) key.attachment();
+        NioSocketWrapper att = (NioSocketWrapper) key.attachment();
         int written = 0;
         boolean timedout = false;
         int keycount = 1; //assume we can write
@@ -162,7 +162,7 @@ public class NioBlockingSelector {
         if (reference == null) {
             reference = new KeyReference();
         }
-        KeyAttachment att = (KeyAttachment) key.attachment();
+        NioSocketWrapper att = (NioSocketWrapper) key.attachment();
         int read = 0;
         boolean timedout = false;
         int keycount = 1; //assume we can read
@@ -171,10 +171,9 @@ public class NioBlockingSelector {
             while(!timedout) {
                 if (keycount > 0) { //only read if we were registered for a read
                     read = socket.read(buf);
-                    if (read == -1)
-                        throw new EOFException();
-                    if (read > 0)
+                    if (read != 0) {
                         break;
+                    }
                 }
                 try {
                     if ( att.getReadLatch()==null || att.getReadLatch().getCount()==0) att.startReadLatch(1);
@@ -234,7 +233,7 @@ public class NioBlockingSelector {
             if (wakeupCounter.addAndGet(1)==0) selector.wakeup();
         }
 
-        public void cancel(SelectionKey sk, KeyAttachment key, int ops){
+        public void cancel(SelectionKey sk, NioSocketWrapper key, int ops){
             if (sk!=null) {
                 sk.cancel();
                 sk.attach(null);
@@ -243,10 +242,9 @@ public class NioBlockingSelector {
             }
         }
 
-        public void add(final KeyAttachment key, final int ops, final KeyReference ref) {
+        public void add(final NioSocketWrapper key, final int ops, final KeyReference ref) {
             if ( key == null ) return;
-            NioChannel nch = key.getChannel();
-            if ( nch == null ) return;
+            NioChannel nch = key.getSocket();
             final SocketChannel ch = nch.getIOChannel();
             if ( ch == null ) return;
 
@@ -274,10 +272,9 @@ public class NioBlockingSelector {
             wakeup();
         }
 
-        public void remove(final KeyAttachment key, final int ops) {
+        public void remove(final NioSocketWrapper key, final int ops) {
             if ( key == null ) return;
-            NioChannel nch = key.getChannel();
-            if ( nch == null ) return;
+            NioChannel nch = key.getSocket();
             final SocketChannel ch = nch.getIOChannel();
             if ( ch == null ) return;
 
@@ -364,9 +361,8 @@ public class NioBlockingSelector {
                     // any active event.
                     while (run && iterator != null && iterator.hasNext()) {
                         SelectionKey sk = iterator.next();
-                        KeyAttachment attachment = (KeyAttachment)sk.attachment();
+                        NioSocketWrapper attachment = (NioSocketWrapper)sk.attachment();
                         try {
-                            attachment.access();
                             iterator.remove();
                             sk.interestOps(sk.interestOps() & (~sk.readyOps()));
                             if ( sk.isReadable() ) {

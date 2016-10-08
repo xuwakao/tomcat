@@ -43,6 +43,7 @@ import org.apache.catalina.Loader;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Pipeline;
 import org.apache.catalina.Realm;
+import org.apache.catalina.ThreadBindingListener;
 import org.apache.catalina.Valve;
 import org.apache.catalina.WebResourceRoot;
 import org.apache.catalina.Wrapper;
@@ -54,13 +55,13 @@ import org.apache.catalina.util.LifecycleMBeanBase;
 import org.apache.juli.logging.Log;
 import org.apache.tomcat.InstanceManager;
 import org.apache.tomcat.JarScanner;
-import org.apache.tomcat.util.descriptor.web.ApplicationListener;
 import org.apache.tomcat.util.descriptor.web.ApplicationParameter;
 import org.apache.tomcat.util.descriptor.web.ErrorPage;
 import org.apache.tomcat.util.descriptor.web.FilterDef;
 import org.apache.tomcat.util.descriptor.web.FilterMap;
 import org.apache.tomcat.util.descriptor.web.LoginConfig;
 import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
+import org.apache.tomcat.util.http.CookieProcessor;
 import org.apache.tomcat.util.res.StringManager;
 
 /**
@@ -144,7 +145,7 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
         while (!(c instanceof Engine)) {
             if (c instanceof Context) {
                 keyProperties.append(",context=");
-                ContextName cn = new ContextName(c.getName());
+                ContextName cn = new ContextName(c.getName(), false);
                 keyProperties.append(cn.getDisplayName());
             } else if (c instanceof Host) {
                 keyProperties.append(",host=");
@@ -456,6 +457,16 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
     public void setXmlValidation(boolean xmlValidation) { /* NO-OP */ }
 
     @Override
+    public boolean getXmlBlockExternal() { return true; }
+    @Override
+    public void setXmlBlockExternal(boolean xmlBlockExternal) { /* NO-OP */ }
+
+    @Override
+    public boolean getTldValidation() { return false; }
+    @Override
+    public void setTldValidation(boolean tldValidation){ /* NO-OP */ }
+
+    @Override
     public JarScanner getJarScanner() { return null; }
     @Override
     public void setJarScanner(JarScanner jarScanner) { /* NO-OP */ }
@@ -469,9 +480,9 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
     public boolean getLogEffectiveWebXml() { return false; }
 
     @Override
-    public void addApplicationListener(ApplicationListener listener) { /* NO-OP */ }
+    public void addApplicationListener(String listener) { /* NO-OP */ }
     @Override
-    public ApplicationListener[] findApplicationListeners() { return null; }
+    public String[] findApplicationListeners() { return null; }
     @Override
     public void removeApplicationListener(String listener) { /* NO-OP */ }
 
@@ -519,13 +530,6 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
     public void removeFilterMap(FilterMap filterMap) { /* NO-OP */ }
 
     @Override
-    public void addInstanceListener(String listener) { /* NO-OP */ }
-    @Override
-    public String[] findInstanceListeners() { return null; }
-    @Override
-    public void removeInstanceListener(String listener) { /* NO-OP */ }
-
-    @Override
     public void addLocaleEncodingMappingParameter(String locale, String encoding) { /* NO-OP */ }
 
     @Override
@@ -563,9 +567,7 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
     public void removeSecurityRole(String role) { /* NO-OP */ }
 
     @Override
-    public void addServletMapping(String pattern, String name) { /* NO-OP */ }
-    @Override
-    public void addServletMapping(String pattern, String name,
+    public void addServletMappingDecoded(String pattern, String name,
             boolean jspWildcard) { /* NO-OP */ }
     @Override
     public String findServletMapping(String pattern) { return null; }
@@ -679,6 +681,9 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
     public File getCatalinaBase() { return null; }
 
     @Override
+    public File getCatalinaHome() { return null; }
+
+    @Override
     public void setAddWebinfClassesResources(boolean addWebinfClassesResources) {
         // NO-OP
     }
@@ -714,4 +719,71 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
 
     @Override
     public void setInstanceManager(InstanceManager instanceManager) { /* NO-OP */ }
+
+    @Override
+    public void setContainerSciFilter(String containerSciFilter) { /* NO-OP */ }
+
+    @Override
+    public String getContainerSciFilter() { return null; }
+
+    @Override
+    public ThreadBindingListener getThreadBindingListener() { return null; }
+
+    @Override
+    public void setThreadBindingListener(ThreadBindingListener threadBindingListener) {
+        // NO-OP
+    }
+
+    @Override
+    public ClassLoader bind(boolean usePrivilegedAction, ClassLoader originalClassLoader) {
+        return null;
+    }
+
+    @Override
+    public void unbind(boolean usePrivilegedAction, ClassLoader originalClassLoader) {
+        // NO-OP
+    }
+
+    @Override
+    public Object getNamingToken() { return null; }
+
+    @Override
+    public void setCookieProcessor(CookieProcessor cookieProcessor) { /* NO-OP */ }
+
+    @Override
+    public CookieProcessor getCookieProcessor() { return null; }
+
+    @Override
+    public void setValidateClientProvidedNewSessionId(boolean validateClientProvidedNewSessionId) {
+        // NO-OP
+    }
+
+    @Override
+    public boolean getValidateClientProvidedNewSessionId() { return false; }
+
+    @Override
+    public void setMapperContextRootRedirectEnabled(boolean mapperContextRootRedirectEnabled) {
+        // NO-OP
+    }
+
+    @Override
+    public boolean getMapperContextRootRedirectEnabled() { return false; }
+
+    @Override
+    public void setMapperDirectoryRedirectEnabled(boolean mapperDirectoryRedirectEnabled) {
+        // NO-OP
+    }
+
+    @Override
+    public boolean getMapperDirectoryRedirectEnabled() { return false; }
+
+    @Override
+    public void setUseRelativeRedirects(boolean useRelativeRedirects) { /* NO-OP */ }
+    @Override
+    public boolean getUseRelativeRedirects() { return true; }
+
+    @Override
+    public void setDispatchersUseEncodedPaths(boolean dispatchersUseEncodedPaths) { /* NO-OP */ }
+    @Override
+    public boolean getDispatchersUseEncodedPaths() { return true; }
 }

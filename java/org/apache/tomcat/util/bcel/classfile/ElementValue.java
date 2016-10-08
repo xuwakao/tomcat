@@ -13,114 +13,87 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
  */
 package org.apache.tomcat.util.bcel.classfile;
 
-import java.io.DataInputStream;
+import java.io.DataInput;
 import java.io.IOException;
 
-/**
- * @version $Id: ElementValue
- * @author <A HREF="mailto:dbrosius@qis.net">D. Brosius</A>
- * @since 5.3
- */
 public abstract class ElementValue
 {
-    protected int type;
+    private final int type;
 
-    protected ConstantPool cpool;
+    private final ConstantPool cpool;
 
 
-    protected ElementValue(int type, ConstantPool cpool)
-    {
+    ElementValue(final int type, final ConstantPool cpool) {
         this.type = type;
         this.cpool = cpool;
     }
 
-
     public abstract String stringifyValue();
 
-    public static final int STRING = 's';
+    public static final byte STRING            = 's';
+    public static final byte ENUM_CONSTANT     = 'e';
+    public static final byte CLASS             = 'c';
+    public static final byte ANNOTATION        = '@';
+    public static final byte ARRAY             = '[';
+    public static final byte PRIMITIVE_INT     = 'I';
+    public static final byte PRIMITIVE_BYTE    = 'B';
+    public static final byte PRIMITIVE_CHAR    = 'C';
+    public static final byte PRIMITIVE_DOUBLE  = 'D';
+    public static final byte PRIMITIVE_FLOAT   = 'F';
+    public static final byte PRIMITIVE_LONG    = 'J';
+    public static final byte PRIMITIVE_SHORT   = 'S';
+    public static final byte PRIMITIVE_BOOLEAN = 'Z';
 
-    public static final int ENUM_CONSTANT = 'e';
-
-    public static final int CLASS = 'c';
-
-    public static final int ANNOTATION = '@';
-
-    public static final int ARRAY = '[';
-
-    public static final int PRIMITIVE_INT = 'I';
-
-    public static final int PRIMITIVE_BYTE = 'B';
-
-    public static final int PRIMITIVE_CHAR = 'C';
-
-    public static final int PRIMITIVE_DOUBLE = 'D';
-
-    public static final int PRIMITIVE_FLOAT = 'F';
-
-    public static final int PRIMITIVE_LONG = 'J';
-
-    public static final int PRIMITIVE_SHORT = 'S';
-
-    public static final int PRIMITIVE_BOOLEAN = 'Z';
-
-    public static ElementValue readElementValue(DataInputStream dis,
-            ConstantPool cpool) throws IOException
+    public static ElementValue readElementValue(final DataInput input, final ConstantPool cpool) throws IOException
     {
-        byte type = dis.readByte();
+        final byte type = input.readByte();
         switch (type)
         {
-        case 'B': // byte
-            return new SimpleElementValue(PRIMITIVE_BYTE, dis
-                    .readUnsignedShort(), cpool);
-        case 'C': // char
-            return new SimpleElementValue(PRIMITIVE_CHAR, dis
-                    .readUnsignedShort(), cpool);
-        case 'D': // double
-            return new SimpleElementValue(PRIMITIVE_DOUBLE, dis
-                    .readUnsignedShort(), cpool);
-        case 'F': // float
-            return new SimpleElementValue(PRIMITIVE_FLOAT, dis
-                    .readUnsignedShort(), cpool);
-        case 'I': // int
-            return new SimpleElementValue(PRIMITIVE_INT, dis
-                    .readUnsignedShort(), cpool);
-        case 'J': // long
-            return new SimpleElementValue(PRIMITIVE_LONG, dis
-                    .readUnsignedShort(), cpool);
-        case 'S': // short
-            return new SimpleElementValue(PRIMITIVE_SHORT, dis
-                    .readUnsignedShort(), cpool);
-        case 'Z': // boolean
-            return new SimpleElementValue(PRIMITIVE_BOOLEAN, dis
-                    .readUnsignedShort(), cpool);
-        case 's': // String
-            return new SimpleElementValue(STRING, dis.readUnsignedShort(),
-                    cpool);
-        case 'e': // Enum constant
-            dis.readUnsignedShort();    // Unused type_index
-            return new EnumElementValue(ENUM_CONSTANT,
-                    dis.readUnsignedShort(), cpool);
-        case 'c': // Class
-            return new ClassElementValue(CLASS, dis.readUnsignedShort(), cpool);
-        case '@': // Annotation
-            // TODO isRuntimeVisible
-            return new AnnotationElementValue(ANNOTATION, AnnotationEntry.read(
-                    dis, cpool), cpool);
-        case '[': // Array
-            int numArrayVals = dis.readUnsignedShort();
-            ElementValue[] evalues = new ElementValue[numArrayVals];
-            for (int j = 0; j < numArrayVals; j++)
-            {
-                evalues[j] = ElementValue.readElementValue(dis, cpool);
-            }
-            return new ArrayElementValue(ARRAY, evalues, cpool);
-        default:
-            throw new RuntimeException(
-                    "Unexpected element value kind in annotation: " + type);
+            case PRIMITIVE_BYTE:
+            case PRIMITIVE_CHAR:
+            case PRIMITIVE_DOUBLE:
+            case PRIMITIVE_FLOAT:
+            case PRIMITIVE_INT:
+            case PRIMITIVE_LONG:
+            case PRIMITIVE_SHORT:
+            case PRIMITIVE_BOOLEAN:
+            case STRING:
+                return new SimpleElementValue(type, input.readUnsignedShort(), cpool);
+
+            case ENUM_CONSTANT:
+                input.readUnsignedShort();    // Unused type_index
+                return new EnumElementValue(ENUM_CONSTANT, input.readUnsignedShort(), cpool);
+
+            case CLASS:
+                return new ClassElementValue(CLASS, input.readUnsignedShort(), cpool);
+
+            case ANNOTATION:
+                // TODO isRuntimeVisible
+                return new AnnotationElementValue(ANNOTATION, new AnnotationEntry(input, cpool), cpool);
+
+            case ARRAY:
+                final int numArrayVals = input.readUnsignedShort();
+                final ElementValue[] evalues = new ElementValue[numArrayVals];
+                for (int j = 0; j < numArrayVals; j++)
+                {
+                    evalues[j] = ElementValue.readElementValue(input, cpool);
+                }
+                return new ArrayElementValue(ARRAY, evalues, cpool);
+
+            default:
+                throw new ClassFormatException(
+                        "Unexpected element value kind in annotation: " + type);
         }
+    }
+
+    final ConstantPool getConstantPool() {
+        return cpool;
+    }
+
+    final int getType() {
+        return type;
     }
 }

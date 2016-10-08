@@ -24,12 +24,15 @@ import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.security.AccessControlException;
 import java.util.Random;
 
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanException;
 import javax.management.ObjectName;
 
 import org.apache.catalina.Context;
@@ -55,7 +58,6 @@ import org.apache.tomcat.util.res.StringManager;
  * (but not required) when deploying and starting Catalina.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
 public final class StandardServer extends LifecycleMBeanBase implements Server {
 
@@ -147,7 +149,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
     /**
      * The property change support for this component.
      */
-    protected final PropertyChangeSupport support = new PropertyChangeSupport(this);
+    final PropertyChangeSupport support = new PropertyChangeSupport(this);
 
     private volatile boolean stopAwait = false;
 
@@ -169,8 +171,16 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
 
     private File catalinaBase = null;
 
+    private final Object namingToken = new Object();
+
 
     // ------------------------------------------------------------- Properties
+
+    @Override
+    public Object getNamingToken() {
+        return namingToken;
+    }
+
 
     /**
      * Return the global naming resources context.
@@ -232,9 +242,27 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      * @return Tomcat release identifier
      */
     public String getServerInfo() {
-
         return ServerInfo.getServerInfo();
     }
+
+
+    /**
+     * Return the current server built timestamp
+     * @return server built timestamp.
+     */
+    public String getServerBuilt() {
+        return ServerInfo.getServerBuilt();
+    }
+
+
+    /**
+     * Return the current server's version number.
+     * @return server's version number.
+     */
+    public String getServerNumber() {
+        return ServerInfo.getServerNumber();
+    }
+
 
     /**
      * Return the port number we listen to for shutdown commands.
@@ -433,10 +461,17 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
                 StringBuilder command = new StringBuilder();
                 try {
                     InputStream stream;
+                    long acceptStartTime = System.currentTimeMillis();
                     try {
                         socket = serverSocket.accept();
                         socket.setSoTimeout(10 * 1000);  // Ten seconds
                         stream = socket.getInputStream();
+                    } catch (SocketTimeoutException ste) {
+                        // This should never happen but bug 56684 suggests that
+                        // it does.
+                        log.warn(sm.getString("standardServer.accept.timeout",
+                                Long.valueOf(System.currentTimeMillis() - acceptStartTime)), ste);
+                        continue;
                     } catch (AccessControlException ace) {
                         log.warn("StandardServer.accept security exception: "
                                 + ace.getMessage(), ace);
@@ -508,7 +543,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
 
 
     /**
-     * Return the specified Service (if it exists); otherwise return
+     * @return the specified Service (if it exists); otherwise return
      * <code>null</code>.
      *
      * @param name Name of the Service to be returned
@@ -532,7 +567,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
 
 
     /**
-     * Return the set of Services defined within this Server.
+     * @return the set of Services defined within this Server.
      */
     @Override
     public Service[] findServices() {
@@ -542,7 +577,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
     }
 
     /**
-     * Return the JMX service names.
+     * @return the JMX service names.
      */
     public ObjectName[] getServiceNames() {
         ObjectName onames[]=new ObjectName[ services.length ];
@@ -665,17 +700,27 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      * Write the configuration information for this entire <code>Server</code>
      * out to the server.xml configuration file.
      *
-     * @exception   javax.management.InstanceNotFoundException
-     *              if the managed resource object cannot be found
-     * @exception   javax.management.MBeanException
-     *              if the initializer of the object throws an exception, or
-     *              persistence is not supported
-     * @exception   javax.management.RuntimeOperationsException
-     *              if an exception is reported by the persistence mechanism
+     * @exception InstanceNotFoundException
+     *            if the managed resource object cannot be found
+     * @exception MBeanException
+     *            if the initializer of the object throws an exception, or
+     *            persistence is not supported
+     * @exception javax.management.RuntimeOperationsException
+     *            if an exception is reported by the persistence mechanism
      */
-    public synchronized void storeConfig() throws Exception {
-        ObjectName sname = new ObjectName("Catalina:type=StoreConfig");
-        mserver.invoke(sname, "storeConfig", null, null);
+    public synchronized void storeConfig() throws InstanceNotFoundException, MBeanException {
+        try {
+            // Note: Hard-coded domain used since this object is per Server/JVM
+            ObjectName sname = new ObjectName("Catalina:type=StoreConfig");
+            if (mserver.isRegistered(sname)) {
+                mserver.invoke(sname, "storeConfig", null, null);
+            } else {
+                log.error(sm.getString("standardServer.storeConfig.notAvailable", sname));
+            }
+        } catch (Throwable t) {
+            ExceptionUtils.handleThrowable(t);
+            log.error(t);
+        }
     }
 
 
@@ -683,34 +728,35 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      * Write the configuration information for <code>Context</code>
      * out to the specified configuration file.
      *
-     * @exception javax.management.InstanceNotFoundException if the managed resource object
-     *  cannot be found
-     * @exception javax.management.MBeanException if the initializer of the object throws
-     *  an exception, or persistence is not supported
-     * @exception javax.management.RuntimeOperationsException if an exception is reported
-     *  by the persistence mechanism
+     * @param context the context which should save its configuration
+     * @exception InstanceNotFoundException
+     *            if the managed resource object cannot be found
+     * @exception MBeanException
+     *            if the initializer of the object throws an exception
+     *            or persistence is not supported
+     * @exception javax.management.RuntimeOperationsException
+     *            if an exception is reported by the persistence mechanism
      */
-    public synchronized void storeContext(Context context) throws Exception {
-
-        ObjectName sname = null;
+    public synchronized void storeContext(Context context) throws InstanceNotFoundException, MBeanException {
         try {
-           sname = new ObjectName("Catalina:type=StoreConfig");
-           if(mserver.isRegistered(sname)) {
-               mserver.invoke(sname, "store",
-                   new Object[] {context},
-                   new String [] { "java.lang.String"});
-           } else
-               log.error("StoreConfig mbean not registered" + sname);
+            // Note: Hard-coded domain used since this object is per Server/JVM
+            ObjectName sname = new ObjectName("Catalina:type=StoreConfig");
+            if (mserver.isRegistered(sname)) {
+                mserver.invoke(sname, "store",
+                    new Object[] {context},
+                    new String [] { "java.lang.String"});
+            } else {
+                log.error(sm.getString("standardServer.storeConfig.notAvailable", sname));
+            }
         } catch (Throwable t) {
             ExceptionUtils.handleThrowable(t);
             log.error(t);
         }
-
     }
 
 
     /**
-     * Return true if naming should be used.
+     * @return <code>true</code> if naming should be used.
      */
     private boolean isUseNaming() {
         boolean useNaming = true;

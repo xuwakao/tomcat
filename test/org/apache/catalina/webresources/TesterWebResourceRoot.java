@@ -22,7 +22,7 @@ import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleListener;
 import org.apache.catalina.LifecycleState;
-import org.apache.catalina.core.TesterContext;
+import org.apache.tomcat.unittest.TesterContext;
 
 /**
  * Minimal implementation for use in unit tests that supports main and pre
@@ -91,14 +91,14 @@ public class TesterWebResourceRoot extends StandardRoot {
     }
 
     @Override
-    public void createWebResourceSet(ResourceSetType type, URL url,
-            String webAppPath, String internalPath) {
+    public void createWebResourceSet(ResourceSetType type, String webAppPath,
+            URL url, String internalPath) {
         // NO-OP
     }
 
     @Override
-    public void createWebResourceSet(ResourceSetType type, String base,
-            String webAppMount, String internalPath) {
+    public void createWebResourceSet(ResourceSetType type, String webAppPath,
+            String base, String archivePath, String internalPath) {
         // NO-OP
     }
 
@@ -143,12 +143,12 @@ public class TesterWebResourceRoot extends StandardRoot {
     }
 
     @Override
-    public void setCacheMaxObjectSize(long cacheMaxObjectSize) {
+    public void setCacheObjectMaxSize(int cacheObjectMaxSize) {
         // NO-OP
     }
 
     @Override
-    public long getCacheMaxObjectSize() {
+    public int getCacheObjectMaxSize() {
         return 0;
     }
 

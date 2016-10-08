@@ -20,9 +20,7 @@ package org.apache.tomcat.jni;
 /** Status
  *
  * @author Mladen Turk
- * @version $Id$
  */
-
 public class Status {
 
     /**
@@ -183,9 +181,9 @@ public class Status {
     public static final int ETIMEDOUT         = (APR_OS_START_USERERR + 5);
 
     private static native boolean is(int err, int idx);
-    /**
+    /*
      * APR_STATUS_IS Status Value Tests
-     * <br /><b>Warning :</b> For any particular error condition, more than one of these tests
+     * <br><b>Warning :</b> For any particular error condition, more than one of these tests
      *      may match. This is because platform-specific error codes may not
      *      always match the semantics of the POSIX codes these tests (and the
      *      corresponding APR error codes) are named after. A notable example

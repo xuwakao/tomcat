@@ -14,16 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 package org.apache.catalina.util;
 
-
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.tomcat.util.res.StringManager;
-
 
 /**
  * Extended implementation of <strong>HashMap</strong> that includes a
@@ -32,11 +28,12 @@ import org.apache.tomcat.util.res.StringManager;
  * to clone them in order to avoid modifications.  When first created, a
  * <code>ParmaeterMap</code> instance is not locked.
  *
+ * @param <K> The type of Key
+ * @param <V> The type of Value
+ *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
-public final class ParameterMap<K,V> extends HashMap<K,V> {
+public final class ParameterMap<K,V> extends LinkedHashMap<K,V> {
 
     private static final long serialVersionUID = 1L;
 
@@ -102,7 +99,7 @@ public final class ParameterMap<K,V> extends HashMap<K,V> {
 
 
     /**
-     * Return the locked state of this parameter map.
+     * @return the locked state of this parameter map.
      */
     public boolean isLocked() {
 

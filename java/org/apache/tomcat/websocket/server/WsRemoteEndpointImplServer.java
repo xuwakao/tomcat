@@ -20,29 +20,30 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
 
-import javax.servlet.ServletOutputStream;
 import javax.websocket.SendHandler;
 import javax.websocket.SendResult;
 
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.net.AbstractEndpoint;
+import org.apache.tomcat.util.net.SocketWrapperBase;
 import org.apache.tomcat.util.res.StringManager;
+import org.apache.tomcat.websocket.Transformation;
 import org.apache.tomcat.websocket.WsRemoteEndpointImplBase;
 
 /**
  * This is the server side {@link javax.websocket.RemoteEndpoint} implementation
- * - i.e. what the server uses to send data to the client. Communication is over
- * a {@link ServletOutputStream}.
+ * - i.e. what the server uses to send data to the client.
  */
 public class WsRemoteEndpointImplServer extends WsRemoteEndpointImplBase {
 
     private static final StringManager sm =
-            StringManager.getManager(Constants.PACKAGE_NAME);
-    private static final Log log =
-            LogFactory.getLog(WsHttpUpgradeHandler.class);
+            StringManager.getManager(WsRemoteEndpointImplServer.class);
+    private static final Log log = LogFactory.getLog(WsRemoteEndpointImplServer.class);
 
-    private final ServletOutputStream sos;
+    private final SocketWrapperBase<?> socketWrapper;
     private final WsWriteTimeout wsWriteTimeout;
     private volatile SendHandler handler = null;
     private volatile ByteBuffer[] buffers = null;
@@ -50,10 +51,9 @@ public class WsRemoteEndpointImplServer extends WsRemoteEndpointImplBase {
     private volatile long timeoutExpiry = -1;
     private volatile boolean close;
 
-
-    public WsRemoteEndpointImplServer(ServletOutputStream sos,
+    public WsRemoteEndpointImplServer(SocketWrapperBase<?> socketWrapper,
             WsServerContainer serverContainer) {
-        this.sos = sos;
+        this.socketWrapper = socketWrapper;
         this.wsWriteTimeout = serverContainer.getTimeout();
     }
 
@@ -65,51 +65,85 @@ public class WsRemoteEndpointImplServer extends WsRemoteEndpointImplBase {
 
 
     @Override
-    protected void doWrite(SendHandler handler, ByteBuffer... buffers) {
-        this.handler = handler;
-        this.buffers = buffers;
-        onWritePossible();
+    protected void doWrite(SendHandler handler, long blockingWriteTimeoutExpiry,
+            ByteBuffer... buffers) {
+        if (blockingWriteTimeoutExpiry == -1) {
+            this.handler = handler;
+            this.buffers = buffers;
+            // This is definitely the same thread that triggered the write so a
+            // dispatch will be required.
+            onWritePossible(true);
+        } else {
+            // Blocking
+            for (ByteBuffer buffer : buffers) {
+                long timeout = blockingWriteTimeoutExpiry - System.currentTimeMillis();
+                if (timeout < 0) {
+                    SendResult sr = new SendResult(new SocketTimeoutException());
+                    handler.onResult(sr);
+                    return;
+                }
+                socketWrapper.setWriteTimeout(timeout);
+                try {
+                    socketWrapper.write(true, buffer);
+                    timeout = blockingWriteTimeoutExpiry - System.currentTimeMillis();
+                    if (timeout < 0) {
+                        SendResult sr = new SendResult(new SocketTimeoutException());
+                        handler.onResult(sr);
+                        return;
+                    }
+                    socketWrapper.setWriteTimeout(timeout);
+                    socketWrapper.flush(true);
+                    handler.onResult(SENDRESULT_OK);
+                } catch (IOException e) {
+                    SendResult sr = new SendResult(e);
+                    handler.onResult(sr);
+                }
+            }
+        }
     }
 
 
-    public void onWritePossible() {
-        boolean complete = true;
+    public void onWritePossible(boolean useDispatch) {
+        ByteBuffer[] buffers = this.buffers;
+        if (buffers == null) {
+            // Servlet 3.1 will call the write listener once even if nothing
+            // was written
+            return;
+        }
+        boolean complete = false;
         try {
+            socketWrapper.flush(false);
             // If this is false there will be a call back when it is true
-            while (sos.isReady()) {
+            while (socketWrapper.isReadyForWrite()) {
                 complete = true;
                 for (ByteBuffer buffer : buffers) {
                     if (buffer.hasRemaining()) {
                         complete = false;
-                        sos.write(buffer.array(), buffer.arrayOffset(),
-                                buffer.limit());
-                        buffer.position(buffer.limit());
+                        socketWrapper.write(false, buffer);
                         break;
                     }
                 }
                 if (complete) {
-                    wsWriteTimeout.unregister(this);
-                    if (close) {
-                        close();
+                    socketWrapper.flush(false);
+                    complete = socketWrapper.isReadyForWrite();
+                    if (complete) {
+                        wsWriteTimeout.unregister(this);
+                        clearHandler(null, useDispatch);
+                        if (close) {
+                            close();
+                        }
                     }
-                    // Setting the result marks this (partial) message as
-                    // complete which means the next one may be sent which
-                    // could update the value of the handler. Therefore, keep a
-                    // local copy before signalling the end of the (partial)
-                    // message.
-                    clearHandler(null);
                     break;
                 }
             }
-
-        } catch (IOException ioe) {
+        } catch (IOException | IllegalStateException e) {
             wsWriteTimeout.unregister(this);
+            clearHandler(e, useDispatch);
             close();
-            clearHandler(ioe);
         }
+
         if (!complete) {
             // Async write is in progress
-
             long timeout = getSendTimeout();
             if (timeout > 0) {
                 // Register with timeout thread
@@ -123,10 +157,14 @@ public class WsRemoteEndpointImplServer extends WsRemoteEndpointImplBase {
     @Override
     protected void doClose() {
         if (handler != null) {
-            clearHandler(new EOFException());
+            // close() can be triggered by a wide range of scenarios. It is far
+            // simpler just to always use a dispatch than it is to try and track
+            // whether or not this method was called by the same thread that
+            // triggered the write
+            clearHandler(new EOFException(), true);
         }
         try {
-            sos.close();
+            socketWrapper.close();
         } catch (IOException e) {
             if (log.isInfoEnabled()) {
                 log.info(sm.getString("wsRemoteEndpointServer.closeFailed"), e);
@@ -141,18 +179,86 @@ public class WsRemoteEndpointImplServer extends WsRemoteEndpointImplBase {
     }
 
 
-    protected void onTimeout() {
+    /*
+     * Currently this is only called from the background thread so we could just
+     * call clearHandler() with useDispatch == false but the method parameter
+     * was added in case other callers started to use this method to make sure
+     * that those callers think through what the correct value of useDispatch is
+     * for them.
+     */
+    protected void onTimeout(boolean useDispatch) {
         if (handler != null) {
-            clearHandler(new SocketTimeoutException());
+            clearHandler(new SocketTimeoutException(), useDispatch);
         }
         close();
     }
 
 
-    private void clearHandler(Throwable t) {
+    @Override
+    protected void setTransformation(Transformation transformation) {
+        // Overridden purely so it is visible to other classes in this package
+        super.setTransformation(transformation);
+    }
+
+
+    /**
+     *
+     * @param t             The throwable associated with any error that
+     *                      occurred
+     * @param useDispatch   Should {@link SendHandler#onResult(SendResult)} be
+     *                      called from a new thread, keeping in mind the
+     *                      requirements of
+     *                      {@link javax.websocket.RemoteEndpoint.Async}
+     */
+    private void clearHandler(Throwable t, boolean useDispatch) {
+        // Setting the result marks this (partial) message as
+        // complete which means the next one may be sent which
+        // could update the value of the handler. Therefore, keep a
+        // local copy before signalling the end of the (partial)
+        // message.
         SendHandler sh = handler;
         handler = null;
+        buffers = null;
         if (sh != null) {
+            if (useDispatch) {
+                OnResultRunnable r = new OnResultRunnable(sh, t);
+                AbstractEndpoint<?> endpoint = socketWrapper.getEndpoint();
+                Executor containerExecutor = endpoint.getExecutor();
+                if (endpoint.isRunning() && containerExecutor != null) {
+                    containerExecutor.execute(r);
+                } else {
+                    // Can't use the executor so call the runnable directly.
+                    // This may not be strictly specification compliant in all
+                    // cases but during shutdown only close messages are going
+                    // to be sent so there should not be the issue of nested
+                    // calls leading to stack overflow as described in bug
+                    // 55715. The issues with nested calls was the reason for
+                    // the separate thread requirement in the specification.
+                    r.run();
+                }
+            } else {
+                if (t == null) {
+                    sh.onResult(new SendResult());
+                } else {
+                    sh.onResult(new SendResult(t));
+                }
+            }
+        }
+    }
+
+
+    private static class OnResultRunnable implements Runnable {
+
+        private final SendHandler sh;
+        private final Throwable t;
+
+        private OnResultRunnable(SendHandler sh, Throwable t) {
+            this.sh = sh;
+            this.t = t;
+        }
+
+        @Override
+        public void run() {
             if (t == null) {
                 sh.onResult(new SendResult());
             } else {

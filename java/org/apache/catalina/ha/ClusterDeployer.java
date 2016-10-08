@@ -17,19 +17,16 @@
 
 package org.apache.catalina.ha;
 
-/**
- * A <b>ClusterDeployer</b> interface allows to plug in and out the
- * different deployment implementations
- *
- * @author Filip Hanik
- * @version $Id$
- */
 import java.io.File;
 import java.io.IOException;
 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.tribes.ChannelListener;
 
+/**
+ * A <b>ClusterDeployer</b> interface allows to plug in and out the
+ * different deployment implementations
+ */
 public interface ClusterDeployer extends ChannelListener {
 
     /**
@@ -40,7 +37,7 @@ public interface ClusterDeployer extends ChannelListener {
 
     /**
      * Stops the cluster deployer, the owning container will invoke this
-     * @throws LifecycleException
+     * @throws LifecycleException Error stopping cluster deployer
      */
     public void stop() throws LifecycleException;
 

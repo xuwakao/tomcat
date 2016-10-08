@@ -47,10 +47,8 @@ import org.apache.tools.ant.types.RedirectorElement;
  *
  *
  * @author Gabriele Garuglieri
- * @version $Id$
  * @since 5.5
  */
-
 public abstract class BaseRedirectorHelperTask extends Task {
 
     // ------------------------------------------------------------- Properties
@@ -77,6 +75,7 @@ public abstract class BaseRedirectorHelperTask extends Task {
      * This flag does not control parameters checking. If the task is called
      * with wrong or invalid parameters, it will throw BuildException
      * independently from the setting of this flag.
+     * </b>
      */
     protected boolean failOnError = true;
 
@@ -103,14 +102,18 @@ public abstract class BaseRedirectorHelperTask extends Task {
      * Whether to fail (with a BuildException) if
      * ManagerServlet returns an error.  The default behavior is
      * to do so.
+     *
+     * @param fail The new value of failonerror
      */
     public void setFailonerror(boolean fail) {
         failOnError = fail;
     }
 
     /**
-     * Returns the value of the failOnError
-     * property.
+     * Returns the value of the failOnError property.
+     *
+     * @return <code>true</code> if the task should will if an error occurs,
+     *         otherwise <code>false</code>
      */
     public boolean isFailOnError() {
       return failOnError;
@@ -350,6 +353,7 @@ public abstract class BaseRedirectorHelperTask extends Task {
      * priorities to output stream.
      *
      * @param output The output to log. Should not be <code>null</code>.
+     * @param priority The priority level that should be used
      */
     protected void handleOutput(String output, int priority) {
         if (priority == Project.MSG_ERR) {

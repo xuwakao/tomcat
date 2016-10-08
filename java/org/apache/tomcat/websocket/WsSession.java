@@ -19,6 +19,7 @@ package org.apache.tomcat.websocket;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritePendingException;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Collections;
@@ -30,19 +31,26 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.websocket.CloseReason;
+import javax.websocket.CloseReason.CloseCode;
 import javax.websocket.CloseReason.CloseCodes;
 import javax.websocket.DeploymentException;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.Extension;
 import javax.websocket.MessageHandler;
+import javax.websocket.MessageHandler.Partial;
+import javax.websocket.MessageHandler.Whole;
 import javax.websocket.PongMessage;
 import javax.websocket.RemoteEndpoint;
+import javax.websocket.SendResult;
 import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.InstanceManager;
+import org.apache.tomcat.InstanceManagerBindings;
+import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.res.StringManager;
 
 public class WsSession implements Session {
@@ -54,8 +62,7 @@ public class WsSession implements Session {
     // An ellipsis is three bytes in UTF-8
     private static final int ELLIPSIS_BYTES_LEN = ELLIPSIS_BYTES.length;
 
-    private static final StringManager sm =
-            StringManager.getManager(Constants.PACKAGE_NAME);
+    private static final StringManager sm = StringManager.getManager(WsSession.class);
     private static AtomicLong ids = new AtomicLong(0);
 
     private final Log log = LogFactory.getLog(WsSession.class);
@@ -72,6 +79,7 @@ public class WsSession implements Session {
     private final Principal userPrincipal;
     private final EndpointConfig endpointConfig;
 
+    private final List<Extension> negotiatedExtensions;
     private final String subProtocol;
     private final Map<String,String> pathParameters;
     private final boolean secure;
@@ -79,10 +87,10 @@ public class WsSession implements Session {
     private final String id;
 
     // Expected to handle message types of <String> only
-    private MessageHandler textMessageHandler = null;
+    private volatile MessageHandler textMessageHandler = null;
     // Expected to handle message types of <ByteBuffer> only
-    private MessageHandler binaryMessageHandler = null;
-    private MessageHandler.Whole<PongMessage> pongMessageHandler = null;
+    private volatile MessageHandler binaryMessageHandler = null;
+    private volatile MessageHandler.Whole<PongMessage> pongMessageHandler = null;
     private volatile State state = State.OPEN;
     private final Object stateLock = new Object();
     private final Map<String,Object> userProperties = new ConcurrentHashMap<>();
@@ -92,6 +100,7 @@ public class WsSession implements Session {
             Constants.DEFAULT_BUFFER_SIZE;
     private volatile long maxIdleTimeout = 0;
     private volatile long lastActive = System.currentTimeMillis();
+    private Map<FutureToSendHandler,FutureToSendHandler> futures = new ConcurrentHashMap<>();
 
     /**
      * Creates a new WebSocket session for communication between the two
@@ -99,18 +108,42 @@ public class WsSession implements Session {
      * at the time this constructor is called will be used when calling
      * {@link Endpoint#onClose(Session, CloseReason)}.
      *
-     * @param localEndpoint
-     * @param wsRemoteEndpoint
-     * @throws DeploymentException
+     * @param localEndpoint        The end point managed by this code
+     * @param wsRemoteEndpoint     The other / remote endpoint
+     * @param wsWebSocketContainer The container that created this session
+     * @param requestUri           The URI used to connect to this endpoint or
+     *                             <code>null</code> is this is a client session
+     * @param requestParameterMap  The parameters associated with the request
+     *                             that initiated this session or
+     *                             <code>null</code> if this is a client session
+     * @param queryString          The query string associated with the request
+     *                             that initiated this session or
+     *                             <code>null</code> if this is a client session
+     * @param userPrincipal        The principal associated with the request
+     *                             that initiated this session or
+     *                             <code>null</code> if this is a client session
+     * @param httpSessionId        The HTTP session ID associated with the
+     *                             request that initiated this session or
+     *                             <code>null</code> if this is a client session
+     * @param negotiatedExtensions The agreed extensions to use for this session
+     * @param subProtocol          The agreed subprotocol to use for this
+     *                             session
+     * @param pathParameters       The path parameters associated with the
+     *                             request that initiated this session or
+     *                             <code>null</code> if this is a client session
+     * @param secure               Was this session initiated over a secure
+     *                             connection?
+     * @param endpointConfig       The configuration information for the
+     *                             endpoint
+     * @throws DeploymentException if an invalid encode is specified
      */
     public WsSession(Endpoint localEndpoint,
             WsRemoteEndpointImplBase wsRemoteEndpoint,
             WsWebSocketContainer wsWebSocketContainer,
             URI requestUri, Map<String,List<String>> requestParameterMap,
             String queryString, Principal userPrincipal, String httpSessionId,
-            String subProtocol, Map<String,String> pathParameters,
-            boolean secure, EndpointConfig endpointConfig)
-                    throws DeploymentException {
+            List<Extension> negotiatedExtensions, String subProtocol, Map<String,String> pathParameters,
+            boolean secure, EndpointConfig endpointConfig) throws DeploymentException {
         this.localEndpoint = localEndpoint;
         this.wsRemoteEndpoint = wsRemoteEndpoint;
         this.wsRemoteEndpoint.setSession(this);
@@ -135,6 +168,7 @@ public class WsSession implements Session {
         this.queryString = queryString;
         this.userPrincipal = userPrincipal;
         this.httpSessionId = httpSessionId;
+        this.negotiatedExtensions = negotiatedExtensions;
         if (subProtocol == null) {
             this.subProtocol = "";
         } else {
@@ -147,6 +181,22 @@ public class WsSession implements Session {
 
         this.userProperties.putAll(endpointConfig.getUserProperties());
         this.id = Long.toHexString(ids.getAndIncrement());
+
+        InstanceManager instanceManager = webSocketContainer.getInstanceManager();
+        if (instanceManager == null) {
+            instanceManager = InstanceManagerBindings.get(applicationClassLoader);
+        }
+        if (instanceManager != null) {
+            try {
+                instanceManager.newInstance(localEndpoint);
+            } catch (Exception e) {
+                throw new DeploymentException(sm.getString("wsSession.instanceNew"), e);
+            }
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug(sm.getString("wsSession.created", id));
+        }
     }
 
 
@@ -157,10 +207,29 @@ public class WsSession implements Session {
     }
 
 
-    @SuppressWarnings("unchecked")
     @Override
     public void addMessageHandler(MessageHandler listener) {
+        Class<?> target = Util.getMessageType(listener);
+        doAddMessageHandler(target, listener);
+    }
 
+
+    @Override
+    public <T> void addMessageHandler(Class<T> clazz, Partial<T> handler)
+            throws IllegalStateException {
+        doAddMessageHandler(clazz, handler);
+    }
+
+
+    @Override
+    public <T> void addMessageHandler(Class<T> clazz, Whole<T> handler)
+            throws IllegalStateException {
+        doAddMessageHandler(clazz, handler);
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private void doAddMessageHandler(Class<?> target, MessageHandler listener) {
         checkState();
 
         // Message handlers that require decoders may map to text messages,
@@ -174,7 +243,7 @@ public class WsSession implements Session {
         // just as easily.
 
         Set<MessageHandlerResult> mhResults =
-                Util.getMessageHandlers(listener, endpointConfig);
+                Util.getMessageHandlers(target, listener, endpointConfig, this);
 
         for (MessageHandlerResult mhResult : mhResults) {
             switch (mhResult.getType()) {
@@ -261,13 +330,13 @@ public class WsSession implements Session {
             removed = true;
         }
 
-        if (listener.equals(binaryMessageHandler) ||
+        if (wrapped.equals(binaryMessageHandler) ||
                 listener.equals(binaryMessageHandler)) {
             binaryMessageHandler = null;
             removed = true;
         }
 
-        if (listener.equals(pongMessageHandler) ||
+        if (wrapped.equals(pongMessageHandler) ||
                 listener.equals(pongMessageHandler)) {
             pongMessageHandler = null;
             removed = true;
@@ -299,7 +368,7 @@ public class WsSession implements Session {
     @Override
     public List<Extension> getNegotiatedExtensions() {
         checkState();
-        return Collections.emptyList();
+        return negotiatedExtensions;
     }
 
 
@@ -361,7 +430,7 @@ public class WsSession implements Session {
     @Override
     public Set<Session> getOpenSessions() {
         checkState();
-        return webSocketContainer.getOpenSessions(localEndpoint.getClass());
+        return webSocketContainer.getOpenSessions(localEndpoint);
     }
 
 
@@ -395,9 +464,11 @@ public class WsSession implements Session {
      * WebSocket 1.0. Section 2.1.5.
      * Need internal close method as spec requires that the local endpoint
      * receives a 1006 on timeout.
+     *
+     * @param closeReasonMessage The close reason to pass to the remote endpoint
+     * @param closeReasonLocal   The close reason to pass to the local endpoint
      */
-    private void doClose(CloseReason closeReasonMessage,
-            CloseReason closeReasonLocal) {
+    public void doClose(CloseReason closeReasonMessage, CloseReason closeReasonLocal) {
         // Double-checked locking. OK because state is volatile
         if (state != State.OPEN) {
             return;
@@ -408,12 +479,26 @@ public class WsSession implements Session {
                 return;
             }
 
-            state = State.CLOSING;
+            if (log.isDebugEnabled()) {
+                log.debug(sm.getString("wsSession.doClose", id));
+            }
+            try {
+                wsRemoteEndpoint.setBatchingAllowed(false);
+            } catch (IOException e) {
+                log.warn(sm.getString("wsSession.flushFailOnClose"), e);
+                fireEndpointOnError(e);
+            }
+
+            state = State.OUTPUT_CLOSED;
 
             sendCloseMessage(closeReasonMessage);
             fireEndpointOnClose(closeReasonLocal);
+        }
 
-            state = State.CLOSED;
+        IOException ioe = new IOException(sm.getString("wsSession.messageFailed"));
+        SendResult sr = new SendResult(ioe);
+        for (FutureToSendHandler f2sh : futures.keySet()) {
+            f2sh.onResult(sr);
         }
     }
 
@@ -422,30 +507,78 @@ public class WsSession implements Session {
      * Called when a close message is received. Should only ever happen once.
      * Also called after a protocol error when the ProtocolHandler needs to
      * force the closing of the connection.
+     *
+     * @param closeReason The reason contained within the received close
+     *                    message.
      */
     public void onClose(CloseReason closeReason) {
 
         synchronized (stateLock) {
-            if (state == State.OPEN) {
-                sendCloseMessage(closeReason);
-                fireEndpointOnClose(closeReason);
+            if (state != State.CLOSED) {
+                try {
+                    wsRemoteEndpoint.setBatchingAllowed(false);
+                } catch (IOException e) {
+                    log.warn(sm.getString("wsSession.flushFailOnClose"), e);
+                    fireEndpointOnError(e);
+                }
+                if (state == State.OPEN) {
+                    state = State.OUTPUT_CLOSED;
+                    sendCloseMessage(closeReason);
+                    fireEndpointOnClose(closeReason);
+                }
                 state = State.CLOSED;
-            }
 
-            // Close the socket
-            wsRemoteEndpoint.close();
+                // Close the socket
+                wsRemoteEndpoint.close();
+            }
         }
     }
-
 
     private void fireEndpointOnClose(CloseReason closeReason) {
 
         // Fire the onClose event
+        Throwable throwable = null;
+        InstanceManager instanceManager = webSocketContainer.getInstanceManager();
+        if (instanceManager == null) {
+            instanceManager = InstanceManagerBindings.get(applicationClassLoader);
+        }
         Thread t = Thread.currentThread();
         ClassLoader cl = t.getContextClassLoader();
         t.setContextClassLoader(applicationClassLoader);
         try {
             localEndpoint.onClose(this, closeReason);
+        } catch (Throwable t1) {
+            ExceptionUtils.handleThrowable(t1);
+            throwable = t1;
+        } finally {
+            if (instanceManager != null) {
+                try {
+                    instanceManager.destroyInstance(localEndpoint);
+                } catch (Throwable t2) {
+                    ExceptionUtils.handleThrowable(t2);
+                    if (throwable == null) {
+                        throwable = t2;
+                    }
+                }
+            }
+            t.setContextClassLoader(cl);
+        }
+
+        if (throwable != null) {
+            fireEndpointOnError(throwable);
+        }
+    }
+
+
+
+    private void fireEndpointOnError(Throwable throwable) {
+
+        // Fire the onError event
+        Thread t = Thread.currentThread();
+        ClassLoader cl = t.getContextClassLoader();
+        t.setContextClassLoader(applicationClassLoader);
+        try {
+            localEndpoint.onError(this, throwable);
         } finally {
             t.setContextClassLoader(cl);
         }
@@ -455,7 +588,14 @@ public class WsSession implements Session {
     private void sendCloseMessage(CloseReason closeReason) {
         // 125 is maximum size for the payload of a control message
         ByteBuffer msg = ByteBuffer.allocate(125);
-        msg.putShort((short) closeReason.getCloseCode().getCode());
+        CloseCode closeCode = closeReason.getCloseCode();
+        // CLOSED_ABNORMALLY should not be put on the wire
+        if (closeCode == CloseCodes.CLOSED_ABNORMALLY) {
+            // PROTOCOL_ERROR is probably better than GOING_AWAY here
+            msg.putShort((short) CloseCodes.PROTOCOL_ERROR.getCode());
+        } else {
+            msg.putShort((short) closeCode.getCode());
+        }
 
         String reason = closeReason.getReasonPhrase();
         if (reason != null && reason.length() > 0) {
@@ -463,16 +603,21 @@ public class WsSession implements Session {
         }
         msg.flip();
         try {
-            wsRemoteEndpoint.startMessageBlock(
-                    Constants.OPCODE_CLOSE, msg, true);
-        } catch (IOException ioe) {
+            wsRemoteEndpoint.sendMessageBlock(Constants.OPCODE_CLOSE, msg, true);
+        } catch (IOException | WritePendingException e) {
             // Failed to send close message. Close the socket and let the caller
             // deal with the Exception
             if (log.isDebugEnabled()) {
-                log.debug(sm.getString("wsSession.sendCloseFail"), ioe);
+                log.debug(sm.getString("wsSession.sendCloseFail", id), e);
             }
             wsRemoteEndpoint.close();
-            localEndpoint.onError(this, ioe);
+            // Failure to send a close message is not unexpected in the case of
+            // an abnormal closure (usually triggered by a failure to read/write
+            // from/to the client. In this case do not trigger the endpoint's
+            // error handling
+            if (closeCode != CloseCodes.CLOSED_ABNORMALLY) {
+                localEndpoint.onError(this, e);
+            }
         } finally {
             webSocketContainer.unregisterSession(localEndpoint, this);
         }
@@ -481,6 +626,8 @@ public class WsSession implements Session {
 
     /**
      * Use protected so unit tests can access this method directly.
+     * @param msg The message
+     * @param reason The reason
      */
     protected static void appendCloseReasonWithTruncation(ByteBuffer msg,
             String reason) {
@@ -509,6 +656,48 @@ public class WsSession implements Session {
             msg.put(ELLIPSIS_BYTES);
         }
     }
+
+
+    /**
+     * Make the session aware of a {@link FutureToSendHandler} that will need to
+     * be forcibly closed if the session closes before the
+     * {@link FutureToSendHandler} completes.
+     * @param f2sh The handler
+     */
+    protected void registerFuture(FutureToSendHandler f2sh) {
+        boolean fail = false;
+        synchronized (stateLock) {
+            // If the session has already been closed the any registered futures
+            // will have been processed so the failure result for this future
+            // needs to be set here.
+            if (state == State.OPEN) {
+                futures.put(f2sh, f2sh);
+            } else if (f2sh.isDone()) {
+                // NO-OP. The future completed before the session closed so no
+                // need to register in case the session closes before it
+                // completes.
+            } else {
+                // Construct the exception outside of the sync block
+                fail = true;
+            }
+        }
+
+        if (fail) {
+            IOException ioe = new IOException(sm.getString("wsSession.messageFailed"));
+            SendResult sr = new SendResult(ioe);
+            f2sh.onResult(sr);
+        }
+    }
+
+
+    /**
+     * Remove a {@link FutureToSendHandler} from the set of tracked instances.
+     * @param f2sh The handler
+     */
+    protected void unregisterFuture(FutureToSendHandler f2sh) {
+        futures.remove(f2sh);
+    }
+
 
     @Override
     public URI getRequestURI() {
@@ -588,14 +777,17 @@ public class WsSession implements Session {
     }
 
 
-    protected void expire() {
+    protected void checkExpiration() {
         long timeout = maxIdleTimeout;
         if (timeout < 1) {
             return;
         }
 
         if (System.currentTimeMillis() - lastActive > timeout) {
-            String msg = sm.getString("wsSession.timeout");
+            String msg = sm.getString("wsSession.timeout", getId());
+            if (log.isDebugEnabled()) {
+                log.debug(msg);
+            }
             doClose(new CloseReason(CloseCodes.GOING_AWAY, msg),
                     new CloseReason(CloseCodes.CLOSED_ABNORMALLY, msg));
         }
@@ -604,13 +796,17 @@ public class WsSession implements Session {
 
     private void checkState() {
         if (state == State.CLOSED) {
-            throw new IllegalStateException(sm.getString("wsSession.closed"));
+            /*
+             * As per RFC 6455, a WebSocket connection is considered to be
+             * closed once a peer has sent and received a WebSocket close frame.
+             */
+            throw new IllegalStateException(sm.getString("wsSession.closed", id));
         }
     }
 
     private static enum State {
         OPEN,
-        CLOSING,
+        OUTPUT_CLOSED,
         CLOSED
     }
 }

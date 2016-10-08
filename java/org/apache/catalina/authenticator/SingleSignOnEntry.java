@@ -16,7 +16,14 @@
  */
 package org.apache.catalina.authenticator;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.security.Principal;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -29,26 +36,29 @@ import org.apache.catalina.Session;
  * reauthentications when SingleSignOn is in use.
  *
  * @author  B Stansberry, based on work by Craig R. McClanahan
- * @version $Revision$
  *
  * @see SingleSignOn
  * @see AuthenticatorBase#reauthenticateFromSSO
  */
-public class SingleSignOnEntry
-{
+public class SingleSignOnEntry implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
     // ------------------------------------------------------  Instance Fields
 
-    protected String authType = null;
+    private String authType = null;
 
-    protected String password = null;
+    private String password = null;
 
-    protected Principal principal = null;
+    // Marked as transient so special handling can be applied to serialization
+    private transient Principal principal = null;
 
-    protected Session sessions[] = new Session[0];
+    private final Map<SingleSignOnSessionKey,SingleSignOnSessionKey> sessionKeys =
+            new ConcurrentHashMap<>();
 
-    protected String username = null;
+    private String username = null;
 
-    protected boolean canReauthenticate = false;
+    private boolean canReauthenticate = false;
 
     // ---------------------------------------------------------  Constructors
 
@@ -76,18 +86,16 @@ public class SingleSignOnEntry
      *
      * @param sso       The <code>SingleSignOn</code> valve that is managing
      *                  the SSO session.
+     * @param ssoId     The ID of the SSO session.
      * @param session   The <code>Session</code> being associated with the SSO.
      */
-    public synchronized void addSession(SingleSignOn sso, Session session) {
-        for (int i = 0; i < sessions.length; i++) {
-            if (session == sessions[i])
-                return;
+    public void addSession(SingleSignOn sso, String ssoId, Session session) {
+        SingleSignOnSessionKey key = new SingleSignOnSessionKey(session);
+        SingleSignOnSessionKey currentKey = sessionKeys.putIfAbsent(key, key);
+        if (currentKey == null) {
+            // Session not previously added
+            session.addSessionListener(sso.getSessionListener(ssoId));
         }
-        Session results[] = new Session[sessions.length + 1];
-        System.arraycopy(sessions, 0, results, 0, sessions.length);
-        results[sessions.length] = session;
-        sessions = results;
-        session.addSessionListener(sso);
     }
 
     /**
@@ -96,21 +104,19 @@ public class SingleSignOnEntry
      *
      * @param session  the <code>Session</code> to remove.
      */
-    public synchronized void removeSession(Session session) {
-        Session[] nsessions = new Session[sessions.length - 1];
-        for (int i = 0, j = 0; i < sessions.length; i++) {
-            if (session == sessions[i])
-                continue;
-            nsessions[j++] = sessions[i];
-        }
-        sessions = nsessions;
+    public void removeSession(Session session) {
+        SingleSignOnSessionKey key = new SingleSignOnSessionKey(session);
+        sessionKeys.remove(key);
     }
 
     /**
-     * Returns the <code>Session</code>s associated with this SSO.
+     * Returns the HTTP Session identifiers associated with this SSO.
+     *
+     * @return The identifiers for the HTTP sessions that are current associated
+     *         with this SSo entry
      */
-    public synchronized Session[] findSessions() {
-        return (this.sessions);
+    public Set<SingleSignOnSessionKey> findSessions() {
+        return sessionKeys.keySet();
     }
 
     /**
@@ -120,7 +126,7 @@ public class SingleSignOnEntry
      * @return "BASIC", "CLIENT_CERT", "DIGEST", "FORM" or "NONE"
      */
     public String getAuthType() {
-        return (this.authType);
+        return this.authType;
     }
 
     /**
@@ -131,7 +137,7 @@ public class SingleSignOnEntry
      *          "BASIC" or "FORM", <code>false</code> otherwise.
      */
     public boolean getCanReauthenticate() {
-        return (this.canReauthenticate);
+        return this.canReauthenticate;
     }
 
     /**
@@ -142,23 +148,28 @@ public class SingleSignOnEntry
      *          does not involve a password.
      */
     public String getPassword() {
-        return (this.password);
+        return this.password;
     }
 
     /**
-     * Gets the <code>Principal</code> that has been authenticated by
-     * the SSO.
+     * Gets the <code>Principal</code> that has been authenticated by the SSO.
+     *
+     * @return The Principal that was created by the authentication that
+     *         triggered the creation of the SSO entry
      */
     public Principal getPrincipal() {
-        return (this.principal);
+        return this.principal;
     }
 
     /**
-     * Gets the username provided by the user as part of the authentication
+     * Gets the user name provided by the user as part of the authentication
      * process.
+     *
+     * @return The user name that was authenticated as part of the
+     *         authentication that triggered the creation of the SSO entry
      */
     public String getUsername() {
-        return (this.username);
+        return this.username;
     }
 
 
@@ -173,16 +184,33 @@ public class SingleSignOnEntry
      * @param username  the username (if any) used for the authentication
      * @param password  the password (if any) used for the authentication
      */
-    public void updateCredentials(Principal principal, String authType,
+    public synchronized void updateCredentials(Principal principal, String authType,
                                   String username, String password) {
-
         this.principal = principal;
         this.authType = authType;
         this.username = username;
         this.password = password;
-        this.canReauthenticate =
-            (HttpServletRequest.BASIC_AUTH.equals(authType)
-                || HttpServletRequest.FORM_AUTH.equals(authType));
+        this.canReauthenticate = (HttpServletRequest.BASIC_AUTH.equals(authType) ||
+                HttpServletRequest.FORM_AUTH.equals(authType));
     }
 
+
+    private void writeObject(ObjectOutputStream out) throws IOException {
+        out.defaultWriteObject();
+        if (principal instanceof Serializable) {
+            out.writeBoolean(true);
+            out.writeObject(principal);
+        } else {
+            out.writeBoolean(false);
+        }
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException,
+            ClassNotFoundException {
+        in.defaultReadObject();
+        boolean hasPrincipal = in.readBoolean();
+        if (hasPrincipal) {
+            principal = (Principal) in.readObject();
+        }
+    }
 }

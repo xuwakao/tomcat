@@ -34,7 +34,6 @@ import org.apache.el.util.MessageFactory;
 
 /**
  * @author Jacob Hookom [jacob@hookom.net]
- * @version $Id$
  */
 public final class AstFunction extends SimpleNode {
 
@@ -162,13 +161,30 @@ public final class AstFunction extends SimpleNode {
         Class<?>[] paramTypes = m.getParameterTypes();
         Object[] params = null;
         Object result = null;
-        int numParams = parameters.jjtGetNumChildren();
-        if (numParams > 0) {
-            params = new Object[numParams];
+        int inputParameterCount = parameters.jjtGetNumChildren();
+        int methodParameterCount = paramTypes.length;
+        if (inputParameterCount > 0) {
+            params = new Object[methodParameterCount];
             try {
-                for (int i = 0; i < numParams; i++) {
-                    params[i] = parameters.jjtGetChild(i).getValue(ctx);
-                    params[i] = coerceToType(params[i], paramTypes[i]);
+                for (int i = 0; i < methodParameterCount; i++) {
+                    if (m.isVarArgs() && i == methodParameterCount - 1) {
+                        if (inputParameterCount < methodParameterCount) {
+                            params[i] = null;
+                        } else {
+                            Object[] varargs =
+                                    new Object[inputParameterCount - methodParameterCount + 1];
+                            Class<?> target = paramTypes[i].getComponentType();
+                            for (int j = i; j < inputParameterCount; j++) {
+                                varargs[j-i] = parameters.jjtGetChild(j).getValue(ctx);
+                                varargs[j-i] = coerceToType(ctx, varargs[j-i], target);
+                            }
+                            params[i] = varargs;
+                            params[i] = coerceToType(ctx, params[i], paramTypes[i]);
+                        }
+                    } else {
+                        params[i] = parameters.jjtGetChild(i).getValue(ctx);
+                        params[i] = coerceToType(ctx, params[i], paramTypes[i]);
+                    }
                 }
             } catch (ELException ele) {
                 throw new ELException(MessageFactory.get("error.function", this

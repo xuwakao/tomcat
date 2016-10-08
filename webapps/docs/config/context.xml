@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -291,6 +291,15 @@
         If not specified, the standard value (defined below) will be used.</p>
       </attribute>
 
+      <attribute name="containerSciFilter" required="false">
+        <p>The regular expression that specifies which container provided SCIs
+        should be filtered out and not used for this context. Matching uses
+        <code>java.util.regex.Matcher.find()</code> so the regular expression
+        only has to match a sub-string of the fully qualified class name of the
+        container provided SCI for it to be filtered out. If not specified,
+        no filtering will be applied.</p>
+      </attribute>
+
       <attribute name="cookies" required="false">
         <p>Set to <code>true</code> if you want cookies to be used for
         session identifier communication if supported by the client (this
@@ -325,6 +334,22 @@
         sufficient.</p>
       </attribute>
 
+      <attribute name="dispatchersUseEncodedPaths" required="false">
+        <p>Controls whether paths used in calls to obtain a request dispatcher
+        ares expected to be encoded. This affects both how Tomcat handles calls
+        to obtain a request dispatcher as well as how Tomcat generates paths
+        used to obtain request dispatchers internally. If not specified, the
+        default value of <code>true</code> is used.</p>
+      </attribute>
+
+      <attribute name="failCtxIfServletStartFails" required="false">
+        <p>Set to <code>true</code> to have the context fail its startup if any
+        servlet that has load-on-startup &gt;=0 fails its own startup.</p>
+        <p>If not specified, the attribute of the same name in the parent Host
+        configuration is used if specified. Otherwise the default value of
+        <code>false</code> is used.</p>
+      </attribute>
+
       <attribute name="fireRequestListenersOnForwards" required="false">
         <p>Set to <code>true</code> to fire any configured
         ServletRequestListeners  when Tomcat forwards a request. This is
@@ -340,6 +365,22 @@
         starts. The effective web.xml is the result of combining the
         application's web.xml with any defaults configured by Tomcat and any
         web-fragment.xml files and annotations discovered. If not specified, the
+        default value of <code>false</code> is used.</p>
+      </attribute>
+
+      <attribute name="mapperContextRootRedirectEnabled" required="false">
+        <p>If enabled, requests for a web application context root will be
+        redirected (adding a trailing slash) if necessary by the Mapper rather
+        than the default Servlet. This is more efficient but has the side effect
+        of confirming that the context path exists. If not specified, the
+        default value of <code>true</code> is used.</p>
+      </attribute>
+
+      <attribute name="mapperDirectoryRedirectEnabled" required="false">
+        <p>If enabled, requests for a web application directory will be
+        redirected (adding a trailing slash) if necessary by the Mapper rather
+        than the default Servlet. This is more efficient but has the side effect
+        of confirming that the directory is exists. If not specified, the
         default value of <code>false</code> is used.</p>
       </attribute>
 
@@ -448,18 +489,34 @@
         useful for portlet specification implementations) set this attribute to
         <code>/</code> in the global <code>CATALINA_BASE/conf/context.xml</code>
         file.</p>
+        <p>Note: Once one web application using
+        <code>sessionCookiePath=&quot;/&quot;</code> obtains a session, all
+        subsequent sessions for any other web application in the same host also
+        configured with <code>sessionCookiePath=&quot;/&quot;</code> will always
+        use the same session ID. This holds even if the session is invalidated
+        and a new one created. This makes session fixation protection more
+        difficult and requires custom, Tomcat specific code to change the
+        session ID shared by the multiple applications.</p>
       </attribute>
 
       <attribute name="sessionCookiePathUsesTrailingSlash" required="false">
-        <p>Some browsers, such as IE, will send a session cookie for a context
-        with a path of /foo with a request to /foobar. To prevent this, Tomcat
-        will add a trailing slash to the path associated with the session cookie
-        so, in the above example, the cookie path becomes /foo/. However, with a
-        cookie path of /foo/, IE will no longer send the cookie with a request
-        to /foo. This should not be a problem unless there is a servlet mapped
-        to /*. In this case this feature will need to be disabled. The default
-        value for this attribute is <code>true.</code> To disable this feature,
-        set the attribute to <code>false</code>.</p>
+        <p>Some browsers, such as Internet Explorer, Safari and Edge, will send
+        a session cookie for a context with a path of <code>/foo</code> with a
+        request to <code>/foobar</code> in violation of RFC6265. This could
+        expose a session ID from an application deployed at <code>/foo</code> to
+        an application deployed at <code>/foobar</code>. If the application
+        deployed at <code>/foobar</code> is untrusted, this could create a
+        security risk. However, it should be noted that RFC 6265, section 8.5
+        makes clear that path alone should not be view as sufficient to prevent
+        untrusted applications accessing cookies from other applications. To
+        mitigate this risk, this attribute may bet ste to <code>true</code> and
+        Tomcat will add a trailing slash to the path associated with the session
+        cookie so, in the above example, the cookie path becomes /foo/. However,
+        with a cookie path of /foo/, browsers will no longer send the cookie
+        with a request to /foo. This should not be a problem unless there is a
+        servlet mapped to /*. In this case this attribute will need to be set to
+        <code>false</code> to disable this feature. The default value for this
+        attribute is <code>false</code>.</p>
       </attribute>
 
       <attribute name="swallowAbortedUploads" required="false">
@@ -477,7 +534,7 @@
         <p>
         Not reading the additional data will free the request processing thread
         more quickly. Unfortunately most HTTP clients will not read the response
-        if they can not write the full request.</p>
+        if they cannot write the full request.</p>
         <p>The default is <code>true</code>, so additional data will be
         read.</p>
         <p>Note if an error occurs during the request processing that triggers
@@ -493,33 +550,9 @@
         of the flag is <code>false</code>.</p>
       </attribute>
 
-      <attribute name="useHttpOnly" required="false">
-       <p>Should the HttpOnly flag be set on session cookies to prevent client
-          side script from accessing the session ID? Defaults to
-          <code>true</code>.</p>
-      </attribute>
-
-      <attribute name="wrapperClass" required="false">
-        <p>Java class name of the <code>org.apache.catalina.Wrapper</code>
-        implementation class that will be used for servlets managed by this
-        Context.  If not specified, a standard default value will be used.</p>
-      </attribute>
-
-      <attribute name="xmlNamespaceAware" required="false">
-        <p>If the value of this flag is <code>true</code>, the validation of
-        XML files will be namespace-aware.  If you turn this flag on,
-        you should probably also turn <code>xmlValidation</code> on. If
-        the <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
-        <a href="systemprops.html">system property</a> is set to
-        <code>true</code>, the default value of this attribute will be
-        <code>true</code>, else the default value will be <code>false</code>.
-        Setting this attribute to <code>true</code> will incur a performance
-        penalty.</p>
-      </attribute>
-
-      <attribute name="xmlValidation" required="false">
-        <p>If the value of this flag is <code>true</code>, the XML files
-        will be validated on context startup. If the
+      <attribute name="tldValidation" required="false">
+        <p>If the value of this flag is <code>true</code>, the TLD files
+        will be XML validated on context startup. If the
         <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
         <a href="systemprops.html">system property</a> is set to
         <code>true</code>, the default value of this attribute will be
@@ -528,6 +561,92 @@
         penalty.</p>
       </attribute>
 
+      <attribute name="useHttpOnly" required="false">
+       <p>Should the HttpOnly flag be set on session cookies to prevent client
+          side script from accessing the session ID? Defaults to
+          <code>true</code>.</p>
+      </attribute>
+
+      <attribute name="useRelativeRedirects" required="false">
+        <p>Controls whether HTTP 1.1 and later location headers generated by a
+        call to
+        <code>javax.servlet.http.HttpServletResponse#sendRedirect(String)</code>
+        will use relative or absolute redirects. Relative redirects are more
+        efficient but may not work with reverse proxies that change the context
+        path. It should be noted that it is not recommended to use a reverse
+        proxy to change the context path because of the multiple issues it
+        creates. Absolute redirects should work with reverse proxies that change
+        the context path but may cause issues with the
+        <code>org.apache.catalina.filters.RemoteIpFilter</code> if the filter is
+         changing the scheme and/or port. If the
+        <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
+        <a href="systemprops.html">system property</a> is set to
+        <code>true</code>, the default value of this attribute will be
+        <code>false</code>, else the default value will be <code>true</code>.
+        </p>
+      </attribute>
+
+      <attribute name="validateClientProvidedNewSessionId" required="false">
+        <p>When a client provides the ID for a new session, this attribute
+        controls whether that ID is validated. The only use case for using a
+        client provided session ID is to have a common session ID across
+        multiple web applications. Therefore, any client provided session ID
+        should already exist in another web application. If this check is
+        enabled, the client provided session ID will only be used if the session
+        ID exists in at least one other web application for the current host.
+        Note that the following additional tests are always applied,
+        irrespective of this setting:</p>
+        <ul>
+          <li>The session ID is provided by a cookie</li>
+          <li>The session cookie has a path of {@code /}</li>
+        </ul>
+        <p>If not specified, the default value of <code>true</code> will be
+        used.</p>
+      </attribute>
+
+      <attribute name="wrapperClass" required="false">
+        <p>Java class name of the <code>org.apache.catalina.Wrapper</code>
+        implementation class that will be used for servlets managed by this
+        Context.  If not specified, a standard default value will be used.</p>
+      </attribute>
+
+      <attribute name="xmlBlockExternal" required="false">
+        <p>If the value of this flag is <code>true</code>, the parsing of
+        <code>web.xml</code>, <code>web-fragment.xml</code>, <code>*.tld</code>,
+        <code>*.jspx</code>, <code>*.tagx</code> and <code>tagPlugins.xml</code>
+        files for this web application will not permit external entities to be
+        loaded. If not specified, the default value of <code>true</code> will
+        be used.</p>
+      </attribute>
+
+      <attribute name="xmlNamespaceAware" required="false">
+        <p>If the value of this flag is <code>true</code>, the parsing of
+        <code>web.xml</code> and <code>web-fragment.xml</code> files for this
+        web application will be namespace-aware. Note that <code>*.tld</code>,
+        <code>*.jspx</code> and <code>*.tagx</code> files are always parsed
+        using a namespace-aware parser and that the <code>tagPlugins.xml</code>
+        file (if any) is never parsed using a namespace-aware parser. Note also
+        that if you turn this flag on, you should probably also turn
+        <code>xmlValidation</code> on. If the
+        <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
+        <a href="systemprops.html">system property</a> is set to
+        <code>true</code>, the default value of this attribute will be
+        <code>true</code>, else the default value will be <code>false</code>.
+        Setting this attribute to <code>true</code> will incur a performance
+        penalty.</p>
+      </attribute>
+
+      <attribute name="xmlValidation" required="false">
+        <p>If the value of this flag is <code>true</code>, the parsing of
+        <code>web.xml</code> and <code>web-fragment.xml</code> files for this
+        web application will use a validating parser. If the
+        <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
+        <a href="systemprops.html">system property</a> is set to
+        <code>true</code>, the default value of this attribute will be
+        <code>true</code>, else the default value will be <code>false</code>.
+        Setting this attribute to <code>true</code> will incur a performance
+        penalty.</p>
+      </attribute>
 
     </attributes>
 
@@ -554,30 +673,6 @@
         </p>
       </attribute>
 
-      <attribute name="allowLinking" required="false">
-        <p>If the value of this flag is <code>true</code>, symlinks will be
-        allowed inside the web application, pointing to resources outside the
-        web application base path. If not specified, the default value
-        of the flag is <code>false</code>.</p>
-        <p><b>NOTE: This flag MUST NOT be set to true on the Windows platform
-        (or any other OS which does not have a case sensitive filesystem),
-        as it will disable case sensitivity checks, allowing JSP source code
-        disclosure, among other security problems.</b></p>
-      </attribute>
-
-      <attribute name="antiJARLocking" required="false">
-        <p>If true, the Tomcat classloader will take extra measures to avoid
-        JAR file locking when resources are accessed inside JARs through URLs.
-        This will impact startup time of applications, but could prove to be
-        useful on platforms or configurations where file locking can occur.
-        If not specified, the default value is <code>false</code>.</p>
-
-        <p><code>antiJARLocking</code> is a subset of
-        <code>antiResourceLocking</code> and therefore, to prevent duplicate
-        work and possible issues, only one of these attributes should be set
-        to <code>true</code> at any one time.</p>
-      </attribute>
-
       <attribute name="antiResourceLocking" required="false">
         <p>If true, Tomcat will prevent any file locking.
         This will significantly impact startup time of applications,
@@ -585,14 +680,9 @@
         or configurations where file locking can occur.
         If not specified, the default value is <code>false</code>.</p>
 
-        <p><code>antiJARLocking</code> is a subset of
-        <code>antiResourceLocking</code> and therefore, to prevent duplicate
-        work and possible issues, only one of these attributes should be set
-        to <code>true</code> at any one time.</p>
-
         <p>Please note that setting this to <code>true</code> has some side
         effects, including the disabling of JSP reloading in a running server:
-        see <a href="http://issues.apache.org/bugzilla/show_bug.cgi?id=37668">
+        see <a href="http://bz.apache.org/bugzilla/show_bug.cgi?id=37668">
         Bugzilla 37668</a>.</p>
 
         <p>Please note that setting this flag to true in applications that are
@@ -603,71 +693,62 @@
         appBase for its Host.</p>
       </attribute>
 
-      <attribute name="cacheMaxSize" required="false">
-        <p>Maximum size of the static resource cache in kilobytes.
-        If not specified, the default value is <code>10240</code>
-        (10 megabytes).</p>
-      </attribute>
-
-      <attribute name="cacheObjectMaxSize" required="false">
-        <p>Maximum size of the static resource that will be placed in the cache.
-        If not specified, the default value is <code>512</code>
-        (512 kilobytes). If this value is greater than
-        <code>cacheMaxSize/20</code> it will be reduced to
-        <code>cacheMaxSize/20</code>.</p>
-      </attribute>
-
-      <attribute name="cacheTTL" required="false">
-        <p>Amount of time in milliseconds between cache entries revalidation.
-        If not specified, the default value is <code>5000</code>
-        (5 seconds).</p>
-      </attribute>
-
-      <attribute name="cachingAllowed" required="false">
-        <p>If the value of this flag is <code>true</code>, the cache for static
-        resources will be used. If not specified, the default value
-        of the flag is <code>true</code>.</p>
-      </attribute>
-
-      <attribute name="clearReferencesHttpClientKeepAliveThread" required = "false">
+      <attribute name="clearReferencesHttpClientKeepAliveThread" required="false">
         <p>If <code>true</code> and an <code>sun.net.www.http.HttpClient</code>
         keep-alive timer thread has been started by this web application and is
         still running, Tomcat will change the context class loader for that
-        thread from the current <code>WebappClassLoader</code> to
-        <code>WebappClassLoader#parent</code> to prevent a memory leak. Note
-        that the keep-alive timer thread will stop on its own once the
-        keep-alives all expire however, on a busy system that might not happen
-        for some time. If not specified, the default value of
-        <code>true</code> will be used.</p>
+        thread from the web application class loader to the parent of the web
+        application class loader to prevent a memory leak. Note that the
+        keep-alive timer thread will stop on its own once the keep-alives all
+        expire however, on a busy system that might not happen for some time. If
+        not specified, the default value of <code>true</code> will be used.</p>
       </attribute>
 
-      <attribute name="clearReferencesStatic" required = "false">
-        <p>If <code>true</code>, Tomcat attempts to null out any static or final
-        fields from loaded classes when a web application is stopped as a work
-        around for apparent garbage collection bugs and application coding
-        errors. There have been some issues reported with log4j when this
-        is <code>true</code>. Applications without memory leaks using recent
-        JVMs should operate correctly with this attribute set to
-        <code>false</code>. If not specified, the default value of
-        <code>false</code> will be used.</p>
+      <attribute name="clearReferencesRmiTargets" required="false">
+        <p>If <code>true</code>, Tomcat looks for memory leaks associated with
+        RMI Targets and clears any it finds. This feature uses reflection to
+        identify the leaks and therefore requires that the command line option
+        <code>-XaddExports:java.rmi/sun.rmi.transport=ALL-UNNAMED</code> is set
+        when running on Java 9 and above. Applications without memory leaks
+        should operate correctly with this attribute set to <code>false</code>.
+        If not specified, the default value of <code>true</code> will be used.</p>
       </attribute>
 
-      <attribute name="clearReferencesStopThreads" required = "false">
+      <attribute name="clearReferencesStopThreads" required="false">
         <p>If <code>true</code>, Tomcat attempts to terminate threads that have
         been started by the web application. Stopping threads is performed via
         the deprecated (for good reason) <code>Thread.stop()</code> method and
         is likely to result in instability. As such, enabling this should be
         viewed as an option of last resort in a development environment and is
         not recommended in a production environment. If not specified, the
-        default value of <code>false</code> will be used.</p>
+        default value of <code>false</code> will be used. If this feature is
+        enabled, web applications may take up to two seconds longer to stop as
+        executor threads are given up to two seconds to stop gracefully before
+        <code>Thread.stop()</code> is called on any remaining threads.</p>
       </attribute>
 
-      <attribute name="clearReferencesStopTimerThreads" required = "false">
+      <attribute name="clearReferencesStopTimerThreads" required="false">
         <p>If <code>true</code>, Tomcat attempts to terminate
         <code>java.util.Timer</code> threads that have been started by the web
         application. Unlike standard threads, timer threads can be stopped
         safely although there may still be side-effects for the application. If
         not specified, the default value of <code>false</code> will be used.</p>
+      </attribute>
+
+      <attribute name="copyXML" required="false">
+        <p>Set to <code>true</code> if you want a context XML descriptor
+        embedded inside the application (located at
+        <code>/META-INF/context.xml</code>) to be copied to the owning
+        <a href="host.html">Host</a>'s <code>xmlBase</code> when the application
+        is deployed. On subsequent starts, the copied context XML descriptor
+        will be used in preference to any context XML descriptor embedded inside
+        the application even if the descriptor embedded inside the application
+        is more recent. The flag's value defaults to <code>false</code>. Note if
+        the <strong>deployXML</strong> attribute of the owning
+        <a href="host.html">Host</a> is <code>false</code> or if the
+        <strong>copyXML</strong> attribute of the owning
+        <a href="host.html">Host</a> is <code>true</code>, this attribute will
+        have no effect.</p>
       </attribute>
 
       <attribute name="jndiExceptionOnFailedWrite" required="false">
@@ -681,12 +762,6 @@
         and methods that return values will return <code>null</code>. If not
         specified, the specification compliant default of <code>true</code> will
         be used.</p>
-      </attribute>
-
-      <attribute name="processTlds" required="false">
-        <p>Whether the context should process TLDs on startup.  The default
-        is true.  The false setting is intended for special cases
-        that know in advance TLDs are not part of the webapp.</p>
       </attribute>
 
       <attribute name="renewThreadsWhenStoppingContext" required="false">
@@ -710,9 +785,7 @@
         file will not be unpacked. If <code>true</code>, the value of the owning
         <a href="host.html">Host</a>&apos;s <strong>unpackWARs</strong>
         attribute will determine if the WAR is unpacked. If not specified, the
-        default value is <code>true</code>. Note that WAR files located outside
-        of a <a href="host.html">Host</a>&apos;s <strong>appBase</strong> are
-        never unpacked.</p>
+        default value is <code>true</code>.</p>
       </attribute>
 
       <attribute name="useNaming" required="false">
@@ -747,6 +820,8 @@
   by nesting a corresponding element inside your <strong>Context</strong>
   element:</p>
   <ul>
+  <li><a href="cookie-processor.html"><strong>Cookie Processor</strong></a> -
+      Configure parsing and generation of HTTP cookie headers.</li>
   <li><a href="loader.html"><strong>Loader</strong></a> -
       Configure the web application class loader that will be used to load
       servlet and bean classes for this web application.  Normally, the
@@ -769,6 +844,13 @@
       specified static resource of the web application for updates, and will
       reload the web application if it is updated. The content of this element
       must be a string.</li>
+  <li><a href="jar-scanner.html"><strong>JarScanner</strong></a> -
+      Configure the Jar Scanner that will be used to scan the web application
+      for JAR files and directories of class files. It is typically used during
+      web application start to identify configuration files such as TLDs o
+      web-fragment.xml files that must be processed as part of the web
+      application initialisation..  Normally, the default Jar Scanner
+      configuration will be sufficient.</li>
   </ul>
 
 </section>
@@ -803,12 +885,12 @@
 <source><![CDATA[<Context>
   ...
   <Valve className="org.apache.catalina.valves.AccessLogValve"
-         prefix="localhost_access_log." suffix=".txt"
+         prefix="localhost_access_log" suffix=".txt"
          pattern="common"/>
   ...
 </Context>]]></source>
 
-    <p>See <a href="valve.html#Access_Log_Valve">Access Log Valve</a>
+    <p>See <a href="valve.html#Access_Logging">Access Logging Valves</a>
     for more information on the configuration attributes that are
     supported.</p>
 

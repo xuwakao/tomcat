@@ -25,7 +25,6 @@ import org.apache.el.lang.EvaluationContext;
 
 /**
  * @author Jacob Hookom [jacob@hookom.net]
- * @version $Id$
  */
 public final class AstLessThan extends BooleanNode {
     public AstLessThan(int id) {
@@ -43,6 +42,6 @@ public final class AstLessThan extends BooleanNode {
         if (obj1 == null) {
             return Boolean.FALSE;
         }
-        return (compare(obj0, obj1) < 0) ? Boolean.TRUE : Boolean.FALSE;
+        return (compare(ctx, obj0, obj1) < 0) ? Boolean.TRUE : Boolean.FALSE;
     }
 }

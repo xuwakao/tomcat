@@ -32,30 +32,27 @@ import org.apache.catalina.mapper.Mapper;
  * and classes on the system class path.
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public interface Service extends Lifecycle {
 
     // ------------------------------------------------------------- Properties
 
-
     /**
-     * Return the <code>Container</code> that handles requests for all
+     * @return the <code>Engine</code> that handles requests for all
      * <code>Connectors</code> associated with this Service.
      */
-    public Container getContainer();
+    public Engine getContainer();
 
     /**
-     * Set the <code>Container</code> that handles requests for all
+     * Set the <code>Engine</code> that handles requests for all
      * <code>Connectors</code> associated with this Service.
      *
-     * @param container The new Container
+     * @param engine The new Engine
      */
-    public void setContainer(Container container);
+    public void setContainer(Engine engine);
 
     /**
-     * Return the name of this Service.
+     * @return the name of this Service.
      */
     public String getName();
 
@@ -67,7 +64,7 @@ public interface Service extends Lifecycle {
     public void setName(String name);
 
     /**
-     * Return the <code>Server</code> with which we are associated (if any).
+     * @return the <code>Server</code> with which we are associated (if any).
      */
     public Server getServer();
 
@@ -79,7 +76,7 @@ public interface Service extends Lifecycle {
     public void setServer(Server server);
 
     /**
-     * Return the parent class loader for this component. If not set, return
+     * @return the parent class loader for this component. If not set, return
      * {@link #getServer()} {@link Server#getParentClassLoader()}. If no server
      * has been set, return the system class loader.
      */
@@ -93,7 +90,7 @@ public interface Service extends Lifecycle {
     public void setParentClassLoader(ClassLoader parent);
 
     /**
-     * Obtain the domain under which this container will be / has been
+     * @return the domain under which this container will be / has been
      * registered.
      */
     public String getDomain();
@@ -111,6 +108,8 @@ public interface Service extends Lifecycle {
 
     /**
      * Find and return the set of Connectors associated with this Service.
+     *
+     * @return the set of associated Connectors
      */
     public Connector[] findConnectors();
 
@@ -149,7 +148,7 @@ public interface Service extends Lifecycle {
     public void removeExecutor(Executor ex);
 
     /**
-     * The mapper associated with this Service.
+     * @return the mapper associated with this Service.
      */
     Mapper getMapper();
 }

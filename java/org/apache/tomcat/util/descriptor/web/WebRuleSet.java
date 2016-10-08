@@ -35,9 +35,7 @@ import org.xml.sax.Attributes;
  * deployment descriptor (<code>/WEB-INF/web.xml</code>) resource.</p>
  *
  * @author Craig R. McClanahan
- * @version $Id$
  */
-
 public class WebRuleSet extends RuleSetBase {
 
     /**
@@ -120,6 +118,7 @@ public class WebRuleSet extends RuleSetBase {
     /**
      * Construct an instance of this <code>RuleSet</code> with the default
      * matching pattern prefix.
+     * @param fragment <code>true</code> if this is a web fragment
      */
     public WebRuleSet(boolean fragment) {
 
@@ -134,6 +133,7 @@ public class WebRuleSet extends RuleSetBase {
      *
      * @param prefix Prefix for matching pattern rules (including the
      *  trailing slash character)
+     * @param fragment <code>true</code> if this is a web fragment
      */
     public WebRuleSet(String prefix, boolean fragment) {
 
@@ -528,6 +528,7 @@ public class WebRuleSet extends RuleSetBase {
         digester.addSetNext(fullPrefix + "/env-entry",
                             "addEnvEntry",
                             "org.apache.tomcat.util.descriptor.web.ContextEnvironment");
+        digester.addRule(fullPrefix + "/env-entry", new SetOverrideRule());
         digester.addCallMethod(fullPrefix + "/env-entry/description",
                                "setDescription", 0);
         digester.addCallMethod(fullPrefix + "/env-entry/env-entry-name",
@@ -704,7 +705,7 @@ public class WebRuleSet extends RuleSetBase {
  * only 1 time within the web.xml
  */
 final class SetLoginConfig extends Rule {
-    protected boolean isLoginConfigSet = false;
+    boolean isLoginConfigSet = false;
     public SetLoginConfig() {
         // NO-OP
     }
@@ -727,7 +728,7 @@ final class SetLoginConfig extends Rule {
  * only 1 time within the web.xml
  */
 final class SetJspConfig extends Rule {
-    protected boolean isJspConfigSet = false;
+    boolean isJspConfigSet = false;
     public SetJspConfig() {
         // NO-OP
     }
@@ -750,7 +751,7 @@ final class SetJspConfig extends Rule {
  * only 1 time within the web.xml
  */
 final class SetSessionConfig extends Rule {
-    protected boolean isSessionConfigSet = false;
+    boolean isSessionConfigSet = false;
     public SetSessionConfig() {
         // NO-OP
     }
@@ -947,7 +948,7 @@ final class CallParamMultiRule extends CallParamRule {
  */
 final class CallMethodMultiRule extends CallMethodRule {
 
-    protected final int multiParamIndex;
+    final int multiParamIndex;
 
     public CallMethodMultiRule(String methodName, int paramCount, int multiParamIndex) {
         super(methodName, paramCount);
@@ -1104,7 +1105,7 @@ final class VersionRule extends Rule {
  */
 final class NameRule extends Rule {
 
-    protected boolean isNameSet = false;
+    boolean isNameSet = false;
 
     public NameRule() {
         // NO-OP
@@ -1135,7 +1136,7 @@ final class NameRule extends Rule {
  */
 final class AbsoluteOrderingRule extends Rule {
 
-    protected boolean isAbsoluteOrderingSet = false;
+    boolean isAbsoluteOrderingSet = false;
     private final boolean fragment;
 
     public AbsoluteOrderingRule(boolean fragment) {
@@ -1169,7 +1170,7 @@ final class AbsoluteOrderingRule extends Rule {
  */
 final class RelativeOrderingRule extends Rule {
 
-    protected boolean isRelativeOrderingSet = false;
+    boolean isRelativeOrderingSet = false;
     private final boolean fragment;
 
     public RelativeOrderingRule(boolean fragment) {
@@ -1350,5 +1351,21 @@ final class LifecycleCallbackRule extends CallMethodRule {
             }
         }
         super.end(namespace, name);
+    }
+}
+
+final class SetOverrideRule extends Rule {
+
+    public SetOverrideRule() {
+        // no-op
+    }
+
+    @Override
+    public void begin(String namespace, String name, Attributes attributes) throws Exception {
+        ContextEnvironment envEntry = (ContextEnvironment) digester.peek();
+        envEntry.setOverride(false);
+        if (digester.getLogger().isDebugEnabled()) {
+            digester.getLogger().debug(envEntry.getClass().getName() + ".setOverride(false)");
+        }
     }
 }

@@ -55,8 +55,6 @@ import org.apache.tomcat.util.http.fileupload.util.Streams;
  * deleted later on.</p>
  *
  * @since FileUpload 1.1
- *
- * @version $Id$
  */
 public class DiskFileItem
     implements FileItem {
@@ -278,12 +276,13 @@ public class DiskFileItem
      * contents of the file were not yet cached in memory, they will be
      * loaded from the disk storage and cached.
      *
-     * @return The contents of the file as an array of bytes.
+     * @return The contents of the file as an array of bytes
+     * or {@code null} if the data cannot be read
      */
     @Override
     public byte[] get() {
         if (isInMemory()) {
-            if (cachedContent == null) {
+            if (cachedContent == null && dfos != null) {
                 cachedContent = dfos.getData();
             }
             return cachedContent;
@@ -293,18 +292,12 @@ public class DiskFileItem
         InputStream fis = null;
 
         try {
-            fis = new BufferedInputStream(new FileInputStream(dfos.getFile()));
-            fis.read(fileData);
+            fis = new FileInputStream(dfos.getFile());
+            IOUtils.readFully(fis, fileData);
         } catch (IOException e) {
             fileData = null;
         } finally {
-            if (fis != null) {
-                try {
-                    fis.close();
-                } catch (IOException e) {
-                    // ignore
-                }
-            }
+            IOUtils.closeQuietly(fis);
         }
 
         return fileData;
@@ -378,10 +371,9 @@ public class DiskFileItem
             try {
                 fout = new FileOutputStream(file);
                 fout.write(get());
+                fout.close();
             } finally {
-                if (fout != null) {
-                    fout.close();
-                }
+                IOUtils.closeQuietly(fout);
             }
         } else {
             File outputFile = getStoreLocation();
@@ -402,21 +394,10 @@ public class DiskFileItem
                         out = new BufferedOutputStream(
                                 new FileOutputStream(file));
                         IOUtils.copy(in, out);
+                        out.close();
                     } finally {
-                        if (in != null) {
-                            try {
-                                in.close();
-                            } catch (IOException e) {
-                                // ignore
-                            }
-                        }
-                        if (out != null) {
-                            try {
-                                out.close();
-                            } catch (IOException e) {
-                                // ignore
-                            }
-                        }
+                        IOUtils.closeQuietly(in);
+                        IOUtils.closeQuietly(out);
                     }
                 }
             } else {
@@ -508,7 +489,7 @@ public class DiskFileItem
      * be used for storing the contents of the file.
      *
      * @return An {@link java.io.OutputStream OutputStream} that can be used
-     *         for storing the contensts of the file.
+     *         for storing the contents of the file.
      *
      * @throws IOException if an error occurs.
      */
@@ -541,6 +522,9 @@ public class DiskFileItem
         if (dfos == null) {
             return null;
         }
+        if (isInMemory()) {
+            return null;
+        }
         return dfos.getFile();
     }
 
@@ -551,6 +535,9 @@ public class DiskFileItem
      */
     @Override
     protected void finalize() {
+        if (dfos == null) {
+            return;
+        }
         File outputFile = dfos.getFile();
 
         if (outputFile != null && outputFile.exists()) {
@@ -563,6 +550,9 @@ public class DiskFileItem
      * named temporary file in the configured repository path. The lifetime of
      * the file is tied to the lifetime of the <code>FileItem</code> instance;
      * the file will be deleted when the instance is garbage collected.
+     * <p>
+     * <b>Note: Subclasses that override this method must ensure that they return the
+     * same File each time.</b>
      *
      * @return The {@link java.io.File File} to be used for temporary storage.
      */
@@ -585,7 +575,7 @@ public class DiskFileItem
 
     /**
      * Returns an identifier that is unique within the class loader used to
-     * load this class, but does not have random-like apearance.
+     * load this class, but does not have random-like appearance.
      *
      * @return A String with the non-random looking instance identifier.
      */

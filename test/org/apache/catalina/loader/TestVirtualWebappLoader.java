@@ -42,10 +42,10 @@ public class TestVirtualWebappLoader extends TomcatBaseTest {
     @Test
     public void testStartInternal() throws Exception {
         Tomcat tomcat = getTomcatInstance();
+
         File appDir = new File("test/webapp");
-        // Must have a real docBase - just use temp
-        StandardContext ctx =
-            (StandardContext)tomcat.addContext("",  appDir.getAbsolutePath());
+        StandardContext ctx = (StandardContext) tomcat.addContext("",
+                appDir.getAbsolutePath());
 
 
         WebappLoader loader = new WebappLoader();
@@ -58,21 +58,21 @@ public class TestVirtualWebappLoader extends TomcatBaseTest {
 
         File f1 = new File("test/webapp-fragments/WEB-INF/lib");
         ctx.getResources().createWebResourceSet(
-                WebResourceRoot.ResourceSetType.POST, f1.getAbsolutePath(),
-                "/WEB-INF/lib", "/");
+                WebResourceRoot.ResourceSetType.POST, "/WEB-INF/lib",
+                f1.getAbsolutePath(), null, "/");
 
         loader.start();
         String[] repos = loader.getLoaderRepositories();
-        assertEquals(3,repos.length);
+        assertEquals(4,repos.length);
         loader.stop();
-        // ToDo: Why doesn't remove repositories?
+
         repos = loader.getLoaderRepositories();
-        assertEquals(3, repos.length);
+        assertEquals(0, repos.length);
 
         // no leak
         loader.start();
         repos = loader.getLoaderRepositories();
-        assertEquals(3,repos.length);
+        assertEquals(4,repos.length);
 
         // clear loader
         ctx.setLoader(null);

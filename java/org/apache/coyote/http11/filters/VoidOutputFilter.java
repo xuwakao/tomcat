@@ -18,11 +18,11 @@
 package org.apache.coyote.http11.filters;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.apache.coyote.OutputBuffer;
 import org.apache.coyote.Response;
 import org.apache.coyote.http11.OutputFilter;
-import org.apache.tomcat.util.buf.ByteChunk;
 
 /**
  * Void output filter, which silently swallows bytes written. Used with a 204
@@ -35,18 +35,9 @@ public class VoidOutputFilter implements OutputFilter {
 
     // --------------------------------------------------- OutputBuffer Methods
 
-
-    /**
-     * Write some bytes.
-     *
-     * @return number of bytes written by the filter
-     */
     @Override
-    public int doWrite(ByteChunk chunk, Response res)
-        throws IOException {
-
-        return chunk.getLength();
-
+    public int doWrite(ByteBuffer chunk) throws IOException {
+        return chunk.remaining();
     }
 
 

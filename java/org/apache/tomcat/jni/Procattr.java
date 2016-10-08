@@ -20,15 +20,14 @@ package org.apache.tomcat.jni;
 /** Procattr
  *
  * @author Mladen Turk
- * @version $Id$
  */
-
 public class Procattr {
 
     /**
      * Create and initialize a new procattr variable
      * @param cont The pool to use
      * @return The newly created procattr.
+     * @throws Error An error occurred
      */
     public static native long create(long cont)
         throws Error;
@@ -40,11 +39,13 @@ public class Procattr {
      * @param in Should stdin be a pipe back to the parent?
      * @param out Should stdout be a pipe back to the parent?
      * @param err Should stderr be a pipe back to the parent?
+     * @return the operation status
      */
     public static native int ioSet(long attr, int in, int out, int err);
+
     /**
      * Set the child_in and/or parent_in values to existing apr_file_t values.
-     * <br />
+     * <br>
      * This is NOT a required initializer function. This is
      * useful if you have already opened a pipe (or multiple files)
      * that you wish to use, perhaps persistently across multiple
@@ -54,12 +55,13 @@ public class Procattr {
      * @param attr The procattr we care about.
      * @param in apr_file_t value to use as child_in. Must be a valid file.
      * @param parent apr_file_t value to use as parent_in. Must be a valid file.
+     * @return the operation status
      */
     public static native int childInSet(long attr, long in, long parent);
 
     /**
      * Set the child_out and parent_out values to existing apr_file_t values.
-     * <br />
+     * <br>
      * This is NOT a required initializer function. This is
      * useful if you have already opened a pipe (or multiple files)
      * that you wish to use, perhaps persistently across multiple
@@ -67,12 +69,13 @@ public class Procattr {
      * @param attr The procattr we care about.
      * @param out apr_file_t value to use as child_out. Must be a valid file.
      * @param parent apr_file_t value to use as parent_out. Must be a valid file.
+     * @return the operation status
      */
     public static native int childOutSet(long attr, long out, long parent);
 
     /**
      * Set the child_err and parent_err values to existing apr_file_t values.
-     * <br />
+     * <br>
      * This is NOT a required initializer function. This is
      * useful if you have already opened a pipe (or multiple files)
      * that you wish to use, perhaps persistently across multiple
@@ -80,6 +83,7 @@ public class Procattr {
      * @param attr The procattr we care about.
      * @param err apr_file_t value to use as child_err. Must be a valid file.
      * @param parent apr_file_t value to use as parent_err. Must be a valid file.
+     * @return the operation status
      */
     public static native int childErrSet(long attr, long err, long parent);
 
@@ -89,6 +93,7 @@ public class Procattr {
      * @param dir Which dir to start in.  By default, this is the same dir as
      *            the parent currently resides in, when the createprocess call
      *            is made.
+     * @return the operation status
      */
     public static native int dirSet(long attr, String dir);
 
@@ -102,6 +107,7 @@ public class Procattr {
      * APR_PROGRAM_ENV  --  Executable program, copy environment
      * APR_PROGRAM_PATH --  Executable program on PATH, copy env
      * </PRE>
+     * @return the operation status
      */
     public static native int cmdtypeSet(long attr, int cmd);
 
@@ -109,6 +115,7 @@ public class Procattr {
      * Determine if the child should start in detached state.
      * @param attr The procattr we care about.
      * @param detach Should the child start in detached state?  Default is no.
+     * @return the operation status
      */
     public static native int detachSet(long attr, int detach);
 
@@ -119,11 +126,12 @@ public class Procattr {
      * @param attr The procattr describing the child process to be created.
      * @param chk Flag to indicate whether or not extra work should be done
      *            to try to report failures to the caller.
-     * <br />
+     * <br>
      * This flag only affects apr_proc_create() on platforms where
      * fork() is used.  This leads to extra overhead in the calling
      * process, but that may help the application handle such
      * errors more gracefully.
+     * @return the operation status
      */
     public static native int errorCheckSet(long attr, int chk);
 
@@ -133,6 +141,7 @@ public class Procattr {
      * @param attr The procattr we care about.
      * @param addrspace Should the child start in its own address space?  Default
      * is no on NetWare and yes on other platforms.
+     * @return the operation status
      */
     public static native int addrspaceSet(long attr, int addrspace);
 
@@ -142,7 +151,7 @@ public class Procattr {
      * @param attr The procattr describing the child process to be created.
      * @param pool The the pool to use.
      * @param o The Object to call in the child process.
-     * <br />
+     * <br>
      * At the present time, it will only be called from apr_proc_create()
      * on platforms where fork() is used.  It will never be called on other
      * platforms, on those platforms apr_proc_create() will return the error
@@ -158,6 +167,7 @@ public class Procattr {
      * @param password User password if needed. Password is needed on WIN32
      *                 or any other platform having
      *                 APR_PROCATTR_USER_SET_REQUIRES_PASSWORD set.
+     * @return the operation status
      */
     public static native int userSet(long attr, String username, String password);
 
@@ -165,8 +175,8 @@ public class Procattr {
      * Set the group used for running process
      * @param attr The procattr we care about.
      * @param groupname The group name  used
+     * @return the operation status
      */
     public static native int groupSet(long attr, String groupname);
-
 
 }

@@ -11,6 +11,7 @@ package org.apache.el.parser;
  * You can modify this class to customize your error reporting
  * mechanisms so long as you retain the public fields.
  */
+@SuppressWarnings("all") // Ignore warnings in generated code
 public class ParseException extends Exception {
 
   /**
@@ -88,7 +89,6 @@ public class ParseException extends Exception {
   private static String initialise(Token currentToken,
                            int[][] expectedTokenSequences,
                            String[] tokenImage) {
-    String eol = System.getProperty("line.separator", "\n");
     StringBuffer expected = new StringBuffer();
     int maxSize = 0;
     for (int i = 0; i < expectedTokenSequences.length; i++) {
@@ -101,7 +101,7 @@ public class ParseException extends Exception {
       if (expectedTokenSequences[i][expectedTokenSequences[i].length - 1] != 0) {
         expected.append("...");
       }
-      expected.append(eol).append("    ");
+      expected.append(System.lineSeparator()).append("    ");
     }
     String retval = "Encountered \"";
     Token tok = currentToken.next;
@@ -118,20 +118,15 @@ public class ParseException extends Exception {
       tok = tok.next;
     }
     retval += "\" at line " + currentToken.next.beginLine + ", column " + currentToken.next.beginColumn;
-    retval += "." + eol;
+    retval += "." + System.lineSeparator();
     if (expectedTokenSequences.length == 1) {
-      retval += "Was expecting:" + eol + "    ";
+      retval += "Was expecting:" + System.lineSeparator() + "    ";
     } else {
-      retval += "Was expecting one of:" + eol + "    ";
+      retval += "Was expecting one of:" + System.lineSeparator() + "    ";
     }
     retval += expected.toString();
     return retval;
   }
-
-  /**
-   * The end of line string for this machine.
-   */
-  protected String eol = System.getProperty("line.separator", "\n");
 
   /**
    * Used to convert raw characters to their escaped version
