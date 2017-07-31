@@ -44,6 +44,7 @@ import org.apache.catalina.core.ContainerBase;
 import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.startup.HostConfig;
 import org.apache.tomcat.util.ExceptionUtils;
+import org.apache.tomcat.util.buf.StringUtils;
 import org.apache.tomcat.util.res.StringManager;
 
 /**
@@ -140,9 +141,7 @@ public class HostManagerServlet
      */
     @Override
     public Wrapper getWrapper() {
-
-        return (this.wrapper);
-
+        return this.wrapper;
     }
 
 
@@ -480,7 +479,7 @@ public class HostManagerServlet
         try {
             Container child = engine.findChild(name);
             engine.removeChild(child);
-            if ( child instanceof ContainerBase ) ((ContainerBase)child).destroy();
+            if ( child instanceof ContainerBase ) child.destroy();
         } catch (Exception e) {
             writer.println(smClient.getString("hostManagerServlet.exception",
                     e.toString()));
@@ -519,15 +518,8 @@ public class HostManagerServlet
             Host host = (Host) hosts[i];
             String name = host.getName();
             String[] aliases = host.findAliases();
-            StringBuilder buf = new StringBuilder();
-            if (aliases.length > 0) {
-                buf.append(aliases[0]);
-                for (int j = 1; j < aliases.length; j++) {
-                    buf.append(',').append(aliases[j]);
-                }
-            }
             writer.println(smClient.getString("hostManagerServlet.listitem",
-                                        name, buf.toString()));
+                    name, StringUtils.join(aliases)));
         }
     }
 
@@ -588,9 +580,7 @@ public class HostManagerServlet
                     "hostManagerServlet.startFailed", name));
             writer.println(smClient.getString(
                     "hostManagerServlet.exception", e.toString()));
-            return;
         }
-
     }
 
 
@@ -650,9 +640,7 @@ public class HostManagerServlet
                     name));
             writer.println(smClient.getString("hostManagerServlet.exception",
                     e.toString()));
-            return;
         }
-
     }
 
 
@@ -683,7 +671,6 @@ public class HostManagerServlet
             } else {
                 writer.println(smClient.getString("hostManagerServlet.exception", e.toString()));
             }
-            return;
         }
     }
 

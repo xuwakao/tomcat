@@ -184,7 +184,7 @@ public class ReflectionUtil {
                         if (isAssignableFrom(paramTypes[j], varType)) {
                             assignableMatch++;
                         } else {
-                            if (paramValues == null) {
+                            if (paramValues == null || j >= paramValues.length) {
                                 noMatch = true;
                                 break;
                             } else {
@@ -203,7 +203,7 @@ public class ReflectionUtil {
                 } else if (isAssignableFrom(paramTypes[i], mParamTypes[i])) {
                     assignableMatch++;
                 } else {
-                    if (paramValues == null) {
+                    if (paramValues == null || i >= paramValues.length) {
                         noMatch = true;
                         break;
                     } else {
@@ -501,6 +501,30 @@ public class ReflectionUtil {
                 }
             }
             return cmp;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            return o == this
+                    || (null != o
+                    && this.getClass().equals(o.getClass())
+                    && ((MatchResult)o).getExact() == this.getExact()
+                    && ((MatchResult)o).getAssignable() == this.getAssignable()
+                    && ((MatchResult)o).getCoercible() == this.getCoercible()
+                    && ((MatchResult)o).isBridge() == this.isBridge()
+                    )
+                    ;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return (this.isBridge() ? 1 << 24 : 0)
+                    ^ this.getExact() << 16
+                    ^ this.getAssignable() << 8
+                    ^ this.getCoercible()
+                    ;
         }
     }
 

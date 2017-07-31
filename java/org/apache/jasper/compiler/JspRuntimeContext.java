@@ -28,7 +28,6 @@ import java.security.CodeSource;
 import java.security.PermissionCollection;
 import java.security.Policy;
 import java.security.cert.Certificate;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -170,6 +169,14 @@ public final class JspRuntimeContext {
      */
     private FastRemovalDequeue<JspServletWrapper> jspQueue = null;
 
+    /**
+     * Map of class name to associated source map. This is maintained here as
+     * multiple JSPs can depend on the same file (included JSP, tag file, etc.)
+     * so a web application scoped Map is required.
+     */
+    private final Map<String,SmapStratum> smaps = new ConcurrentHashMap<>();
+
+
     // ------------------------------------------------------ Public Methods
 
     /**
@@ -283,9 +290,8 @@ public final class JspRuntimeContext {
      * Process a "destroy" event for this web application context.
      */
     public void destroy() {
-        Iterator<JspServletWrapper> servlets = jsps.values().iterator();
-        while (servlets.hasNext()) {
-            servlets.next().destroy();
+        for (JspServletWrapper jspServletWrapper : jsps.values()) {
+            jspServletWrapper.destroy();
         }
     }
 
@@ -391,8 +397,12 @@ public final class JspRuntimeContext {
     }
 
 
-    // -------------------------------------------------------- Private Methods
+    public Map<String,SmapStratum> getSmaps() {
+        return smaps;
+    }
 
+
+    // -------------------------------------------------------- Private Methods
 
     /**
      * Method used to initialize classpath for compiles.

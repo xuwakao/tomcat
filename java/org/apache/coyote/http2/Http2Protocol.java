@@ -17,7 +17,14 @@
 package org.apache.coyote.http2;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.coyote.Adapter;
 import org.apache.coyote.Processor;
@@ -26,6 +33,7 @@ import org.apache.coyote.UpgradeProtocol;
 import org.apache.coyote.UpgradeToken;
 import org.apache.coyote.http11.upgrade.InternalHttpUpgradeHandler;
 import org.apache.coyote.http11.upgrade.UpgradeProcessorInternal;
+import org.apache.tomcat.util.buf.StringUtils;
 import org.apache.tomcat.util.net.SocketWrapperBase;
 
 public class Http2Protocol implements UpgradeProtocol {
@@ -54,6 +62,14 @@ public class Http2Protocol implements UpgradeProtocol {
     // If a lower initial value is required, set it here but DO NOT change the
     // default defined above.
     private int initialWindowSize = DEFAULT_INITIAL_WINDOW_SIZE;
+    // Limits
+    private Set<String> allowedTrailerHeaders =
+            Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
+    private int maxHeaderCount = Constants.DEFAULT_MAX_HEADER_COUNT;
+    private int maxHeaderSize = Constants.DEFAULT_MAX_HEADER_SIZE;
+    private int maxTrailerCount = Constants.DEFAULT_MAX_TRAILER_COUNT;
+    private int maxTrailerSize = Constants.DEFAULT_MAX_TRAILER_SIZE;
+    private boolean initiatePingDisabled = false;
 
     @Override
     public String getHttpUpgradeName(boolean isSSLEnabled) {
@@ -77,15 +93,17 @@ public class Http2Protocol implements UpgradeProtocol {
     @Override
     public Processor getProcessor(SocketWrapperBase<?> socketWrapper, Adapter adapter) {
         UpgradeProcessorInternal processor = new UpgradeProcessorInternal(socketWrapper,
-                new UpgradeToken(getInternalUpgradeHandler(adapter, null), null, null));
+                new UpgradeToken(getInternalUpgradeHandler(socketWrapper, adapter, null), null, null));
         return processor;
     }
 
 
     @Override
-    public InternalHttpUpgradeHandler getInternalUpgradeHandler(Adapter adapter,
-            Request coyoteRequest) {
-        Http2UpgradeHandler result = new Http2UpgradeHandler(adapter, coyoteRequest);
+    public InternalHttpUpgradeHandler getInternalUpgradeHandler(SocketWrapperBase<?> socketWrapper,
+            Adapter adapter, Request coyoteRequest) {
+        Http2UpgradeHandler result = (socketWrapper.hasAsyncIO())
+                ? new Http2AsyncUpgradeHandler(adapter, coyoteRequest)
+                : new Http2UpgradeHandler(adapter, coyoteRequest);
 
         result.setReadTimeout(getReadTimeout());
         result.setKeepAliveTimeout(getKeepAliveTimeout());
@@ -93,7 +111,12 @@ public class Http2Protocol implements UpgradeProtocol {
         result.setMaxConcurrentStreams(getMaxConcurrentStreams());
         result.setMaxConcurrentStreamExecution(getMaxConcurrentStreamExecution());
         result.setInitialWindowSize(getInitialWindowSize());
-
+        result.setAllowedTrailerHeaders(allowedTrailerHeaders);
+        result.setMaxHeaderCount(getMaxHeaderCount());
+        result.setMaxHeaderSize(getMaxHeaderSize());
+        result.setMaxTrailerCount(getMaxTrailerCount());
+        result.setMaxTrailerSize(getMaxTrailerSize());
+        result.setInitiatePingDisabled(initiatePingDisabled);
         return result;
     }
 
@@ -177,5 +200,79 @@ public class Http2Protocol implements UpgradeProtocol {
 
     public void setInitialWindowSize(int initialWindowSize) {
         this.initialWindowSize = initialWindowSize;
+    }
+
+
+    public void setAllowedTrailerHeaders(String commaSeparatedHeaders) {
+        // Jump through some hoops so we don't end up with an empty set while
+        // doing updates.
+        Set<String> toRemove = new HashSet<>();
+        toRemove.addAll(allowedTrailerHeaders);
+        if (commaSeparatedHeaders != null) {
+            String[] headers = commaSeparatedHeaders.split(",");
+            for (String header : headers) {
+                String trimmedHeader = header.trim().toLowerCase(Locale.ENGLISH);
+                if (toRemove.contains(trimmedHeader)) {
+                    toRemove.remove(trimmedHeader);
+                } else {
+                    allowedTrailerHeaders.add(trimmedHeader);
+                }
+            }
+            allowedTrailerHeaders.removeAll(toRemove);
+        }
+    }
+
+
+    public String getAllowedTrailerHeaders() {
+        // Chances of a size change between these lines are small enough that a
+        // sync is unnecessary.
+        List<String> copy = new ArrayList<>(allowedTrailerHeaders.size());
+        copy.addAll(allowedTrailerHeaders);
+        return StringUtils.join(copy);
+    }
+
+
+    public void setMaxHeaderCount(int maxHeaderCount) {
+        this.maxHeaderCount = maxHeaderCount;
+    }
+
+
+    public int getMaxHeaderCount() {
+        return maxHeaderCount;
+    }
+
+
+    public void setMaxHeaderSize(int maxHeaderSize) {
+        this.maxHeaderSize = maxHeaderSize;
+    }
+
+
+    public int getMaxHeaderSize() {
+        return maxHeaderSize;
+    }
+
+
+    public void setMaxTrailerCount(int maxTrailerCount) {
+        this.maxTrailerCount = maxTrailerCount;
+    }
+
+
+    public int getMaxTrailerCount() {
+        return maxTrailerCount;
+    }
+
+
+    public void setMaxTrailerSize(int maxTrailerSize) {
+        this.maxTrailerSize = maxTrailerSize;
+    }
+
+
+    public int getMaxTrailerSize() {
+        return maxTrailerSize;
+    }
+
+
+    public void setInitiatePingDisabled(boolean initiatePingDisabled) {
+        this.initiatePingDisabled = initiatePingDisabled;
     }
 }

@@ -299,7 +299,7 @@ public abstract class WsRemoteEndpointImplBase implements RemoteEndpoint {
                 throw new SocketTimeoutException(msg);
             }
         } catch (InterruptedException e) {
-            String msg = sm.getString("wsRemoteEndpoint.sendInterupt");
+            String msg = sm.getString("wsRemoteEndpoint.sendInterrupt");
             wsSession.doClose(new CloseReason(CloseCodes.GOING_AWAY, msg),
                     new CloseReason(CloseCodes.CLOSED_ABNORMALLY, msg));
             throw new IOException(msg, e);
@@ -711,7 +711,7 @@ public abstract class WsRemoteEndpointImplBase implements RemoteEndpoint {
     }
 
 
-    protected abstract void doWrite(SendHandler handler, long blockingWrieTimeoutExpiry,
+    protected abstract void doWrite(SendHandler handler, long blockingWriteTimeoutExpiry,
             ByteBuffer... data);
     protected abstract boolean isMasked();
     protected abstract void doClose();
@@ -1142,7 +1142,7 @@ public abstract class WsRemoteEndpointImplBase implements RemoteEndpoint {
     }
 
 
-    private static enum State {
+    private enum State {
         OPEN,
         STREAM_WRITING,
         WRITER_WRITING,

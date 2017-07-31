@@ -21,8 +21,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.jar.JarEntry;
@@ -39,7 +37,7 @@ public abstract class AbstractArchiveResourceSet extends AbstractResourceSet {
     private String baseUrlString;
 
     private JarFile archive = null;
-    protected HashMap<String,JarEntry> archiveEntries = null;
+    protected Map<String,JarEntry> archiveEntries = null;
     protected final Object archiveLock = new Object();
     private long archiveUseCount = 0;
 
@@ -76,9 +74,7 @@ public abstract class AbstractArchiveResourceSet extends AbstractResourceSet {
             if (pathInJar.length() > 0 && pathInJar.charAt(0) == '/') {
                 pathInJar = pathInJar.substring(1);
             }
-            Iterator<String> entries = getArchiveEntries(false).keySet().iterator();
-            while (entries.hasNext()) {
-                String name = entries.next();
+            for (String name : getArchiveEntries(false).keySet()) {
                 if (name.length() > pathInJar.length() &&
                         name.startsWith(pathInJar)) {
                     if (name.charAt(name.length() - 1) == '/') {
@@ -135,9 +131,7 @@ public abstract class AbstractArchiveResourceSet extends AbstractResourceSet {
                 }
             }
 
-            Iterator<String> entries = getArchiveEntries(false).keySet().iterator();
-            while (entries.hasNext()) {
-                String name = entries.next();
+            for (String name : getArchiveEntries(false).keySet()) {
                 if (name.length() > pathInJar.length() &&
                         name.startsWith(pathInJar)) {
                     int nextSlash = name.indexOf('/', pathInJar.length());
@@ -179,7 +173,7 @@ public abstract class AbstractArchiveResourceSet extends AbstractResourceSet {
      * @return The archives entries mapped to their names or null if
      *         {@link #getArchiveEntry(String)} should be used.
      */
-    protected abstract HashMap<String,JarEntry> getArchiveEntries(boolean single);
+    protected abstract Map<String,JarEntry> getArchiveEntries(boolean single);
 
 
     /**

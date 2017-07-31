@@ -46,7 +46,7 @@ public interface ServletRequest {
      * requests made using HTTPS, the attribute
      * <code>javax.servlet.request.X509Certificate</code> can be used to
      * retrieve information on the certificate of the client. Attributes can
-     * also be set programatically using {@link ServletRequest#setAttribute}.
+     * also be set programmatically using {@link ServletRequest#setAttribute}.
      * This allows information to be embedded into a request before a
      * {@link RequestDispatcher} call.
      * <p>
@@ -76,8 +76,15 @@ public interface ServletRequest {
 
     /**
      * Returns the name of the character encoding used in the body of this
-     * request. This method returns <code>null</code> if the request does not
-     * specify a character encoding
+     * request. This method returns <code>null</code> if the no character
+     * encoding has been specified. The following priority order is used to
+     * determine the specified encoding:
+     * <ol>
+     * <li>per request</li>
+     * <li>web application default via the deployment descriptor or
+     *     {@link ServletContext#setRequestCharacterEncoding(String)}</li>
+     * <li>container default via container specific configuration</li>
+     * </ol>
      *
      * @return a <code>String</code> containing the name of the character
      *         encoding, or <code>null</code> if the request does not specify a

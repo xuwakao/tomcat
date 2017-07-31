@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.catalina.LifecycleException;
@@ -53,12 +54,6 @@ public class MemoryRealm  extends RealmBase {
      * The Digester we will use to process in-memory database files.
      */
     private static Digester digester = null;
-
-
-    /**
-     * Descriptive information about this Realm implementation.
-     */
-    protected static final String name = "MemoryRealm";
 
 
     /**
@@ -161,7 +156,7 @@ public class MemoryRealm  extends RealmBase {
     void addUser(String username, String password, String roles) {
 
         // Accumulate the list of roles for this user
-        ArrayList<String> list = new ArrayList<>();
+        List<String> list = new ArrayList<>();
         roles += ",";
         while (true) {
             int comma = roles.indexOf(',');
@@ -188,7 +183,6 @@ public class MemoryRealm  extends RealmBase {
      * the XML input file, creating a new one if necessary.
      */
     protected synchronized Digester getDigester() {
-
         if (digester == null) {
             digester = new Digester();
             digester.setValidating(false);
@@ -201,19 +195,7 @@ public class MemoryRealm  extends RealmBase {
             }
             digester.addRuleSet(new MemoryRuleSet());
         }
-        return (digester);
-
-    }
-
-
-    /**
-     * @return a short name for this Realm implementation.
-     */
-    @Override
-    protected String getName() {
-
-        return (name);
-
+        return digester;
     }
 
 
@@ -225,9 +207,9 @@ public class MemoryRealm  extends RealmBase {
 
         GenericPrincipal principal = principals.get(username);
         if (principal != null) {
-            return (principal.getPassword());
+            return principal.getPassword();
         } else {
-            return (null);
+            return null;
         }
 
     }

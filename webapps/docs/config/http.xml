@@ -311,10 +311,16 @@
     </attribute>
 
     <attribute name="address" required="false">
-      <p>For servers with more than one IP address, this attribute
-      specifies which address will be used for listening on the specified
-      port.  By default, this port will be used on all IP addresses
-      associated with the server.</p>
+      <p>For servers with more than one IP address, this attribute specifies
+      which address will be used for listening on the specified port. By
+      default, the connector will listen all local addresses. Unless the JVM is
+      configured otherwise using system properties, the Java based connectors
+      (NIO, NIO2) will listen on both IPv4 and IPv6 addresses when configured
+      with either <code>0.0.0.0</code> or <code>::</code>. The APR/native
+      connector will only listen on IPv4 addresses if configured with
+      <code>0.0.0.0</code> and will listen on IPv6 addresses (and optionally
+      IPv4 addresses depending on the setting of <strong>ipv6onlyv6</strong>) if
+      configured with <code>::</code>.</p>
     </attribute>
 
     <attribute name="allowedTrailerHeaders" required="false">
@@ -341,12 +347,12 @@
       provider will be used.</p>
     </attribute>
 
-    <attribute name="compressableMimeType" required="false">
+    <attribute name="compressibleMimeType" required="false">
       <p>The value is a comma separated list of MIME types for which HTTP
       compression may be used.
       The default value is
       <code>
-      text/html,text/xml,text/plain,text/css,text/javascript,application/javascript
+      text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,application/xml
       </code>.
       </p>
     </attribute>
@@ -495,7 +501,10 @@
       maximum number of simultaneous requests that can be handled.  If
       not specified, this attribute is set to 200. If an executor is associated
       with this connector, this attribute is ignored as the connector will
-      execute tasks using the executor rather than an internal thread pool.</p>
+      execute tasks using the executor rather than an internal thread pool. Note
+      that if an executor is configured any value set for this attribute will be
+      recorded correctly but it will be reported (e.g. via JMX) as
+      <code>-1</code> to make clear that it is not used.</p>
     </attribute>
 
     <attribute name="maxTrailerSize" required="false">
@@ -507,7 +516,12 @@
 
     <attribute name="minSpareThreads" required="false">
       <p>The minimum number of threads always kept running. If not specified,
-      the default of <code>10</code> is used.</p>
+      the default of <code>10</code> is used. If an executor is associated
+      with this connector, this attribute is ignored as the connector will
+      execute tasks using the executor rather than an internal thread pool. Note
+      that if an executor is configured any value set for this attribute will be
+      recorded correctly but it will be reported (e.g. via JMX) as
+      <code>-1</code> to make clear that it is not used.</p>
     </attribute>
 
     <attribute name="noCompressionUserAgents" required="false">
@@ -575,12 +589,16 @@
       The default value is <code>5</code> (the value of the
       <code>java.lang.Thread.NORM_PRIORITY</code> constant). See the JavaDoc
       for the <code>java.lang.Thread</code> class for more details on what
-      this priority means.
-      </p>
+      this priority means. If an executor is associated
+      with this connector, this attribute is ignored as the connector will
+      execute tasks using the executor rather than an internal thread pool. Note
+      that if an executor is configured any value set for this attribute will be
+      recorded correctly but it will be reported (e.g. via JMX) as
+      <code>-1</code> to make clear that it is not used.</p>
     </attribute>
 
     <attribute name="throwOnFailure" required="false">
-      <p>If the Connector expereinces an Exception during a Lifecycle transition
+      <p>If the Connector experiences an Exception during a Lifecycle transition
       should the Exception be rethrown or logged? If not specified, the default
       of <code>false</code> will be used. Note that the default can be changed
       by the <code>org.apache.catalina.startup.EXIT_ON_INIT_FAILURE</code>
@@ -914,6 +932,13 @@
         otherwise it is <code>false</code>.</p>
       </attribute>
 
+      <attribute name="ipv6v6only" required="false">
+        <p>If listening on an IPv6 address on a dual stack system, should the
+        connector only listen on the IPv6 address? If not specified the default
+        is <code>false</code> and the connector will listen on the IPv6 address
+        and the equivalent IPv4 address if present.</p>
+      </attribute>
+
       <attribute name="pollerThreadCount" required="false">
         <p>Number of threads used to poll kept alive connections. On Windows the
         default is chosen so that the sockets managed by each thread is
@@ -1018,6 +1043,9 @@
      implementation to enable HTTP/2 support. See the
      <code>sslImplementationName</code> attribute of the
      <strong>Connector</strong>.</p>
+
+  <p>Additional configuration attributes are available. See the
+  <a href="http2.html">HTTP/2 Upgrade Protocol</a> documentation for details.</p>
 
   </subsection>
 
@@ -1202,8 +1230,8 @@
       <p>The names of the protocols to support when communicating with clients.
       This should be a list of any combination of the following:
       </p>
-      <ul><li>SSLv2Hello</li><li>SSLv2</li><li>SSLv3</li><li>TLSv1</li>
-          <li>TLSv1.1</li><li>TLSv1.2</li><li>all</li></ul>
+      <ul><li>SSLv2Hello</li><li>SSLv3</li><li>TLSv1</li><li>TLSv1.1</li>
+      <li>TLSv1.2</li><li>all</li></ul>
       <p>Each token in the list can be prefixed with a plus sign ("+")
       or a minus sign ("-"). A plus sign adds the protocol, a minus sign
       removes it form the current list. The list is built starting from
@@ -1219,6 +1247,16 @@
       unsafe.</p>
       <p>If not specified, the default value of <code>all</code> will be
       used.</p>
+    </attribute>
+
+    <attribute name="revocationEnabled" required="false">
+      <p>JSSE only.</p>
+      <p>Should the JSSE provider enable certificate revocation checks? If
+      <strong>certificateRevocationListFile</strong> is set then this attribute
+      is ignored and revocation checks are always enabled. This attribute is
+      intended to enable revocation checks that have been configured for the
+      current JSSE provider via other means. If not specified, a default of
+      <code>false</code> is used.</p>
     </attribute>
 
     <attribute name="sessionCacheSize" required="false">
@@ -1300,8 +1338,11 @@
       <p>JSSE only.</p>
       <p>The type of key store used for the trust store. The default is the
       value of the <code>javax.net.ssl.trustStoreType</code> system property. If
-      that property is null, the value of <code>keystoreType</code> is used as
-      the default.</p>
+      that property is null, a single certificate has been configured for this
+      TLS virtual host and that certificate has a <code>keystoreType</code> that
+      is not <code>PKCS12</code> then the default will be the
+      <code>keystoreType</code> of the single certificate. If none of these
+      identify a default, the default will be <code>JKS</code>.</p>
      </attribute>
 
   </attributes>

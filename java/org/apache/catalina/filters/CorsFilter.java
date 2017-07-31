@@ -75,7 +75,7 @@ import org.apache.tomcat.util.res.StringManager;
  * @see <a href="http://www.w3.org/TR/cors/">CORS specification</a>
  *
  */
-public final class CorsFilter extends GenericFilter {
+public class CorsFilter extends GenericFilter {
 
     private static final long serialVersionUID = 1L;
     private static final Log log = LogFactory.getLog(CorsFilter.class);
@@ -276,6 +276,10 @@ public final class CorsFilter extends GenericFilter {
                     CorsFilter.RESPONSE_HEADER_ACCESS_CONTROL_EXPOSE_HEADERS,
                     exposedHeadersString);
         }
+
+        // Indicate the response depends on the origin
+        response.addHeader(CorsFilter.REQUEST_HEADER_VARY,
+                CorsFilter.REQUEST_HEADER_ORIGIN);
 
         // Forward the request down the filter chain.
         filterChain.doFilter(request, response);
@@ -966,6 +970,13 @@ public final class CorsFilter extends GenericFilter {
             "Access-Control-Allow-Headers";
 
     // -------------------------------------------------- CORS Request Headers
+
+    /**
+     * The Vary header indicates allows disabling proxy caching by indicating
+     * the the response depends on the origin.
+     */
+    public static final String REQUEST_HEADER_VARY = "Vary";
+
     /**
      * The Origin header indicates where the cross-origin request or preflight
      * request originates from.
@@ -1022,7 +1033,7 @@ public final class CorsFilter extends GenericFilter {
      * Enumerates varies types of CORS requests. Also, provides utility methods
      * to determine the request type.
      */
-    protected static enum CORSRequestType {
+    protected enum CORSRequestType {
         /**
          * A simple HTTP request, i.e. it shouldn't be pre-flighted.
          */

@@ -20,6 +20,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import org.apache.coyote.InputBuffer;
 import org.apache.coyote.Request;
@@ -27,6 +28,7 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.http.MimeHeaders;
+import org.apache.tomcat.util.http.parser.HttpParser;
 import org.apache.tomcat.util.net.ApplicationBufferHandler;
 import org.apache.tomcat.util.net.SocketWrapperBase;
 import org.apache.tomcat.util.res.StringManager;
@@ -45,56 +47,6 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
      * The string manager for this package.
      */
     private static final StringManager sm = StringManager.getManager(Http11InputBuffer.class);
-
-
-    private static final boolean[] HTTP_TOKEN_CHAR = new boolean[128];
-    static {
-        for (int i = 0; i < 128; i++) {
-            if (i < 32) {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == 127) {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '(') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == ')') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '<') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '>') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '@') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == ',') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == ';') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == ':') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '\\') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '\"') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '/') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '[') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == ']') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '?') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '=') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '{') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == '}') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else if (i == ' ') {
-                HTTP_TOKEN_CHAR[i] = false;
-            } else {
-                HTTP_TOKEN_CHAR[i] = true;
-            }
-        }
-    }
 
 
     private static final byte[] CLIENT_PREFACE_START =
@@ -231,10 +183,7 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
             throw new NullPointerException(sm.getString("iib.filter.npe"));
         }
 
-        InputFilter[] newFilterLibrary = new InputFilter[filterLibrary.length + 1];
-        for (int i = 0; i < filterLibrary.length; i++) {
-            newFilterLibrary[i] = filterLibrary[i];
-        }
+        InputFilter[] newFilterLibrary = Arrays.copyOf(filterLibrary, filterLibrary.length + 1);
         newFilterLibrary[filterLibrary.length] = filter;
         filterLibrary = newFilterLibrary;
 
@@ -330,12 +279,16 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
     void nextRequest() {
         request.recycle();
 
-        // Copy leftover bytes to the beginning of the buffer
-        if (byteBuffer.remaining() > 0 && byteBuffer.position() > 0) {
-            byteBuffer.compact();
+        if (byteBuffer.position() > 0) {
+            if (byteBuffer.remaining() > 0) {
+                // Copy leftover bytes to the beginning of the buffer
+                byteBuffer.compact();
+                byteBuffer.flip();
+            } else {
+                // Reset position and limit to 0
+                byteBuffer.position(0).limit(0);
+            }
         }
-        // Always reset pos to zero
-        byteBuffer.limit(byteBuffer.limit() - byteBuffer.position()).position(0);
 
         // Recycle filters
         for (int i = 0; i <= lastActiveFilter; i++) {
@@ -365,10 +318,12 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
      * @throws IOException If an exception occurs during the underlying socket
      * read operations, or if the given buffer is not big enough to accommodate
      * the whole line.
+     *
      * @return true if data is properly fed; false if no data is available
      * immediately and thread should be freed
      */
-    boolean parseRequestLine(boolean keptAlive) throws IOException {
+    boolean parseRequestLine(boolean keptAlive, int connectionTimeout, int keepAliveTimeout)
+            throws IOException {
 
         // check state
         if (!parsingRequestLine) {
@@ -386,7 +341,7 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
                     if (keptAlive) {
                         // Haven't read any request data yet so use the keep-alive
                         // timeout.
-                        wrapper.setReadTimeout(wrapper.getEndpoint().getKeepAliveTimeout());
+                        wrapper.setReadTimeout(keepAliveTimeout);
                     }
                     if (!fill(false)) {
                         // A read is pending, so no longer in initial state
@@ -395,7 +350,7 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
                     }
                     // At least one byte of the request has been received.
                     // Switch to the socket timeout.
-                    wrapper.setReadTimeout(wrapper.getEndpoint().getSoTimeout());
+                    wrapper.setReadTimeout(connectionTimeout);
                 }
                 if (!keptAlive && byteBuffer.position() == 0 && byteBuffer.limit() >= CLIENT_PREFACE_START.length - 1) {
                     boolean prefaceMatch = true;
@@ -446,7 +401,7 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
                     space = true;
                     request.method().setBytes(byteBuffer.array(), parsingRequestLineStart,
                             pos - parsingRequestLineStart);
-                } else if (!HTTP_TOKEN_CHAR[chr]) {
+                } else if (!HttpParser.isToken(chr)) {
                     byteBuffer.position(byteBuffer.position() - 1);
                     throw new IllegalArgumentException(sm.getString("iib.invalidmethod"));
                 }
@@ -497,6 +452,8 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
                     end = pos;
                 } else if (chr == Constants.QUESTION && parsingRequestLineQPos == -1) {
                     parsingRequestLineQPos = pos;
+                } else if (HttpParser.isNotRequestTarget(chr)) {
+                    throw new IllegalArgumentException(sm.getString("iib.invalidRequestTarget"));
                 }
             }
             if (parsingRequestLineQPos >= 0) {
@@ -534,7 +491,7 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
         if (parsingRequestLinePhase == 6) {
             //
             // Reading the protocol
-            // Protocol is always US-ASCII
+            // Protocol is always "HTTP/" DIGIT "." DIGIT
             //
             while (!parsingRequestLineEol) {
                 // Read new bytes if needed
@@ -552,6 +509,8 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
                         end = pos;
                     }
                     parsingRequestLineEol = true;
+                } else if (!HttpParser.isHttpProtocol(chr)) {
+                    throw new IllegalArgumentException(sm.getString("iib.invalidHttpProtocol"));
                 }
             }
 
@@ -697,6 +656,16 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
     }
 
 
+    boolean isChunking() {
+        for (int i = 0; i < lastActiveFilter; i++) {
+            if (activeFilters[i] == filterLibrary[Constants.CHUNKED_FILTER]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
     void init(SocketWrapperBase<?> socketWrapper) {
 
         wrapper = socketWrapper;
@@ -816,7 +785,7 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
                 headerData.realPos = pos;
                 headerData.lastSignificantChar = pos;
                 break;
-            } else if (chr < 0 || !HTTP_TOKEN_CHAR[chr]) {
+            } else if (!HttpParser.isToken(chr)) {
                 // If a non-token header is detected, skip the line and
                 // ignore the header
                 headerData.lastSignificantChar = pos;
@@ -966,12 +935,12 @@ public class Http11InputBuffer implements InputBuffer, ApplicationBufferHandler 
 
     // ----------------------------------------------------------- Inner classes
 
-    private static enum HeaderParseStatus {
+    private enum HeaderParseStatus {
         DONE, HAVE_MORE_HEADERS, NEED_MORE_DATA
     }
 
 
-    private static enum HeaderParsePosition {
+    private enum HeaderParsePosition {
         /**
          * Start of a new header. A CRLF here means that there are no more
          * headers. Any other character starts a header name.

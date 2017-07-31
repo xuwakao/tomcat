@@ -242,15 +242,13 @@ public class TestELSupport {
 
     @Test
     public void testCoerceToNumber01() {
-        Object result = ELSupport.coerceToNumber(
-                null, (Object) null, Integer.class);
-        Assert.assertNull("Resut: " + result, result);
+        Object result = ELSupport.coerceToNumber(null, null, Integer.class);
+        Assert.assertNull("Result: " + result, result);
     }
 
     @Test
     public void testCoerceToNumber02() {
-        Object result = ELSupport.coerceToNumber(
-                null, (Object) null, int.class);
+        Object result = ELSupport.coerceToNumber(null, null, int.class);
         Assert.assertEquals(Integer.valueOf(0), result);
     }
 
@@ -263,7 +261,7 @@ public class TestELSupport {
     @Test
     public void testCoerceToBoolean02() {
         Object result = ELSupport.coerceToBoolean(null, null, false);
-        Assert.assertNull("Resut: " + result, result);
+        Assert.assertNull("Result: " + result, result);
     }
 
     private static void testIsSame(Object value) {

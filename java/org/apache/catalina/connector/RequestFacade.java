@@ -34,11 +34,11 @@ import javax.servlet.ServletInputStream;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletMapping;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpUpgradeHandler;
-import javax.servlet.http.Mapping;
 import javax.servlet.http.Part;
 import javax.servlet.http.PushBuilder;
 
@@ -738,14 +738,14 @@ public class RequestFacade implements HttpServletRequest {
 
 
     @Override
-    public Mapping getMapping() {
+    public HttpServletMapping getHttpServletMapping() {
 
         if (request == null) {
             throw new IllegalStateException(
                             sm.getString("requestFacade.nullRequest"));
         }
 
-        return request.getMapping();
+        return request.getHttpServletMapping();
     }
 
 
@@ -1068,10 +1068,12 @@ public class RequestFacade implements HttpServletRequest {
         return request.getAsyncContext();
     }
 
+
     @Override
     public DispatcherType getDispatcherType() {
         return request.getDispatcherType();
     }
+
 
     @Override
     public boolean authenticate(HttpServletResponse response)
@@ -1096,31 +1098,25 @@ public class RequestFacade implements HttpServletRequest {
         return request.getParts();
     }
 
+
     @Override
     public Part getPart(String name) throws IllegalStateException, IOException,
             ServletException {
         return request.getPart(name);
     }
 
+
     public boolean getAllowTrace() {
         return request.getConnector().getAllowTrace();
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @since Servlet 3.1
-     */
+
     @Override
     public long getContentLengthLong() {
         return request.getContentLengthLong();
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @since Servlet 3.1
-     */
+
     @Override
     public <T extends HttpUpgradeHandler> T upgrade(
             Class<T> httpUpgradeHandlerClass) throws java.io.IOException, ServletException {
@@ -1128,13 +1124,20 @@ public class RequestFacade implements HttpServletRequest {
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @since Servlet 4.0
-     */
     @Override
-    public PushBuilder getPushBuilder() {
-        return request.getPushBuilder();
+    public PushBuilder newPushBuilder() {
+        return request.newPushBuilder();
+    }
+
+
+    @Override
+    public boolean isTrailerFieldsReady() {
+        return request.isTrailerFieldsReady();
+    }
+
+
+    @Override
+    public Map<String, String> getTrailerFields() {
+        return request.getTrailerFields();
     }
 }

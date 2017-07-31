@@ -23,7 +23,6 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.security.Principal;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import javax.security.auth.Subject;
@@ -140,12 +139,6 @@ public class JAASRealm extends RealmBase {
 
 
     /**
-     * Descriptive information about this <code>Realm</code> implementation.
-     */
-    protected static final String name = "JAASRealm";
-
-
-    /**
      * The list of role class names, split out for easy processing.
      */
     protected final List<String> roleClasses = new ArrayList<>();
@@ -253,7 +246,7 @@ public class JAASRealm extends RealmBase {
      protected String roleClassNames = null;
 
      public String getRoleClassNames() {
-         return (this.roleClassNames);
+         return this.roleClassNames;
      }
 
      /**
@@ -309,7 +302,7 @@ public class JAASRealm extends RealmBase {
      protected String userClassNames = null;
 
      public String getUserClassNames() {
-         return (this.userClassNames);
+         return this.userClassNames;
      }
 
      /**
@@ -407,7 +400,7 @@ public class JAASRealm extends RealmBase {
         } catch (Throwable e) {
             ExceptionUtils.handleThrowable(e);
             log.error(sm.getString("jaasRealm.unexpectedError"), e);
-            return (null);
+            return null;
         } finally {
             if(!isUseContextClassLoader()) {
               Thread.currentThread().setContextClassLoader(ocl);
@@ -425,27 +418,27 @@ public class JAASRealm extends RealmBase {
             if (subject == null) {
                 if( log.isDebugEnabled())
                     log.debug(sm.getString("jaasRealm.failedLogin", username));
-                return (null);
+                return null;
             }
         } catch (AccountExpiredException e) {
             if (log.isDebugEnabled())
                 log.debug(sm.getString("jaasRealm.accountExpired", username));
-            return (null);
+            return null;
         } catch (CredentialExpiredException e) {
             if (log.isDebugEnabled())
                 log.debug(sm.getString("jaasRealm.credentialExpired", username));
-            return (null);
+            return null;
         } catch (FailedLoginException e) {
             if (log.isDebugEnabled())
                 log.debug(sm.getString("jaasRealm.failedLogin", username));
-            return (null);
+            return null;
         } catch (LoginException e) {
             log.warn(sm.getString("jaasRealm.loginException", username), e);
-            return (null);
+            return null;
         } catch (Throwable e) {
             ExceptionUtils.handleThrowable(e);
             log.error(sm.getString("jaasRealm.unexpectedError"), e);
-            return (null);
+            return null;
         }
 
         if( log.isDebugEnabled())
@@ -455,27 +448,17 @@ public class JAASRealm extends RealmBase {
         Principal principal = createPrincipal(username, subject, loginContext);
         if (principal == null) {
             log.debug(sm.getString("jaasRealm.authenticateFailure", username));
-            return (null);
+            return null;
         }
         if (log.isDebugEnabled()) {
             log.debug(sm.getString("jaasRealm.authenticateSuccess", username));
         }
 
-        return (principal);
+        return principal;
         } catch( Throwable t) {
             log.error( "error ", t);
             return null;
         }
-    }
-
-    /**
-     * @return a short name for this <code>Realm</code> implementation.
-     */
-    @Override
-    protected String getName() {
-
-        return (name);
-
     }
 
 
@@ -486,9 +469,7 @@ public class JAASRealm extends RealmBase {
      */
     @Override
     protected String getPassword(String username) {
-
-        return (null);
-
+        return null;
     }
 
 
@@ -529,10 +510,7 @@ public class JAASRealm extends RealmBase {
         Principal userPrincipal = null;
 
         // Scan the Principals for this Subject
-        Iterator<Principal> principals = subject.getPrincipals().iterator();
-        while (principals.hasNext()) {
-            Principal principal = principals.next();
-
+        for (Principal principal : subject.getPrincipals()) {
             String principalClass = principal.getClass().getName();
 
             if( log.isDebugEnabled() ) {

@@ -16,21 +16,35 @@
  */
 package org.apache.tomcat.util.compat;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+
 class Jre9Compat extends JreCompat {
 
     private static final Class<?> inaccessibleObjectExceptionClazz;
-
+    private static final Method setApplicationProtocolsMethod;
+    private static final Method getApplicationProtocolMethod;
 
     static {
         Class<?> c1 = null;
+        Method m2 = null;
+        Method m3 = null;
+
         try {
             c1 = Class.forName("java.lang.reflect.InaccessibleObjectException");
-        } catch (SecurityException e) {
+            m2 = SSLParameters.class.getMethod("setApplicationProtocols", String[].class);
+            m3 = SSLEngine.class.getMethod("getApplicationProtocol");
+        } catch (SecurityException | NoSuchMethodException e) {
             // Should never happen
         } catch (ClassNotFoundException e) {
             // Must be Java 8
         }
         inaccessibleObjectExceptionClazz = c1;
+        setApplicationProtocolsMethod = m2;
+        getApplicationProtocolMethod = m3;
     }
 
 
@@ -40,11 +54,31 @@ class Jre9Compat extends JreCompat {
 
 
     @Override
-    public boolean isInstanceOfInaccessibleObjectException(Exception e) {
-        if (e == null) {
+    public boolean isInstanceOfInaccessibleObjectException(Throwable t) {
+        if (t == null) {
             return false;
         }
 
-        return inaccessibleObjectExceptionClazz.isAssignableFrom(e.getClass());
+        return inaccessibleObjectExceptionClazz.isAssignableFrom(t.getClass());
+    }
+
+
+    @Override
+    public void setApplicationProtocols(SSLParameters sslParameters, String[] protocols) {
+        try {
+            setApplicationProtocolsMethod.invoke(sslParameters, (Object) protocols);
+        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+            throw new UnsupportedOperationException(e);
+        }
+    }
+
+
+    @Override
+    public String getApplicationProtocol(SSLEngine sslEngine) {
+        try {
+            return (String) getApplicationProtocolMethod.invoke(sslEngine);
+        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+            throw new UnsupportedOperationException(e);
+        }
     }
 }

@@ -20,7 +20,6 @@ package org.apache.catalina.ha.backend;
 
 /* for MBean to read ready and busy */
 
-import java.util.Iterator;
 import java.util.Set;
 
 import javax.management.MBeanServer;
@@ -32,7 +31,7 @@ import org.apache.tomcat.util.modeler.Registry;
 /*
  * Listener to provider informations to mod_heartbeat.c
  * *msg_format = "v=%u&ready=%u&busy=%u"; (message to send).
- * send the muticast message using the format...
+ * send the multicast message using the format...
  * what about the bind(IP. port) only IP makes sense (for the moment).
  * BTW:v  = version :-)
  */
@@ -58,9 +57,7 @@ public class CollectedInfo {
         String onStr = "*:type=ThreadPool,*";
         ObjectName objectName = new ObjectName(onStr);
         Set<ObjectInstance> set = mBeanServer.queryMBeans(objectName, null);
-        Iterator<ObjectInstance> iterator = set.iterator();
-        while (iterator.hasNext()) {
-            ObjectInstance oi = iterator.next();
+        for (ObjectInstance oi : set) {
             objName = oi.getObjectName();
             String name = objName.getKeyProperty("name");
 
@@ -83,7 +80,7 @@ public class CollectedInfo {
                 break; /* Done port and host are the expected ones */
         }
         if (objName == null)
-            throw(new Exception("Can't find connector for " + host + ":" + port));
+            throw new Exception("Can't find connector for " + host + ":" + port);
         this.port = iport;
         this.host = shost;
 
@@ -91,7 +88,7 @@ public class CollectedInfo {
 
     public void refresh() throws Exception {
         if (mBeanServer == null || objName == null) {
-            throw(new Exception("Not initialized!!!"));
+            throw new Exception("Not initialized!!!");
         }
         Integer imax = (Integer) mBeanServer.getAttribute(objName, "maxThreads");
 

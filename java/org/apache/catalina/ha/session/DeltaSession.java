@@ -28,6 +28,7 @@ import java.io.WriteAbortedException;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -401,7 +402,8 @@ public class DeltaSession extends StandardSession implements Externalizable,Clus
                 }
             }
         }
-        return (this.isValid);
+
+        return this.isValid;
     }
 
     /**
@@ -498,7 +500,7 @@ public class DeltaSession extends StandardSession implements Externalizable,Clus
         sb.append("DeltaSession[");
         sb.append(id);
         sb.append("]");
-        return (sb.toString());
+        return sb.toString();
     }
 
     @Override
@@ -832,8 +834,8 @@ public class DeltaSession extends StandardSession implements Externalizable,Clus
 
         // Accumulate the names of serializable and non-serializable attributes
         String keys[] = keys();
-        ArrayList<String> saveNames = new ArrayList<>();
-        ArrayList<Object> saveValues = new ArrayList<>();
+        List<String> saveNames = new ArrayList<>();
+        List<Object> saveValues = new ArrayList<>();
         for (int i = 0; i < keys.length; i++) {
             Object value = null;
             value = attributes.get(keys[i]);

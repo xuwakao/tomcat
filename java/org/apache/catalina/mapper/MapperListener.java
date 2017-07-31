@@ -131,7 +131,7 @@ public class MapperListener extends LifecycleMBeanBase
     @Override
     protected String getDomainInternal() {
         if (service instanceof LifecycleMBeanBase) {
-            return ((LifecycleMBeanBase) service).getDomain();
+            return service.getDomain();
         } else {
             return null;
         }
@@ -141,7 +141,7 @@ public class MapperListener extends LifecycleMBeanBase
     @Override
     protected String getObjectNameKeyProperties() {
         // Same as connector but Mapper rather than Connector
-        return ("type=Mapper");
+        return "type=Mapper";
     }
 
     // --------------------------------------------- Container Listener methods

@@ -34,14 +34,14 @@
   <xsl:param    name="home-href"           select="'http://tomcat.apache.org/'"/>
   <xsl:param    name="home-logo"           select="'/images/tomcat.png'"/>
   <xsl:param    name="home-stylesheet"     select="'/images/docs-stylesheet.css'"/>
-  <xsl:param    name="apache-logo"         select="'/images/asf-feather.png'"/>
+  <xsl:param    name="apache-logo"         select="'/images/asf-logo.svg'"/>
   <xsl:param    name="subdir"              select="''"/>
   <xsl:param    name="relative-path"       select="'.'"/>
   <xsl:param    name="version"             select="'9.0.x'"/>
   <xsl:param    name="majorversion"        select="'9'"/>
   <xsl:param    name="majorminorversion"   select="'9.0'"/>
   <xsl:param    name="build-date"          select="'MMM d yyyy'"/>
-  <xsl:param    name="build-date-iso-8601" select="'yyyy-dd-MM'"/>
+  <xsl:param    name="build-date-iso-8601" select="'yyyy-MM-dd'"/>
   <xsl:param    name="year"                select="'yyyy'"/>
   <xsl:param    name="buglink"             select="'http://bz.apache.org/bugzilla/show_bug.cgi?id='"/>
   <xsl:param    name="revlink"             select="'http://svn.apache.org/viewvc?view=rev&amp;rev='"/>

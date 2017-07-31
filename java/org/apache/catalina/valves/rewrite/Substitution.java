@@ -17,8 +17,11 @@
 package org.apache.catalina.valves.rewrite;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
+
+import org.apache.catalina.util.URLEncoder;
 
 public class Substitution {
 
@@ -40,14 +43,18 @@ public class Substitution {
         public int n;
         @Override
         public String evaluate(Matcher rule, Matcher cond, Resolver resolver) {
+            String result = rule.group(n);
+            if (result == null) {
+                result = "";
+            }
             if (escapeBackReferences) {
                 // Note: This should be consistent with the way httpd behaves.
                 //       We might want to consider providing a dedicated decoder
                 //       with an option to add additional safe characters to
                 //       provide users with more flexibility
-                return RewriteValve.ENCODER.encode(rule.group(n), resolver.getUriEncoding());
+                return URLEncoder.DEFAULT.encode(result, resolver.getUriCharset());
             } else {
-                return rule.group(n);
+                return result;
             }
         }
     }
@@ -56,7 +63,7 @@ public class Substitution {
         public int n;
         @Override
         public String evaluate(Matcher rule, Matcher cond, Resolver resolver) {
-            return cond.group(n);
+            return (cond.group(n) == null ? "" : cond.group(n));
         }
     }
 
@@ -95,7 +102,7 @@ public class Substitution {
     public class MapElement extends SubstitutionElement {
         public RewriteMap map = null;
         public String key;
-        public String defaultValue = null;
+        public String defaultValue = "";
         public int n;
         @Override
         public String evaluate(Matcher rule, Matcher cond, Resolver resolver) {
@@ -120,7 +127,7 @@ public class Substitution {
 
     public void parse(Map<String, RewriteMap> maps) {
 
-        ArrayList<SubstitutionElement> elements = new ArrayList<>();
+        List<SubstitutionElement> elements = new ArrayList<>();
         int pos = 0;
         int percentPos = 0;
         int dollarPos = 0;

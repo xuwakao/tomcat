@@ -41,6 +41,7 @@ import javax.servlet.descriptor.TaglibDescriptor;
 
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.buf.B2CConverter;
 import org.apache.tomcat.util.buf.UDecoder;
 import org.apache.tomcat.util.descriptor.XmlIdentifiers;
 import org.apache.tomcat.util.digester.DocumentProperties;
@@ -54,7 +55,7 @@ import org.apache.tomcat.util.res.StringManager;
  * This class checks for invalid duplicates (eg filter/servlet names)
  * StandardContext will check validity of values (eg URL formats etc)
  */
-public class WebXml extends XmlEncodingBase implements DocumentProperties.Encoding {
+public class WebXml extends XmlEncodingBase implements DocumentProperties.Charset {
 
     protected static final String ORDER_OTHERS =
         "org.apache.catalina.order.others";
@@ -317,7 +318,7 @@ public class WebXml extends XmlEncodingBase implements DocumentProperties.Encodi
     private final Map<String,String> servletMappings = new HashMap<>();
     private final Set<String> servletMappingNames = new HashSet<>();
     public void addServletMapping(String urlPattern, String servletName) {
-        addServletMappingDecoded(UDecoder.URLDecode(urlPattern, getEncoding()), servletName);
+        addServletMappingDecoded(UDecoder.URLDecode(urlPattern, getCharset()), servletName);
     }
     public void addServletMappingDecoded(String urlPattern, String servletName) {
         String oldServletName = servletMappings.put(urlPattern, servletName);
@@ -402,7 +403,7 @@ public class WebXml extends XmlEncodingBase implements DocumentProperties.Encodi
     // jsp-config/jsp-property-group
     private final Set<JspPropertyGroup> jspPropertyGroups = new LinkedHashSet<>();
     public void addJspPropertyGroup(JspPropertyGroup propertyGroup) {
-        propertyGroup.setEncoding(getEncoding());
+        propertyGroup.setCharset(getCharset());
         jspPropertyGroups.add(propertyGroup);
     }
     public Set<JspPropertyGroup> getJspPropertyGroups() {
@@ -414,7 +415,7 @@ public class WebXml extends XmlEncodingBase implements DocumentProperties.Encodi
     // TODO: Should support multiple description elements with language
     private final Set<SecurityConstraint> securityConstraints = new HashSet<>();
     public void addSecurityConstraint(SecurityConstraint securityConstraint) {
-        securityConstraint.setEncoding(getEncoding());
+        securityConstraint.setCharset(getCharset());
         securityConstraints.add(securityConstraint);
     }
     public Set<SecurityConstraint> getSecurityConstraints() {
@@ -607,6 +608,36 @@ public class WebXml extends XmlEncodingBase implements DocumentProperties.Encodi
             tlds.add(descriptor);
         }
         return new JspConfigDescriptorImpl(descriptors, tlds);
+    }
+
+    private String requestCharacterEncoding;
+    public String getRequestCharacterEncoding() {
+        return requestCharacterEncoding;
+    }
+    public void setRequestCharacterEncoding(String requestCharacterEncoding) {
+        if (requestCharacterEncoding != null) {
+            try {
+                B2CConverter.getCharset(requestCharacterEncoding);
+            } catch (UnsupportedEncodingException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+        this.requestCharacterEncoding = requestCharacterEncoding;
+    }
+
+    private String responseCharacterEncoding;
+    public String getResponseCharacterEncoding() {
+        return responseCharacterEncoding;
+    }
+    public void setResponseCharacterEncoding(String responseCharacterEncoding) {
+        if (responseCharacterEncoding != null) {
+            try {
+                B2CConverter.getCharset(responseCharacterEncoding);
+            } catch (UnsupportedEncodingException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+        this.responseCharacterEncoding = responseCharacterEncoding;
     }
 
     // Attributes not defined in web.xml or web-fragment.xml
@@ -920,16 +951,16 @@ public class WebXml extends XmlEncodingBase implements DocumentProperties.Encodi
         }
 
         for (ErrorPage errorPage : errorPages.values()) {
-            String exeptionType = errorPage.getExceptionType();
+            String exceptionType = errorPage.getExceptionType();
             int errorCode = errorPage.getErrorCode();
 
-            if (exeptionType == null && errorCode == 0 && getMajorVersion() == 2) {
+            if (exceptionType == null && errorCode == 0 && getMajorVersion() == 2) {
                 // Default error pages are only supported from 3.0 onwards
                 continue;
             }
             sb.append("  <error-page>\n");
             if (errorPage.getExceptionType() != null) {
-                appendElement(sb, INDENT4, "exception-type", exeptionType);
+                appendElement(sb, INDENT4, "exception-type", exceptionType);
             } else if (errorPage.getErrorCode() > 0) {
                 appendElement(sb, INDENT4, "error-code",
                         Integer.toString(errorCode));
@@ -1307,6 +1338,7 @@ public class WebXml extends XmlEncodingBase implements DocumentProperties.Encodi
                     sb.append("    </locale-encoding-mapping>\n");
                 }
                 sb.append("  </locale-encoding-mapping-list>\n");
+                sb.append("\n");
             }
         }
 
@@ -1314,11 +1346,16 @@ public class WebXml extends XmlEncodingBase implements DocumentProperties.Encodi
         if (getMajorVersion() > 3 ||
                 (getMajorVersion() == 3 && getMinorVersion() > 0)) {
             if (denyUncoveredHttpMethods) {
-                sb.append("\n");
                 sb.append("  <deny-uncovered-http-methods/>");
+                sb.append("\n");
             }
         }
 
+        // request-encoding and response-encoding was introduced in Servlet 4.0
+        if (getMajorVersion() >= 4) {
+            appendElement(sb, INDENT2, "request-character-encoding", requestCharacterEncoding);
+            appendElement(sb, INDENT2, "response-character-encoding", responseCharacterEncoding);
+        }
         sb.append("</web-app>");
         return sb.toString();
     }
@@ -1432,12 +1469,26 @@ public class WebXml extends XmlEncodingBase implements DocumentProperties.Encodi
         }
 
         // Note: Not permitted in fragments but we also use fragments for
-        //       per-Host and global defaults so it may appear there
+        //       per-Host and global defaults so they may appear there
         if (!denyUncoveredHttpMethods) {
             for (WebXml fragment : fragments) {
                 if (fragment.getDenyUncoveredHttpMethods()) {
                     denyUncoveredHttpMethods = true;
                     break;
+                }
+            }
+        }
+        if (requestCharacterEncoding == null) {
+            for (WebXml fragment : fragments) {
+                if (fragment.getRequestCharacterEncoding() != null) {
+                    requestCharacterEncoding = fragment.getRequestCharacterEncoding();
+                }
+            }
+        }
+        if (responseCharacterEncoding == null) {
+            for (WebXml fragment : fragments) {
+                if (fragment.getResponseCharacterEncoding() != null) {
+                    responseCharacterEncoding = fragment.getResponseCharacterEncoding();
                 }
             }
         }

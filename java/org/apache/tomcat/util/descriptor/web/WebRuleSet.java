@@ -24,11 +24,10 @@ import org.apache.tomcat.util.digester.CallMethodRule;
 import org.apache.tomcat.util.digester.CallParamRule;
 import org.apache.tomcat.util.digester.Digester;
 import org.apache.tomcat.util.digester.Rule;
-import org.apache.tomcat.util.digester.RuleSetBase;
+import org.apache.tomcat.util.digester.RuleSet;
 import org.apache.tomcat.util.digester.SetNextRule;
 import org.apache.tomcat.util.res.StringManager;
 import org.xml.sax.Attributes;
-
 
 /**
  * <p><strong>RuleSet</strong> for processing the contents of a web application
@@ -36,7 +35,7 @@ import org.xml.sax.Attributes;
  *
  * @author Craig R. McClanahan
  */
-public class WebRuleSet extends RuleSetBase {
+public class WebRuleSet implements RuleSet {
 
     /**
      * The string resources for this package.
@@ -136,9 +135,6 @@ public class WebRuleSet extends RuleSetBase {
      * @param fragment <code>true</code> if this is a web fragment
      */
     public WebRuleSet(String prefix, boolean fragment) {
-
-        super();
-        this.namespaceURI = null;
         this.prefix = prefix;
         this.fragment = fragment;
 
@@ -152,8 +148,8 @@ public class WebRuleSet extends RuleSetBase {
         relativeOrdering = new RelativeOrderingRule(fragment);
     }
 
-    // --------------------------------------------------------- Public Methods
 
+    // --------------------------------------------------------- Public Methods
 
     /**
      * <p>Add the set of Rule instances defined in this RuleSet to the
@@ -195,7 +191,11 @@ public class WebRuleSet extends RuleSetBase {
             digester.addCallMethod(fullPrefix + "/absolute-ordering/others",
                                    "addAbsoluteOrderingOthers");
             digester.addRule(fullPrefix + "/deny-uncovered-http-methods",
-                    new SetDenyUncoveredHttpMethodsRule());
+                             new SetDenyUncoveredHttpMethodsRule());
+            digester.addCallMethod(fullPrefix + "/request-character-encoding",
+                                   "setRequestCharacterEncoding", 0);
+            digester.addCallMethod(fullPrefix + "/response-character-encoding",
+                                   "setResponseCharacterEncoding", 0);
         }
 
         digester.addCallMethod(fullPrefix + "/context-param",

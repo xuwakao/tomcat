@@ -205,6 +205,16 @@
         default is <code>true</code>.</p>
       </attribute>
 
+      <attribute name="forkJoinCommonPoolProtection" required="false">
+        <p>Enables protection so the threads created for
+        <code>ForkJoinPool.commonPool()</code> do not result in a memory leak.
+        The protection is enabled by setting the
+        <code>java.util.concurrent.ForkJoinPool.common.threadFactory</code>
+        system property. If this property is set when Tomcat starts, Tomcat will
+        not over-ride it even if this protection is explicitly enabled. The
+        default is <code>true</code>.</p>
+      </attribute>
+
       <attribute name="gcDaemonProtection" required="false">
         <p>Enables protection so that calls to
         <code>sun.misc.GC.requestLatency(long)</code> triggered by a web
@@ -340,7 +350,7 @@
         used.</p>
       </attribute>
 
-      <attribute name="storeRegsitry" required="false">
+      <attribute name="storeRegistry" required="false">
         <p>The URL of the configuration file that configures how the
         <code>IStoreConfig</code> is to save the configuration. If not specified
         the built in resource
@@ -558,6 +568,15 @@
     <p><strong>Note that the examples above do not use SSL. JMX access should
     be considered equivalent to administrative access and secured accordingly.
     </strong></p>
+
+  </subsection>
+
+  <subsection name="System property replacement - org.apache.catalina.util.SystemPropertyReplacerListener">
+
+    <p>This listener performs system property replacement using the property
+     source configured on the digester. When <code>${parameter}</code>
+     denoted parameters are found in the values of system properties,
+     the property source will be invoked to attempt to replace it.</p>
 
   </subsection>
 

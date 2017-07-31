@@ -51,11 +51,6 @@ public class CombinedRealm extends RealmBase {
     protected final List<Realm> realms = new LinkedList<>();
 
     /**
-     * Descriptive information about this Realm implementation.
-     */
-    protected static final String name = "CombinedRealm";
-
-    /**
      * Add a realm to the list of realms that will be used to authenticate
      * users.
      * @param theRealm realm which should be wrapped by the combined realm
@@ -392,11 +387,6 @@ public class CombinedRealm extends RealmBase {
     }
 
     @Override
-    protected String getName() {
-        return name;
-    }
-
-    @Override
     protected String getPassword(String username) {
         // This method should never be called
         // Stack trace will show where this was called from
@@ -416,6 +406,17 @@ public class CombinedRealm extends RealmBase {
                     sm.getString("combinedRealm.getPrincipal"));
         log.error(sm.getString("combinedRealm.unexpectedMethod"), uoe);
         throw uoe;
+    }
+
+
+    @Override
+    public boolean isAvailable() {
+        for (Realm realm : realms) {
+            if (!realm.isAvailable()) {
+                return false;
+            }
+        }
+        return true;
     }
 
 }

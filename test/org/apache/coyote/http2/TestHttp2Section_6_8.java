@@ -61,8 +61,6 @@ public class TestHttp2Section_6_8 extends Http2TestBase {
 
         // Go away
         parser.readFrame(true);
-        // Debugging Gump failure
-        System.err.println(output.getTrace());
         Assert.assertEquals("0-Goaway-[2147483647]-[0]-[null]", output.getTrace());
         output.clearTrace();
 
@@ -75,11 +73,7 @@ public class TestHttp2Section_6_8 extends Http2TestBase {
         sendSimpleGetRequest(5);
 
         parser.readFrame(true);
-        // Debugging Gump failure
-        System.err.println(output.getTrace());
         parser.readFrame(true);
-        // Debugging Gump failure
-        System.err.println(output.getTrace());
 
         Assert.assertEquals(getSimpleResponseTrace(3),  output.getTrace());
         output.clearTrace();
@@ -97,11 +91,7 @@ public class TestHttp2Section_6_8 extends Http2TestBase {
 
         sendGoaway(1, 1, Http2Error.NO_ERROR.getCode(), null);
 
-        // Go away
-        parser.readFrame(true);
-
-        Assert.assertTrue(output.getTrace(), output.getTrace().startsWith(
-                "0-Goaway-[1]-[" + Http2Error.PROTOCOL_ERROR.getCode() + "]-["));
+        handleGoAwayResponse(1);
     }
 
 

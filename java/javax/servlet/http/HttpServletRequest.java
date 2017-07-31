@@ -19,7 +19,9 @@ package javax.servlet.http;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.Map;
 
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
@@ -170,8 +172,8 @@ public interface HttpServletRequest extends ServletRequest {
      */
     public int getIntHeader(String name);
 
-    public default Mapping getMapping() {
-        return new Mapping() {
+    public default HttpServletMapping getHttpServletMapping() {
+        return new HttpServletMapping() {
 
             @Override
             public String getMatchValue() {
@@ -184,13 +186,13 @@ public interface HttpServletRequest extends ServletRequest {
             }
 
             @Override
-            public MappingMatch getMappingMatch() {
-                return MappingMatch.UNKNOWN;
+            public String getServletName() {
+                return "";
             }
 
             @Override
-            public String getServletName() {
-                return "";
+            public MappingMatch getMappingMatch() {
+                return null;
             }
         };
     }
@@ -240,29 +242,20 @@ public interface HttpServletRequest extends ServletRequest {
     public String getPathTranslated();
 
     /**
-     * Does the current request allow push requests. This will return {@code
-     * true} only if the underlying protocol supports server push and if pushes
-     * are permitted from the current request.
-     *
-     * @return {@code true} if server push is supported for the current request
-     *         otherwise {@code false}
-     */
-    public default boolean isPushSupported() {
-        return false;
-    }
-
-    /**
      * Obtain a builder for generating push requests. {@link PushBuilder}
      * documents how this request will be used as the basis for a push request.
      * Each call to this method will return a new instance, independent of any
      * previous instance obtained.
      *
      * @return A builder that can be used to generate push requests based on
-     *         this request.
+     *         this request or {@code null} if push is not supported. Note that
+     *         even if a PushBuilder instance is returned, by the time that
+     *         {@link PushBuilder#push()} is called, it may no longer be valid
+     *         to push a request and the push request will be ignored.
      *
      * @since Servlet 4.0
      */
-    public default PushBuilder getPushBuilder() {
+    public default PushBuilder newPushBuilder() {
         return null;
     }
 
@@ -584,4 +577,36 @@ public interface HttpServletRequest extends ServletRequest {
      */
     public <T extends HttpUpgradeHandler> T upgrade(
             Class<T> httpUpgradeHandlerClass) throws java.io.IOException, ServletException;
+
+    /**
+     * Obtain a Map of the trailer fields that is not backed by the request
+     * object.
+     *
+     * @return A Map of the received trailer fields with all keys lower case
+     *         or an empty Map if no trailers are present
+     *
+     * @since Servlet 4.0
+     */
+    public default Map<String,String> getTrailerFields() {
+        return Collections.emptyMap();
+    }
+
+    /**
+     * Are trailer fields ready to be read (there may still be no trailers to
+     * read). This method always returns {@code true} if the underlying protocol
+     * does not support trailer fields. Otherwise, {@code true} is returned once
+     * all of the following are true:
+     * <ul>
+     * <li>The application has ready all the request data and an EOF has been
+     *     received or the content-length is zero</li>
+     * <li>All trailer fields, if any, have been received</li>
+     * </ul>
+     *
+     * @return {@code true} if trailers are ready to be read
+     *
+     * @since Servlet 4.0
+     */
+    public default boolean isTrailerFieldsReady() {
+        return false;
+    }
 }

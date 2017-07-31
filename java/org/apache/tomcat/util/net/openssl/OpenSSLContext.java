@@ -23,7 +23,9 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -47,7 +49,7 @@ import org.apache.tomcat.util.net.AbstractEndpoint;
 import org.apache.tomcat.util.net.Constants;
 import org.apache.tomcat.util.net.SSLHostConfig;
 import org.apache.tomcat.util.net.SSLHostConfigCertificate;
-import org.apache.tomcat.util.net.jsse.JSSEKeyManager;
+import org.apache.tomcat.util.net.SSLHostConfigCertificate.Type;
 import org.apache.tomcat.util.net.openssl.ciphers.OpenSSLCipherConfigurationParser;
 import org.apache.tomcat.util.res.StringManager;
 
@@ -112,31 +114,27 @@ public class OpenSSLContext implements org.apache.tomcat.util.net.SSLContext {
         try {
             // SSL protocol
             int value = SSL.SSL_PROTOCOL_NONE;
-            if (sslHostConfig.getProtocols().size() == 0) {
-                value = SSL.SSL_PROTOCOL_ALL;
-            } else {
-                for (String protocol : sslHostConfig.getEnabledProtocols()) {
-                    if (Constants.SSL_PROTO_SSLv2Hello.equalsIgnoreCase(protocol)) {
-                        // NO-OP. OpenSSL always supports SSLv2Hello
-                    } else if (Constants.SSL_PROTO_SSLv2.equalsIgnoreCase(protocol)) {
-                        value |= SSL.SSL_PROTOCOL_SSLV2;
-                    } else if (Constants.SSL_PROTO_SSLv3.equalsIgnoreCase(protocol)) {
-                        value |= SSL.SSL_PROTOCOL_SSLV3;
-                    } else if (Constants.SSL_PROTO_TLSv1.equalsIgnoreCase(protocol)) {
-                        value |= SSL.SSL_PROTOCOL_TLSV1;
-                    } else if (Constants.SSL_PROTO_TLSv1_1.equalsIgnoreCase(protocol)) {
-                        value |= SSL.SSL_PROTOCOL_TLSV1_1;
-                    } else if (Constants.SSL_PROTO_TLSv1_2.equalsIgnoreCase(protocol)) {
-                        value |= SSL.SSL_PROTOCOL_TLSV1_2;
-                    } else if (Constants.SSL_PROTO_ALL.equalsIgnoreCase(protocol)) {
-                        value |= SSL.SSL_PROTOCOL_ALL;
-                    } else {
-                        // Protocol not recognized, fail to start as it is safer than
-                        // continuing with the default which might enable more than the
-                        // is required
-                        throw new Exception(netSm.getString(
-                                "endpoint.apr.invalidSslProtocol", protocol));
-                    }
+            for (String protocol : sslHostConfig.getEnabledProtocols()) {
+                if (Constants.SSL_PROTO_SSLv2Hello.equalsIgnoreCase(protocol)) {
+                    // NO-OP. OpenSSL always supports SSLv2Hello
+                } else if (Constants.SSL_PROTO_SSLv2.equalsIgnoreCase(protocol)) {
+                    value |= SSL.SSL_PROTOCOL_SSLV2;
+                } else if (Constants.SSL_PROTO_SSLv3.equalsIgnoreCase(protocol)) {
+                    value |= SSL.SSL_PROTOCOL_SSLV3;
+                } else if (Constants.SSL_PROTO_TLSv1.equalsIgnoreCase(protocol)) {
+                    value |= SSL.SSL_PROTOCOL_TLSV1;
+                } else if (Constants.SSL_PROTO_TLSv1_1.equalsIgnoreCase(protocol)) {
+                    value |= SSL.SSL_PROTOCOL_TLSV1_1;
+                } else if (Constants.SSL_PROTO_TLSv1_2.equalsIgnoreCase(protocol)) {
+                    value |= SSL.SSL_PROTOCOL_TLSV1_2;
+                } else if (Constants.SSL_PROTO_ALL.equalsIgnoreCase(protocol)) {
+                    value |= SSL.SSL_PROTOCOL_ALL;
+                } else {
+                    // Protocol not recognized, fail to start as it is safer than
+                    // continuing with the default which might enable more than the
+                    // is required
+                    throw new Exception(netSm.getString(
+                            "endpoint.apr.invalidSslProtocol", protocol));
                 }
             }
 
@@ -271,6 +269,10 @@ public class OpenSSLContext implements org.apache.tomcat.util.net.SSLContext {
                     alias = "tomcat";
                 }
                 X509Certificate[] chain = keyManager.getCertificateChain(alias);
+                if (chain == null) {
+                    alias = findAlias(keyManager, certificate);
+                    chain = keyManager.getCertificateChain(alias);
+                }
                 PrivateKey key = keyManager.getPrivateKey(alias);
                 StringBuilder sb = new StringBuilder(BEGIN_KEY);
                 sb.append(Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(key.getEncoded()));
@@ -316,7 +318,7 @@ public class OpenSSLContext implements org.apache.tomcat.util.net.SSLContext {
             }
 
             if (negotiableProtocols != null && negotiableProtocols.size() > 0) {
-                ArrayList<String> protocols = new ArrayList<>();
+                List<String> protocols = new ArrayList<>();
                 protocols.addAll(negotiableProtocols);
                 protocols.add("http/1.1");
                 String[] protocolsArray = protocols.toArray(new String[0]);
@@ -333,12 +335,34 @@ public class OpenSSLContext implements org.apache.tomcat.util.net.SSLContext {
         }
     }
 
-    private static X509KeyManager chooseKeyManager(KeyManager[] managers) throws Exception {
-        for (KeyManager manager : managers) {
-            if (manager instanceof JSSEKeyManager) {
-                return (JSSEKeyManager) manager;
-            }
+    /*
+     * Find a valid alias when none was specified in the config.
+     */
+    private static String findAlias(X509KeyManager keyManager,
+            SSLHostConfigCertificate certificate) {
+
+        Type type = certificate.getType();
+        String result = null;
+
+        List<Type> candidateTypes = new ArrayList<>();
+        if (Type.UNDEFINED.equals(type)) {
+            // Try all types to find an suitable alias
+            candidateTypes.addAll(Arrays.asList(Type.values()));
+            candidateTypes.remove(Type.UNDEFINED);
+        } else {
+            // Look for the specific type to find a suitable alias
+            candidateTypes.add(type);
         }
+
+        Iterator<Type> iter = candidateTypes.iterator();
+        while (result == null && iter.hasNext()) {
+            result = keyManager.chooseServerAlias(iter.next().toString(),  null,  null);
+        }
+
+        return result;
+    }
+
+    private static X509KeyManager chooseKeyManager(KeyManager[] managers) throws Exception {
         for (KeyManager manager : managers) {
             if (manager instanceof X509KeyManager) {
                 return (X509KeyManager) manager;

@@ -16,6 +16,7 @@
  */
 package org.apache.jasper.compiler;
 
+import java.io.BufferedInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -23,7 +24,6 @@ import java.util.Stack;
 
 import org.apache.jasper.JasperException;
 import org.apache.jasper.JspCompilationContext;
-import org.apache.jasper.xmlparser.XMLEncodingDetector;
 import org.apache.tomcat.Jar;
 import org.xml.sax.Attributes;
 
@@ -157,7 +157,7 @@ class ParserController implements TagConstants {
      * @param inFileName    The name of the tag file to be parsed.
      * @param jar The location of the tag file.
      *
-     * @return The parsed tage file nodes
+     * @return The parsed tag file nodes
      *
      * @throws JasperException If an error occurs during parsing
      * @throws IOException If an I/O error occurs such as the file not being
@@ -238,7 +238,7 @@ class ParserController implements TagConstants {
         } else {
             // Standard syntax
             try (InputStreamReader inStreamReader = JspUtil.getReader(
-                    absFileName, sourceEnc, jar, ctxt, err, skip);) {
+                    absFileName, sourceEnc, jar, ctxt, err, skip)) {
                 JspReader jspReader = new JspReader(ctxt, absFileName,
                         inStreamReader, err);
                 parsedPage = Parser.parse(this, jspReader, parent, isTagFile,
@@ -318,16 +318,13 @@ class ParserController implements TagConstants {
             sourceEnc = "ISO-8859-1";
         } else {
             // XML syntax or unknown, (auto)detect encoding ...
-            Object[] ret = XMLEncodingDetector.getEncoding(absFileName, jar,
-                    ctxt, err);
-            sourceEnc = (String) ret[0];
-            if (((Boolean) ret[1]).booleanValue()) {
-                isEncodingSpecifiedInProlog = true;
-            }
-            if (((Boolean) ret[2]).booleanValue()) {
-                isBomPresent = true;
-            }
-            skip = ((Integer) ret[3]).intValue();
+            BufferedInputStream bis = JspUtil.getInputStream(absFileName, jar, ctxt);
+            EncodingDetector encodingDetector = new EncodingDetector(bis);
+
+            sourceEnc = encodingDetector.getEncoding();
+            isEncodingSpecifiedInProlog = encodingDetector.isEncodingSpecifiedInProlog();
+            isBomPresent = (encodingDetector.getSkip() > 0);
+            skip = encodingDetector.getSkip();
 
             if (!isXml && sourceEnc.equals("UTF-8")) {
                 /*

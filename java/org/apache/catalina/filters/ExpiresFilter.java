@@ -464,14 +464,14 @@ public class ExpiresFilter extends FilterBase {
         DAY(Calendar.DAY_OF_YEAR), HOUR(Calendar.HOUR), MINUTE(Calendar.MINUTE), MONTH(
                 Calendar.MONTH), SECOND(Calendar.SECOND), WEEK(
                 Calendar.WEEK_OF_YEAR), YEAR(Calendar.YEAR);
-        private final int calendardField;
+        private final int calendarField;
 
-        private DurationUnit(int calendardField) {
-            this.calendardField = calendardField;
+        private DurationUnit(int calendarField) {
+            this.calendarField = calendarField;
         }
 
         public int getCalendardField() {
-            return calendardField;
+            return calendarField;
         }
 
     }
@@ -1104,7 +1104,7 @@ public class ExpiresFilter extends FilterBase {
         if (str == null || searchStr == null) {
             return false;
         }
-        return str.indexOf(searchStr) >= 0;
+        return str.contains(searchStr);
     }
 
     /**
@@ -1267,6 +1267,9 @@ public class ExpiresFilter extends FilterBase {
      */
     protected Date getExpirationDate(XHttpServletResponse response) {
         String contentType = response.getContentType();
+        if (contentType != null) {
+            contentType = contentType.toLowerCase(Locale.ENGLISH);
+        }
 
         // lookup exact content-type match (e.g.
         // "text/html; charset=iso-8859-1")
@@ -1396,7 +1399,7 @@ public class ExpiresFilter extends FilterBase {
             try {
                 if (name.startsWith(PARAMETER_EXPIRES_BY_TYPE)) {
                     String contentType = name.substring(
-                            PARAMETER_EXPIRES_BY_TYPE.length()).trim();
+                            PARAMETER_EXPIRES_BY_TYPE.length()).trim().toLowerCase(Locale.ENGLISH);
                     ExpiresConfiguration expiresConfiguration = parseExpiresConfiguration(value);
                     this.expiresConfigurationByContentType.put(contentType,
                             expiresConfiguration);

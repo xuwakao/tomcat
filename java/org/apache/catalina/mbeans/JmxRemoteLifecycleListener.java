@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import javax.management.remote.JMXConnectorServer;
 import javax.management.remote.JMXServiceURL;
@@ -211,7 +212,7 @@ public class JmxRemoteLifecycleListener implements LifecycleListener {
             System.setProperty("java.rmi.server.randomIDs", "true");
 
             // Create the environment
-            HashMap<String,Object> env = new HashMap<>();
+            Map<String,Object> env = new HashMap<>();
 
             RMIClientSocketFactory registryCsf = null;
             RMIServerSocketFactory registrySsf = null;
@@ -264,6 +265,10 @@ public class JmxRemoteLifecycleListener implements LifecycleListener {
                 serverCsf = new RmiClientLocalhostSocketFactory(serverCsf);
             }
 
+            env.put("jmx.remote.rmi.server.credential.types", new String[] {
+                    String[].class.getName(),
+                    String.class.getName() });
+
             // Populate the env properties used to create the server
             if (serverCsf != null) {
                 env.put(RMIConnectorServer.RMI_CLIENT_SOCKET_FACTORY_ATTRIBUTE, serverCsf);
@@ -292,7 +297,7 @@ public class JmxRemoteLifecycleListener implements LifecycleListener {
 
     private JMXConnectorServer createServer(String serverName,
             String bindAddress, int theRmiRegistryPort, int theRmiServerPort,
-            HashMap<String,Object> theEnv,
+            Map<String,Object> theEnv,
             RMIClientSocketFactory registryCsf, RMIServerSocketFactory registrySsf,
             RMIClientSocketFactory serverCsf, RMIServerSocketFactory serverSsf) {
 
@@ -328,7 +333,7 @@ public class JmxRemoteLifecycleListener implements LifecycleListener {
             cs = new RMIConnectorServer(serviceUrl, theEnv, server,
                     ManagementFactory.getPlatformMBeanServer());
             cs.start();
-            registry.bind("jmxrmi", server);
+            registry.bind("jmxrmi", server.toStub());
             log.info(sm.getString("jmxRemoteLifecycleListener.start",
                     Integer.toString(theRmiRegistryPort),
                     Integer.toString(theRmiServerPort), serverName));

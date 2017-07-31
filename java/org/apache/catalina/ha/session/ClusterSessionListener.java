@@ -91,7 +91,6 @@ public class ClusterSessionListener extends ClusterListener {
 
             }
         }
-        return;
     }
 
     /**
@@ -105,7 +104,7 @@ public class ClusterSessionListener extends ClusterListener {
      */
     @Override
     public boolean accept(ClusterMessage msg) {
-        return (msg instanceof SessionMessage);
+        return msg instanceof SessionMessage;
     }
 }
 

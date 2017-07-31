@@ -19,8 +19,7 @@ package org.apache.catalina.tribes.tipis;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.List;
 
 import org.apache.catalina.tribes.Channel;
 import org.apache.catalina.tribes.ChannelException;
@@ -67,7 +66,7 @@ public class ReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
      * Creates a new map
      * @param owner The map owner
      * @param channel The channel to use for communication
-     * @param timeout long - timeout for RPC messags
+     * @param timeout long - timeout for RPC messages
      * @param mapContextName String - unique name for this map, to allow multiple maps per channel
      * @param initialCapacity int - the size of this map, see HashMap
      * @param loadFactor float - load factor, see HashMap
@@ -81,7 +80,7 @@ public class ReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
      * Creates a new map
      * @param owner The map owner
      * @param channel The channel to use for communication
-     * @param timeout long - timeout for RPC messags
+     * @param timeout long - timeout for RPC messages
      * @param mapContextName String - unique name for this map, to allow multiple maps per channel
      * @param initialCapacity int - the size of this map, see HashMap
      * @param cls Class loaders
@@ -94,7 +93,7 @@ public class ReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
      * Creates a new map
      * @param owner The map owner
      * @param channel The channel to use for communication
-     * @param timeout long - timeout for RPC messags
+     * @param timeout long - timeout for RPC messages
      * @param mapContextName String - unique name for this map, to allow multiple maps per channel
      * @param cls Class loaders
      */
@@ -106,7 +105,7 @@ public class ReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
      * Creates a new map
      * @param owner The map owner
      * @param channel The channel to use for communication
-     * @param timeout long - timeout for RPC messags
+     * @param timeout long - timeout for RPC messages
      * @param mapContextName String - unique name for this map, to allow multiple maps per channel
      * @param cls Class loaders
      * @param terminate boolean - Flag for whether to terminate this map that failed to start.
@@ -153,7 +152,7 @@ public class ReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
         } catch (ChannelException e) {
             FaultyMember[] faultyMembers = e.getFaultyMembers();
             if (faultyMembers.length == 0) throw e;
-            ArrayList<Member> faulty = new ArrayList<>();
+            List<Member> faulty = new ArrayList<>();
             for (FaultyMember faultyMember : faultyMembers) {
                 if (!(faultyMember.getCause() instanceof RemoteProcessException)) {
                     faulty.add(faultyMember.getMember());
@@ -188,9 +187,7 @@ public class ReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
         if (log.isInfoEnabled())
             log.info(sm.getString("replicatedMap.member.disappeared", member));
         long start = System.currentTimeMillis();
-        Iterator<Map.Entry<K,MapEntry<K,V>>> i = innerMap.entrySet().iterator();
-        while (i.hasNext()) {
-            Map.Entry<K,MapEntry<K,V>> e = i.next();
+        for (Entry<K, MapEntry<K, V>> e : innerMap.entrySet()) {
             MapEntry<K,V> entry = innerMap.get(e.getKey());
             if (entry==null) continue;
             if (entry.isPrimary()) {
@@ -253,9 +250,7 @@ public class ReplicatedMap<K,V> extends AbstractReplicatedMap<K,V> {
         if ( memberAdded ) {
             synchronized (stateMutex) {
                 Member[] backup = getMapMembers();
-                Iterator<Map.Entry<K,MapEntry<K,V>>> i = innerMap.entrySet().iterator();
-                while (i.hasNext()) {
-                    Map.Entry<K,MapEntry<K,V>> e = i.next();
+                for (Entry<K, MapEntry<K, V>> e : innerMap.entrySet()) {
                     MapEntry<K,V> entry = innerMap.get(e.getKey());
                     if ( entry == null ) continue;
                     if (entry.isPrimary() && !inSet(member,entry.getBackupNodes())) {

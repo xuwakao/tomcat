@@ -18,6 +18,7 @@ package org.apache.tomcat.util.net.jsse;
 
 import javax.net.ssl.SSLSession;
 
+import org.apache.tomcat.util.compat.JreCompat;
 import org.apache.tomcat.util.net.SSLHostConfigCertificate;
 import org.apache.tomcat.util.net.SSLImplementation;
 import org.apache.tomcat.util.net.SSLSupport;
@@ -47,5 +48,10 @@ public class JSSEImplementation extends SSLImplementation {
     @Override
     public SSLUtil getSSLUtil(SSLHostConfigCertificate certificate) {
         return new JSSEUtil(certificate);
+    }
+
+    @Override
+    public boolean isAlpnSupported() {
+        return JreCompat.isJre9Available();
     }
 }

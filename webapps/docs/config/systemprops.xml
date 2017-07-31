@@ -45,6 +45,10 @@
          Required to have a public constructor with no arguments.</p>
       <p>Use this to add a property source, that will be invoked when <code>${parameter}</code>
          denoted parameters are found in the XML files that Tomcat parses.</p>
+      <p>Property replacement from the specified property source on the JVM
+         system properties can also be done by adding the
+         <code>org.apache.catalina.util.SystemPropertyReplacerListener</code>
+         listener as a Server listener in the container.</p>
     </property>
   </properties>
 
@@ -580,7 +584,11 @@
     </property>
 
     <property name="catalina.config">
-      <p>The URL for the catalina.properties configuration file.</p>
+      <p>The location from which to load the catalina.properties configuration
+      file. This may be an absolute URL, a relative (to the current working
+      directory) URL or an alternative file name in which case Tomcat will
+      attempt to load the file from the default location of
+      <code>$CATALINA_BASE/conf/</code>.</p>
     </property>
 
     <property name="tomcat.util.buf.StringCache.byte.enabled">
@@ -604,6 +612,13 @@
     <property name="tomcat.util.buf.StringCache.cacheSize">
       <p>The size of the String cache.</p>
       <p>If not specified, the default value of <code>200</code> will be used.</p>
+    </property>
+
+    <property name="org.apache.tomcat.util.buf.UriUtil. WAR_SEPARATOR">
+      <p>The character to use to separate the WAR file and WAR content parts of
+      a WAR URL using the custom WAR scheme provided by Tomcat. This is
+      equivalent to how <code>!</code> is used in JAR URLs.</p>
+      <p>If not specified, the default value of <code>*</code> will be used.</p>
     </property>
 
     <property name="tomcat.util.buf.StringCache.maxStringSize">

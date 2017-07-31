@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
 import java.util.jar.Attributes;
@@ -176,9 +175,7 @@ public class StandardJarScanner implements JarScanner {
         // Scan WEB-INF/lib
         Set<String> dirList = context.getResourcePaths(Constants.WEB_INF_LIB);
         if (dirList != null) {
-            Iterator<String> it = dirList.iterator();
-            while (it.hasNext()) {
-                String path = it.next();
+            for (String path : dirList) {
                 if (path.endsWith(Constants.JAR_EXT) &&
                         getJarScanFilter().check(scanType,
                                 path.substring(path.lastIndexOf('/')+1))) {

@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.util.Properties;
 
+import javax.management.ObjectName;
+
 import org.apache.catalina.tribes.Channel;
 import org.apache.catalina.tribes.ChannelException;
 import org.apache.catalina.tribes.ChannelMessage;
@@ -30,6 +32,7 @@ import org.apache.catalina.tribes.MembershipService;
 import org.apache.catalina.tribes.MessageListener;
 import org.apache.catalina.tribes.io.ChannelData;
 import org.apache.catalina.tribes.io.XByteBuffer;
+import org.apache.catalina.tribes.jmx.JmxRegistry;
 import org.apache.catalina.tribes.util.Arrays;
 import org.apache.catalina.tribes.util.StringManager;
 import org.apache.catalina.tribes.util.UUIDGenerator;
@@ -42,7 +45,8 @@ import org.apache.juli.logging.LogFactory;
  * This class is responsible for maintaining a list of active cluster nodes in the cluster.
  * If a node fails to send out a heartbeat, the node will be dismissed.
  */
-public class McastService implements MembershipService,MembershipListener,MessageListener {
+public class McastService
+        implements MembershipService,MembershipListener,MessageListener, McastServiceMBean {
 
     private static final Log log = LogFactory.getLog(McastService.class);
 
@@ -79,6 +83,11 @@ public class McastService implements MembershipService,MembershipListener,Messag
     protected byte[] domain;
 
     private Channel channel;
+
+    /**
+     * the ObjectName of this McastService.
+     */
+    private ObjectName oname = null;
 
     /**
      * Create a membership service.
@@ -127,6 +136,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
     /**
      * @return the local member name
      */
+    @Override
     public String getLocalMemberName() {
         return localMember.toString() ;
     }
@@ -172,6 +182,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("mcastAddress", addr);
     }
 
+    @Override
     public String getAddress() {
         return properties.getProperty("mcastAddress");
     }
@@ -184,6 +195,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("mcastBindAddress", bindaddr);
     }
 
+    @Override
     public String getBind() {
         return properties.getProperty("mcastBindAddress");
     }
@@ -196,6 +208,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("recoveryCounter", String.valueOf(recoveryCounter));
     }
 
+    @Override
     public int getRecoveryCounter(){
         String p = properties.getProperty("recoveryCounter");
         if(p != null){
@@ -208,6 +221,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("recoveryEnabled", String.valueOf(recoveryEnabled));
     }
 
+    @Override
     public boolean getRecoveryEnabled() {
         String p = properties.getProperty("recoveryEnabled");
         if(p != null){
@@ -220,6 +234,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("recoverySleepTime", String.valueOf(recoverySleepTime));
     }
 
+    @Override
     public long getRecoverySleepTime(){
         String p = properties.getProperty("recoverySleepTime");
         if(p != null){
@@ -232,6 +247,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("localLoopbackDisabled",String.valueOf(localLoopbackDisabled));
     }
 
+    @Override
     public boolean getLocalLoopbackDisabled() {
         String p = properties.getProperty("localLoopbackDisabled");
         if(p != null){
@@ -240,6 +256,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         return false;
     }
 
+    @Override
     public int getPort() {
         String p = properties.getProperty("mcastPort");
         return Integer.parseInt(p);
@@ -249,6 +266,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("mcastFrequency", String.valueOf(time));
     }
 
+    @Override
     public long getFrequency() {
         String p = properties.getProperty("mcastFrequency");
         return Long.parseLong(p);
@@ -261,6 +279,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("memberDropTime", String.valueOf(time));
     }
 
+    @Override
     public long getDropTime() {
         String p = properties.getProperty("memberDropTime");
         return Long.parseLong(p);
@@ -363,7 +382,11 @@ public class McastService implements MembershipService,MembershipListener,Messag
         impl.setChannel(channel);
 
         impl.start(level);
-
+        // register jmx
+        JmxRegistry jmxRegistry = JmxRegistry.getRegistry(channel);
+        if (jmxRegistry != null) {
+            this.oname = jmxRegistry.registerJmx(",component=Membership", this);
+        }
 
     }
 
@@ -375,6 +398,10 @@ public class McastService implements MembershipService,MembershipListener,Messag
     public void stop(int svc) {
         try  {
             if ( impl != null && impl.stop(svc) ) {
+                if (oname != null) {
+                    JmxRegistry.getRegistry(channel).unregisterJmx(oname);
+                    oname = null;
+                }
                 impl.setChannel(null);
                 impl = null;
                 channel = null;
@@ -513,6 +540,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         }
     }
 
+    @Override
     public int getSoTimeout() {
         return mcastSoTimeout;
     }
@@ -522,6 +550,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         properties.setProperty("mcastSoTimeout", String.valueOf(mcastSoTimeout));
     }
 
+    @Override
     public int getTtl() {
         return mcastTTL;
     }
@@ -530,6 +559,7 @@ public class McastService implements MembershipService,MembershipListener,Messag
         return payload;
     }
 
+    @Override
     public byte[] getDomain() {
         return domain;
     }

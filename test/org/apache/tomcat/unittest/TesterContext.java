@@ -116,6 +116,11 @@ public class TesterContext implements Context {
     }
 
     @Override
+    public String getLogName() {
+        return null;
+    }
+
+    @Override
     public ObjectName getObjectName() {
         return null;
     }
@@ -1246,4 +1251,14 @@ public class TesterContext implements Context {
     public void setDispatchersUseEncodedPaths(boolean dispatchersUseEncodedPaths) { /* NO-OP */ }
     @Override
     public boolean getDispatchersUseEncodedPaths() { return true; }
+
+    @Override
+    public void setRequestCharacterEncoding(String encoding) { /* NO-OP */ }
+    @Override
+    public String getRequestCharacterEncoding() { return null; }
+
+    @Override
+    public void setResponseCharacterEncoding(String encoding) { /* NO-OP */ }
+    @Override
+    public String getResponseCharacterEncoding() { return null; }
 }

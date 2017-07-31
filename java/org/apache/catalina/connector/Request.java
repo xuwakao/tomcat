@@ -24,6 +24,7 @@ import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -32,7 +33,6 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -58,12 +58,12 @@ import javax.servlet.ServletRequestAttributeListener;
 import javax.servlet.ServletResponse;
 import javax.servlet.SessionTrackingMode;
 import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletMapping;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpUpgradeHandler;
-import javax.servlet.http.Mapping;
 import javax.servlet.http.Part;
 import javax.servlet.http.PushBuilder;
 
@@ -76,6 +76,7 @@ import org.apache.catalina.Realm;
 import org.apache.catalina.Session;
 import org.apache.catalina.TomcatPrincipal;
 import org.apache.catalina.Wrapper;
+import org.apache.catalina.core.ApplicationFilterChain;
 import org.apache.catalina.core.ApplicationMapping;
 import org.apache.catalina.core.ApplicationPart;
 import org.apache.catalina.core.ApplicationPushBuilder;
@@ -83,6 +84,8 @@ import org.apache.catalina.core.ApplicationSessionCookieConfig;
 import org.apache.catalina.core.AsyncContextImpl;
 import org.apache.catalina.mapper.MappingData;
 import org.apache.catalina.util.ParameterMap;
+import org.apache.catalina.util.RequestUtil;
+import org.apache.catalina.util.TLSUtil;
 import org.apache.catalina.util.URLEncoder;
 import org.apache.coyote.ActionCode;
 import org.apache.coyote.UpgradeToken;
@@ -94,6 +97,7 @@ import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.buf.B2CConverter;
 import org.apache.tomcat.util.buf.ByteChunk;
 import org.apache.tomcat.util.buf.MessageBytes;
+import org.apache.tomcat.util.buf.StringUtils;
 import org.apache.tomcat.util.buf.UDecoder;
 import org.apache.tomcat.util.http.CookieProcessor;
 import org.apache.tomcat.util.http.FastHttpDateFormat;
@@ -124,10 +128,17 @@ public class Request implements HttpServletRequest {
 
     private static final Log log = LogFactory.getLog(Request.class);
 
-    // ----------------------------------------------------------- Constructors
+    /**
+     * Create a new Request object associated with the given Connector.
+     *
+     * @param connector The Connector with which this Request object will always
+     *                  be associated. In normal usage this must be non-null. In
+     *                  some test scenarios, it may be possible to use a null
+     *                  Connector without triggering an NPE.
+     */
+    public Request(Connector connector) {
+        this.connector = connector;
 
-
-    public Request() {
         formats = new SimpleDateFormat[formatsTemplate.length];
         for(int i = 0; i < formats.length; i++) {
             formats[i] = (SimpleDateFormat) formatsTemplate[i].clone();
@@ -159,7 +170,7 @@ public class Request implements HttpServletRequest {
      * @return the Coyote request object
      */
     public org.apache.coyote.Request getCoyoteRequest() {
-        return (this.coyoteRequest);
+        return this.coyoteRequest;
     }
 
 
@@ -544,22 +555,13 @@ public class Request implements HttpServletRequest {
     /**
      * Associated Catalina connector.
      */
-    protected Connector connector;
+    protected final Connector connector;
 
     /**
      * @return the Connector through which this Request was received.
      */
     public Connector getConnector() {
         return this.connector;
-    }
-
-    /**
-     * Set the Connector through which this Request was received.
-     *
-     * @param connector The new connector
-     */
-    public void setConnector(Connector connector) {
-        this.connector = connector;
     }
 
 
@@ -574,18 +576,6 @@ public class Request implements HttpServletRequest {
      */
     public Context getContext() {
         return mappingData.context;
-    }
-
-    /**
-     * @param context The newly associated Context
-     * @deprecated Use setters on {@link #getMappingData() MappingData} object.
-     * Depending on use case, you may need to update other
-     * <code>MappingData</code> fields as well, such as
-     * <code>contextSlashCount</code> and <code>host</code>.
-     */
-    @Deprecated
-    public void setContext(Context context) {
-        mappingData.context = context;
     }
 
 
@@ -737,21 +727,8 @@ public class Request implements HttpServletRequest {
         return mappingData.wrapper;
     }
 
-    /**
-     * @param wrapper The newly associated Wrapper
-     * @deprecated Use setters on {@link #getMappingData() MappingData} object.
-     * Depending on use case, you may need to update other
-     * <code>MappingData</code> fields as well, such as <code>context</code>
-     * and <code>contextSlashCount</code>.
-     */
-    @Deprecated
-    public void setWrapper(Wrapper wrapper) {
-        mappingData.wrapper = wrapper;
-    }
-
 
     // ------------------------------------------------- Request Public Methods
-
 
     /**
      * Create and return a ServletInputStream to read the content
@@ -879,48 +856,46 @@ public class Request implements HttpServletRequest {
      */
     @Override
     public Object getAttribute(String name) {
-
         // Special attributes
         SpecialAttributeAdapter adapter = specialAttributes.get(name);
         if (adapter != null) {
             return adapter.get(this, name);
         }
 
-        Object attr=attributes.get(name);
+        Object attr = attributes.get(name);
 
-        if(attr!=null) {
-            return(attr);
-        }
-
-        attr =  coyoteRequest.getAttribute(name);
-        if(attr != null) {
+        if (attr != null) {
             return attr;
         }
-        if( isSSLAttribute(name) || name.equals(SSLSupport.PROTOCOL_VERSION_KEY)) {
-            coyoteRequest.action(ActionCode.REQ_SSL_ATTRIBUTE,
-                                 coyoteRequest);
+
+        attr = coyoteRequest.getAttribute(name);
+        if (attr != null) {
+            return attr;
+        }
+        if (TLSUtil.isTLSRequestAttribute(name)) {
+            coyoteRequest.action(ActionCode.REQ_SSL_ATTRIBUTE, coyoteRequest);
             attr = coyoteRequest.getAttribute(Globals.CERTIFICATES_ATTR);
-            if( attr != null) {
+            if (attr != null) {
                 attributes.put(Globals.CERTIFICATES_ATTR, attr);
             }
             attr = coyoteRequest.getAttribute(Globals.CIPHER_SUITE_ATTR);
-            if(attr != null) {
+            if (attr != null) {
                 attributes.put(Globals.CIPHER_SUITE_ATTR, attr);
             }
             attr = coyoteRequest.getAttribute(Globals.KEY_SIZE_ATTR);
-            if(attr != null) {
+            if (attr != null) {
                 attributes.put(Globals.KEY_SIZE_ATTR, attr);
             }
             attr = coyoteRequest.getAttribute(Globals.SSL_SESSION_ID_ATTR);
-            if(attr != null) {
+            if (attr != null) {
                 attributes.put(Globals.SSL_SESSION_ID_ATTR, attr);
             }
             attr = coyoteRequest.getAttribute(Globals.SSL_SESSION_MGR_ATTR);
-            if(attr != null) {
+            if (attr != null) {
                 attributes.put(Globals.SSL_SESSION_MGR_ATTR, attr);
             }
             attr = coyoteRequest.getAttribute(SSLSupport.PROTOCOL_VERSION_KEY);
-            if(attr != null) {
+            if (attr != null) {
                 attributes.put(SSLSupport.PROTOCOL_VERSION_KEY, attr);
             }
             attr = attributes.get(name);
@@ -935,18 +910,6 @@ public class Request implements HttpServletRequest {
         return coyoteRequest.getContentLengthLong();
     }
 
-    /**
-     * Test if a given name is one of the special Servlet-spec SSL attributes.
-     *
-     * @return <code>true</code> if this is a special SSL attribute
-     */
-    static boolean isSSLAttribute(String name) {
-        return Globals.CERTIFICATES_ATTR.equals(name) ||
-            Globals.CIPHER_SUITE_ATTR.equals(name) ||
-            Globals.KEY_SIZE_ATTR.equals(name)  ||
-            Globals.SSL_SESSION_ID_ATTR.equals(name) ||
-            Globals.SSL_SESSION_MGR_ATTR.equals(name);
-    }
 
     /**
      * Return the names of all request attributes for this Request, or an
@@ -981,7 +944,7 @@ public class Request implements HttpServletRequest {
         if (isSecure() && !sslAttributesParsed) {
             getAttribute(Globals.CERTIFICATES_ATTR);
         }
-        // Take a copy to prevent ConncurrentModificationExceptions if used to
+        // Take a copy to prevent ConcurrentModificationExceptions if used to
         // remove attributes
         Set<String> names = new HashSet<>();
         names.addAll(attributes.keySet());
@@ -994,7 +957,44 @@ public class Request implements HttpServletRequest {
      */
     @Override
     public String getCharacterEncoding() {
-      return coyoteRequest.getCharacterEncoding();
+        String characterEncoding = coyoteRequest.getCharacterEncoding();
+        if (characterEncoding != null) {
+            return characterEncoding;
+        }
+
+        Context context = getContext();
+        if (context != null) {
+            return context.getRequestCharacterEncoding();
+        }
+
+        return null;
+    }
+
+
+    private Charset getCharset() {
+        Charset charset = null;
+        try {
+            charset = coyoteRequest.getCharset();
+        } catch (UnsupportedEncodingException e) {
+            // Ignore
+        }
+        if (charset != null) {
+            return charset;
+        }
+
+        Context context = getContext();
+        if (context != null) {
+            String encoding = context.getRequestCharacterEncoding();
+            if (encoding != null) {
+                try {
+                    return B2CConverter.getCharset(encoding);
+                } catch (UnsupportedEncodingException e) {
+                    // Ignore
+                }
+            }
+        }
+
+        return org.apache.coyote.Constants.DEFAULT_BODY_CHARSET;
     }
 
 
@@ -1238,7 +1238,7 @@ public class Request implements HttpServletRequest {
         }
 
         try {
-            return (servletContext.getRealPath(path));
+            return servletContext.getRealPath(path);
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -1351,7 +1351,7 @@ public class Request implements HttpServletRequest {
         if (path == null) {
             return null;
         } else if (path.startsWith("/")) {
-            return (context.getServletContext().getRequestDispatcher(path));
+            return context.getServletContext().getRequestDispatcher(path);
         }
 
         // Convert a request-relative path to a context-relative one
@@ -1376,9 +1376,9 @@ public class Request implements HttpServletRequest {
         if (context.getDispatchersUseEncodedPaths()) {
             if (pos >= 0) {
                 relative = URLEncoder.DEFAULT.encode(
-                        requestPath.substring(0, pos + 1), "UTF-8") + path;
+                        requestPath.substring(0, pos + 1), StandardCharsets.UTF_8) + path;
             } else {
-                relative = URLEncoder.DEFAULT.encode(requestPath, "UTF-8") + path;
+                relative = URLEncoder.DEFAULT.encode(requestPath, StandardCharsets.UTF_8) + path;
             }
         } else {
             if (pos >= 0) {
@@ -1448,8 +1448,6 @@ public class Request implements HttpServletRequest {
 
             // Notify interested application event listeners
             notifyAttributeRemoved(name, value);
-        } else {
-            return;
         }
     }
 
@@ -1607,18 +1605,17 @@ public class Request implements HttpServletRequest {
      * @since Servlet 2.3
      */
     @Override
-    public void setCharacterEncoding(String enc)
-        throws UnsupportedEncodingException {
+    public void setCharacterEncoding(String enc) throws UnsupportedEncodingException {
 
         if (usingReader) {
             return;
         }
 
         // Confirm that the encoding name is valid
-        B2CConverter.getCharset(enc);
+        Charset charset = B2CConverter.getCharset(enc);
 
         // Save the validated encoding
-        coyoteRequest.setCharacterEncoding(enc);
+        coyoteRequest.setCharset(charset);
     }
 
 
@@ -1636,7 +1633,11 @@ public class Request implements HttpServletRequest {
     public AsyncContext startAsync(ServletRequest request,
             ServletResponse response) {
         if (!isAsyncSupported()) {
-            throw new IllegalStateException(sm.getString("request.asyncNotSupported"));
+            IllegalStateException ise =
+                    new IllegalStateException(sm.getString("request.asyncNotSupported"));
+            log.warn(sm.getString("coyoteRequest.noAsync",
+                    StringUtils.join(getNonAsyncClassNames())), ise);
+            throw ise;
         }
 
         if (asyncContext == null) {
@@ -1648,6 +1649,31 @@ public class Request implements HttpServletRequest {
         asyncContext.setTimeout(getConnector().getAsyncTimeout());
 
         return asyncContext;
+    }
+
+
+    private Set<String> getNonAsyncClassNames() {
+        Set<String> result = new HashSet<>();
+
+        Wrapper wrapper = getWrapper();
+        if (!wrapper.isAsyncSupported()) {
+            result.add(wrapper.getServletClass());
+        }
+
+        FilterChain filterChain = getFilterChain();
+        if (filterChain instanceof ApplicationFilterChain) {
+            ((ApplicationFilterChain) filterChain).findNonAsyncFilters(result);
+        } else {
+            result.add(sm.getString("coyoteRequest.filterAsyncSupportUnknown"));
+        }
+
+        Container c = wrapper;
+        while (c != null) {
+            c.getPipeline().findNonAsyncValves(result);
+            c = c.getParent();
+        }
+
+        return result;
     }
 
     @Override
@@ -1739,8 +1765,8 @@ public class Request implements HttpServletRequest {
         }
 
         Cookie[] newCookies = new Cookie[size + 1];
-        for (int i = 0; i < size; i++) {
-            newCookies[i] = cookies[i];
+        if (cookies != null) {
+            System.arraycopy(cookies, 0, newCookies, 0, size);
         }
         newCookies[size] = cookie;
 
@@ -1884,57 +1910,69 @@ public class Request implements HttpServletRequest {
      *
      * @param principal The user Principal
      */
-    public void setUserPrincipal(Principal principal) {
-
-        if (Globals.IS_SECURITY_ENABLED){
-            HttpSession session = getSession(false);
-            if ( (subject != null) &&
-                 (!subject.getPrincipals().contains(principal)) ){
+    public void setUserPrincipal(final Principal principal) {
+        if (Globals.IS_SECURITY_ENABLED) {
+            if (subject == null) {
+                final HttpSession session = getSession(false);
+                if (session == null) {
+                    // Cache the subject in the request
+                    subject = newSubject(principal);
+                } else {
+                    // Cache the subject in the request and the session
+                    subject = (Subject) session.getAttribute(Globals.SUBJECT_ATTR);
+                    if (subject == null) {
+                        subject = newSubject(principal);
+                        session.setAttribute(Globals.SUBJECT_ATTR, subject);
+                    } else {
+                        subject.getPrincipals().add(principal);
+                    }
+                }
+            } else {
                 subject.getPrincipals().add(principal);
-            } else if (session != null &&
-                        session.getAttribute(Globals.SUBJECT_ATTR) == null) {
-                subject = new Subject();
-                subject.getPrincipals().add(principal);
-            }
-            if (session != null){
-                session.setAttribute(Globals.SUBJECT_ATTR, subject);
             }
         }
+        userPrincipal = principal;
+    }
 
-        this.userPrincipal = principal;
+
+    private Subject newSubject(final Principal principal) {
+        final Subject result = new Subject();
+        result.getPrincipals().add(principal);
+        return result;
     }
 
 
     // --------------------------------------------- HttpServletRequest Methods
 
-    /**
-     * {@inheritDoc}
-     *
-     * @since Servlet 4.0
-     */
     @Override
-    public boolean isPushSupported() {
+    public boolean isTrailerFieldsReady() {
+        return coyoteRequest.isTrailerFieldsReady();
+    }
+
+
+    @Override
+    public Map<String, String> getTrailerFields() {
+        if (!isTrailerFieldsReady()) {
+            throw new IllegalStateException(sm.getString("coyoteRequest.trailersNotReady"));
+        }
+        Map<String,String> result = new HashMap<>();
+        result.putAll(coyoteRequest.getTrailerFields());
+        return result;
+    }
+
+
+    @Override
+    public PushBuilder newPushBuilder() {
         AtomicBoolean result = new AtomicBoolean();
         coyoteRequest.action(ActionCode.IS_PUSH_SUPPORTED, result);
-        return result.get();
+        if (result.get()) {
+            return new ApplicationPushBuilder(this);
+        } else {
+            return null;
+        }
     }
 
 
-    /**
-     * {@inheritDoc}
-     *
-     * @since Servlet 4.0
-     */
-    @Override
-    public PushBuilder getPushBuilder() {
-        return new ApplicationPushBuilder(this);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @since Servlet 3.1
-     */
     @SuppressWarnings("unchecked")
     @Override
     public <T extends HttpUpgradeHandler> T upgrade(
@@ -1942,14 +1980,17 @@ public class Request implements HttpServletRequest {
         T handler;
         InstanceManager instanceManager = null;
         try {
-            // Do not go through the instance manager for internal Tomcat classes since they don't need injection
+            // Do not go through the instance manager for internal Tomcat classes since they don't
+            // need injection
             if (InternalHttpUpgradeHandler.class.isAssignableFrom(httpUpgradeHandlerClass)) {
-                handler = httpUpgradeHandlerClass.newInstance();
+                handler = httpUpgradeHandlerClass.getConstructor().newInstance();
             } else {
                 instanceManager = getContext().getInstanceManager();
                 handler = (T) instanceManager.newInstance(httpUpgradeHandlerClass);
             }
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NamingException e) {
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                NamingException | IllegalArgumentException | NoSuchMethodException |
+                SecurityException e) {
             throw new ServletException(e);
         }
         UpgradeToken upgradeToken = new UpgradeToken(handler,
@@ -2007,7 +2048,7 @@ public class Request implements HttpServletRequest {
             candidate = uri.substring(0, pos);
         }
         candidate = removePathParameters(candidate);
-        candidate = UDecoder.URLDecode(candidate, connector.getURIEncoding());
+        candidate = UDecoder.URLDecode(candidate, connector.getURICharset());
         candidate = org.apache.tomcat.util.http.RequestUtil.normalize(candidate);
         boolean match = canonicalContextPath.equals(candidate);
         while (!match && pos != -1) {
@@ -2018,7 +2059,7 @@ public class Request implements HttpServletRequest {
                 candidate = uri.substring(0, pos);
             }
             candidate = removePathParameters(candidate);
-            candidate = UDecoder.URLDecode(candidate, connector.getURIEncoding());
+            candidate = UDecoder.URLDecode(candidate, connector.getURICharset());
             candidate = org.apache.tomcat.util.http.RequestUtil.normalize(candidate);
             match = canonicalContextPath.equals(candidate);
         }
@@ -2122,7 +2163,7 @@ public class Request implements HttpServletRequest {
 
         String value = getHeader(name);
         if (value == null) {
-            return (-1L);
+            return -1L;
         }
 
         // Attempt to convert the date header in a variety of formats
@@ -2185,7 +2226,7 @@ public class Request implements HttpServletRequest {
 
         String value = getHeader(name);
         if (value == null) {
-            return (-1);
+            return -1;
         }
 
         return Integer.parseInt(value);
@@ -2193,8 +2234,8 @@ public class Request implements HttpServletRequest {
 
 
     @Override
-    public Mapping getMapping() {
-        return applicationMapping.getMapping();
+    public HttpServletMapping getHttpServletMapping() {
+        return applicationMapping.getHttpServletMapping();
     }
 
 
@@ -2288,44 +2329,9 @@ public class Request implements HttpServletRequest {
     }
 
 
-    /**
-     * Reconstructs the URL the client used to make the request.
-     * The returned URL contains a protocol, server name, port
-     * number, and server path, but it does not include query
-     * string parameters.
-     * <p>
-     * Because this method returns a <code>StringBuffer</code>,
-     * not a <code>String</code>, you can modify the URL easily,
-     * for example, to append query parameters.
-     * <p>
-     * This method is useful for creating redirect messages and
-     * for reporting errors.
-     *
-     * @return A <code>StringBuffer</code> object containing the
-     *  reconstructed URL
-     */
     @Override
     public StringBuffer getRequestURL() {
-
-        StringBuffer url = new StringBuffer();
-        String scheme = getScheme();
-        int port = getServerPort();
-        if (port < 0)
-         {
-            port = 80; // Work around java.net.URL bug
-        }
-
-        url.append(scheme);
-        url.append("://");
-        url.append(getServerName());
-        if ((scheme.equals("http") && (port != 80))
-            || (scheme.equals("https") && (port != 443))) {
-            url.append(':');
-            url.append(port);
-        }
-        url.append(getRequestURI());
-
-        return url;
+        return RequestUtil.getRequestURL(this);
     }
 
 
@@ -2335,7 +2341,7 @@ public class Request implements HttpServletRequest {
      */
     @Override
     public String getServletPath() {
-        return (mappingData.wrapperPath.toString());
+        return mappingData.wrapperPath.toString();
     }
 
 
@@ -2411,7 +2417,7 @@ public class Request implements HttpServletRequest {
     @Override
     @Deprecated
     public boolean isRequestedSessionIdFromUrl() {
-        return (isRequestedSessionIdFromURL());
+        return isRequestedSessionIdFromURL();
     }
 
 
@@ -2505,7 +2511,7 @@ public class Request implements HttpServletRequest {
         }
 
         // Check for a role defined directly as a <security-role>
-        return (realm.hasRole(getWrapper(), userPrincipal, role));
+        return realm.hasRole(getWrapper(), userPrincipal, role);
     }
 
 
@@ -2800,15 +2806,7 @@ public class Request implements HttpServletRequest {
                         upload.parseRequest(new ServletRequestContext(this));
                 int maxPostSize = getConnector().getMaxPostSize();
                 int postSize = 0;
-                String enc = getCharacterEncoding();
-                Charset charset = null;
-                if (enc != null) {
-                    try {
-                        charset = B2CConverter.getCharset(enc);
-                    } catch (UnsupportedEncodingException e) {
-                        // Ignore
-                    }
-                }
+                Charset charset = getCharset();
                 for (FileItem item : items) {
                     ApplicationPart part = new ApplicationPart(item, location);
                     parts.add(part);
@@ -2816,31 +2814,14 @@ public class Request implements HttpServletRequest {
                         String name = part.getName();
                         String value = null;
                         try {
-                            String encoding = parameters.getEncoding();
-                            if (encoding == null) {
-                                if (enc == null) {
-                                    encoding = Parameters.DEFAULT_ENCODING;
-                                } else {
-                                    encoding = enc;
-                                }
-                            }
-                            value = part.getString(encoding);
+                            value = part.getString(charset.name());
                         } catch (UnsupportedEncodingException uee) {
-                            try {
-                                value = part.getString(Parameters.DEFAULT_ENCODING);
-                            } catch (UnsupportedEncodingException e) {
-                                // Should not be possible
-                            }
+                            // Not possible
                         }
                         if (maxPostSize >= 0) {
                             // Have to calculate equivalent size. Not completely
                             // accurate but close enough.
-                            if (charset == null) {
-                                // Name length
-                                postSize += name.getBytes().length;
-                            } else {
-                                postSize += name.getBytes(charset).length;
-                            }
+                            postSize += name.getBytes(charset).length;
                             if (value != null) {
                                 // Equals sign
                                 postSize++;
@@ -2876,6 +2857,10 @@ public class Request implements HttpServletRequest {
                 partsParseException = e;
             }
         } finally {
+            // This might look odd but is correct. setParseFailedReason() only
+            // sets the failure reason if none is currently set. This code could
+            // be more efficient but it is written this way to be robust with
+            // respect to changes in the remainder of the method.
             if (partsParseException != null || !success) {
                 parameters.setParseFailedReason(FailReason.UNKNOWN);
             }
@@ -2889,10 +2874,7 @@ public class Request implements HttpServletRequest {
     @Override
     public Part getPart(String name) throws IOException, IllegalStateException,
             ServletException {
-        Collection<Part> c = getParts();
-        Iterator<Part> iterator = c.iterator();
-        while (iterator.hasNext()) {
-            Part part = iterator.next();
+        for (Part part : getParts()) {
             if (name.equals(part.getName())) {
                 return part;
             }
@@ -2908,7 +2890,7 @@ public class Request implements HttpServletRequest {
         // There cannot be a session if no context has been assigned yet
         Context context = getContext();
         if (context == null) {
-            return (null);
+            return null;
         }
 
         // Return the current session if it exists and is valid
@@ -2916,13 +2898,13 @@ public class Request implements HttpServletRequest {
             session = null;
         }
         if (session != null) {
-            return (session);
+            return session;
         }
 
         // Return the requested session if it exists and is valid
         Manager manager = context.getManager();
         if (manager == null) {
-            return (null);      // Sessions are not supported
+            return null;      // Sessions are not supported
         }
         if (requestedSessionId != null) {
             try {
@@ -2935,13 +2917,13 @@ public class Request implements HttpServletRequest {
             }
             if (session != null) {
                 session.access();
-                return (session);
+                return session;
             }
         }
 
         // Create a new session if requested and the response is not committed
         if (!create) {
-            return (null);
+            return null;
         }
         if (response != null
                 && context.getServletContext()
@@ -3051,6 +3033,7 @@ public class Request implements HttpServletRequest {
         cookiesParsed = true;
 
         ServerCookies serverCookies = coyoteRequest.getCookies();
+        serverCookies.setLimit(connector.getMaxCookieCount());
         CookieProcessor cookieProcessor = getContext().getCookieProcessor();
         cookieProcessor.parseCookieHeader(coyoteRequest.getMimeHeaders(), serverCookies);
     }
@@ -3130,22 +3113,15 @@ public class Request implements HttpServletRequest {
 
             // getCharacterEncoding() may have been overridden to search for
             // hidden form field containing request encoding
-            String enc = getCharacterEncoding();
+            Charset charset = getCharset();
 
             boolean useBodyEncodingForURI = connector.getUseBodyEncodingForURI();
-            if (enc != null) {
-                parameters.setEncoding(enc);
-                if (useBodyEncodingForURI) {
-                    parameters.setQueryStringEncoding(enc);
-                }
-            } else {
-                parameters.setEncoding
-                    (org.apache.coyote.Constants.DEFAULT_CHARACTER_ENCODING);
-                if (useBodyEncodingForURI) {
-                    parameters.setQueryStringEncoding
-                        (org.apache.coyote.Constants.DEFAULT_CHARACTER_ENCODING);
-                }
+            parameters.setCharset(charset);
+            if (useBodyEncodingForURI) {
+                parameters.setQueryStringCharset(charset);
             }
+            // Note: If !useBodyEncodingForURI, the query string encoding is
+            //       that set towards the start of CoyoyeAdapter.service()
 
             parameters.handleQueryParameters();
 

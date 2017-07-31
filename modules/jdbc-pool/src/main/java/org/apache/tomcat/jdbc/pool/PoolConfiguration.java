@@ -752,9 +752,9 @@ public interface PoolConfiguration {
     public void setSuspectTimeout(int seconds);
 
     /**
-     * Returns the time in seconds to pass before a connection is marked an abanoned suspect.
+     * Returns the time in seconds to pass before a connection is marked an abandoned suspect.
      * Any value lesser than or equal to 0 means the check is disabled.
-     * @return Returns the time in seconds to pass before a connection is marked an abanoned suspect.
+     * @return Returns the time in seconds to pass before a connection is marked an abandoned suspect.
      */
     public int getSuspectTimeout();
 
@@ -893,5 +893,20 @@ public interface PoolConfiguration {
      * @see PoolConfiguration#setIgnoreExceptionOnPreLoad(boolean)
      */
     public boolean isIgnoreExceptionOnPreLoad();
+
+    /**
+     * Set this to true if you wish to wrap statements in order to enable equals() and hashCode()
+     * methods to be called on the closed statements if any statement proxy is set.
+     * @param useStatementFacade set to <code>true</code> to wrap statements
+     */
+    public void setUseStatementFacade(boolean useStatementFacade);
+
+    /**
+     * Returns <code>true</code> if this connection pool is configured to wrap statements in order
+     * to enable equals() and hashCode() methods to be called on the closed statements if any
+     * statement proxy is set.
+     * @return <code>true</code> if the statements are wrapped
+     */
+    public boolean getUseStatementFacade();
 
 }

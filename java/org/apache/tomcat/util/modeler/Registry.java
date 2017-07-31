@@ -26,8 +26,8 @@ import java.lang.management.ManagementFactory;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import javax.management.DynamicMBean;
 import javax.management.MBeanAttributeInfo;
@@ -49,7 +49,7 @@ import org.apache.tomcat.util.modeler.modules.ModelerSource;
    - double check the interfaces
    - start removing the use of the experimental methods in tomcat, then remove
      the methods ( before 1.1 final )
-   - is the security enough to prevent Registry beeing used to avoid the permission
+   - is the security enough to prevent Registry being used to avoid the permission
     checks in the mbean server ?
 */
 
@@ -85,7 +85,7 @@ public class Registry implements RegistryMBean, MBeanRegistration  {
      */
     private static Registry registry = null;
 
-    // Per registy fields
+    // Per registry fields
 
     /**
      * The <code>MBeanServer</code> instance that we will use to register
@@ -97,14 +97,14 @@ public class Registry implements RegistryMBean, MBeanRegistration  {
      * The set of ManagedBean instances for the beans this registry
      * knows about, keyed by name.
      */
-    private HashMap<String,ManagedBean> descriptors = new HashMap<>();
+    private Map<String,ManagedBean> descriptors = new HashMap<>();
 
     /** List of managed beans, keyed by class name
      */
-    private HashMap<String,ManagedBean> descriptorsByClass = new HashMap<>();
+    private Map<String,ManagedBean> descriptorsByClass = new HashMap<>();
 
     // map to avoid duplicated searching or loading descriptors
-    private HashMap<String,URL> searchedPaths = new HashMap<>();
+    private Map<String,URL> searchedPaths = new HashMap<>();
 
     private Object guard;
 
@@ -170,7 +170,7 @@ public class Registry implements RegistryMBean, MBeanRegistration  {
                 registry.guard != guard ) {
             return null;
         }
-        return (registry);
+        return registry;
     }
 
     // -------------------- Generic methods  --------------------
@@ -258,9 +258,7 @@ public class Registry implements RegistryMBean, MBeanRegistration  {
         if( mbeans==null ) {
             return;
         }
-        Iterator<ObjectName> itr = mbeans.iterator();
-        while(itr.hasNext()) {
-            ObjectName current = itr.next();
+        for (ObjectName current : mbeans) {
             try {
                 if(current == null) {
                     continue;
@@ -702,14 +700,13 @@ public class Registry implements RegistryMBean, MBeanRegistration  {
             }
             loadDescriptors(pkg, classLoader);
         }
-        return;
     }
 
     private ModelerSource getModelerSource( String type )
             throws Exception
     {
         if( type==null ) type="MbeansDescriptorsDigesterSource";
-        if( type.indexOf( ".") < 0 ) {
+        if(!type.contains(".")) {
             type="org.apache.tomcat.util.modeler.modules." + type;
         }
 

@@ -799,13 +799,10 @@ public final class CGIServlet extends HttpServlet {
             path = currentLocation.getAbsolutePath();
             name = currentLocation.getName();
 
-            if (".".equals(contextPath)) {
-                scriptname = servletPath;
+            if (servletPath.startsWith(cginame)) {
+                scriptname = contextPath + cginame;
             } else {
-                scriptname = contextPath + servletPath;
-            }
-            if (!servletPath.equals(cginame)) {
-                scriptname = scriptname + cginame;
+                scriptname = contextPath + servletPath + cginame;
             }
 
             if (log.isDebugEnabled()) {
@@ -1467,9 +1464,9 @@ public final class CGIServlet extends HttpServlet {
                 log.debug("envp: [" + env + "], command: [" + command + "]");
             }
 
-            if ((command.indexOf(File.separator + "." + File.separator) >= 0)
-                || (command.indexOf(File.separator + "..") >= 0)
-                || (command.indexOf(".." + File.separator) >= 0)) {
+            if ((command.contains(File.separator + "." + File.separator))
+                || (command.contains(File.separator + ".."))
+                || (command.contains(".." + File.separator))) {
                 throw new IOException(this.getClass().getName()
                                       + "Illegal Character in CGI command "
                                       + "path ('.' or '..') detected.  Not "
@@ -1630,7 +1627,7 @@ public final class CGIServlet extends HttpServlet {
                     try {
                         errReaderThread.join(stderrTimeout);
                     } catch (InterruptedException e) {
-                        log.warn(sm.getString("cgiServlet.runReaderInterupt"));                    }
+                        log.warn(sm.getString("cgiServlet.runReaderInterrupt"));                    }
                 }
                 if (proc != null){
                     proc.destroy();

@@ -16,13 +16,18 @@
  */
 package org.apache.catalina.valves.rewrite;
 
+import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.servlets.DefaultServlet;
+import org.apache.catalina.startup.TesterServlet;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
 import org.apache.tomcat.util.buf.ByteChunk;
@@ -232,7 +237,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
         doTestRewrite("RewriteRule ^/b/(.*)/(.*) /c/\u00A1$1?$2 [R,NE]",
-                "/b/%C2%A1/id=%C2%A1?di=%C2%AE", "/c/\u00C2\u00A1\u00C2\u00A1", "id=\u00C2\u00A1");
+                "/b/%C2%A1/id=%C2%A1?di=%C2%AE", null);
     }
 
 
@@ -242,7 +247,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
         doTestRewrite("RewriteRule ^/b/(.*)/(.*) /c/\u00A1$1?$2 [R,B,NE]",
-                "/b/%C2%A1/id=%C2%A1?di=%C2%AE", "/c/\u00C2\u00A1%C2%A1", "id=%C2%A1");
+                "/b/%C2%A1/id=%C2%A1?di=%C2%AE", null);
     }
 
 
@@ -279,8 +284,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
         doTestRewrite("RewriteRule ^/b/(.*)/(.*) /c/\u00A1$1?$2 [R,NE,QSA]",
-                "/b/%C2%A1/id=%C2%A1?di=%C2%AE", "/c/\u00C2\u00A1\u00C2\u00A1",
-                "id=\u00C2\u00A1&di=\u00C2\u00AE");
+                "/b/%C2%A1/id=%C2%A1?di=%C2%AE", null);
     }
 
 
@@ -290,8 +294,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
         doTestRewrite("RewriteRule ^/b/(.*)/(.*) /c/\u00A1$1?$2 [R,B,NE,QSA]",
-                "/b/%C2%A1/id=%C2%A1?di=%C2%AE", "/c/\u00C2\u00A1%C2%A1",
-                "id=%C2%A1&di=\u00C2\u00AE");
+                "/b/%C2%A1/id=%C2%A1?di=%C2%AE", null);
     }
 
 
@@ -333,7 +336,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
         doTestRewrite("RewriteRule ^/b/(.*) /c/\u00A1$1 [R,NE]",
-                "/b/%C2%A1?id=%C2%A1", "/c/\u00C2\u00A1\u00C2\u00A1", "id=\u00C2\u00A1");
+                "/b/%C2%A1?id=%C2%A1", null);
     }
 
 
@@ -343,7 +346,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
         doTestRewrite("RewriteRule ^/b/(.*) /c/\u00A1$1 [R,B,NE]",
-                "/b/%C2%A1?id=%C2%A1", "/c/\u00C2\u00A1%C2%A1", "id=\u00C2\u00A1");
+                "/b/%C2%A1?id=%C2%A1", null);
     }
 
 
@@ -394,7 +397,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
         doTestRewrite("RewriteRule ^/b/(.*)/(.*) /c/\u00A1$1?$2 [R,NE]",
-                "/b/%C2%A1/id=%C2%A1", "/c/\u00C2\u00A1\u00C2\u00A1", "id=\u00C2\u00A1");
+                "/b/%C2%A1/id=%C2%A1", null);
     }
 
 
@@ -404,7 +407,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
         doTestRewrite("RewriteRule ^/b/(.*)/(.*) /c/\u00A1$1?$2 [R,B,NE]",
-                "/b/%C2%A1/id=%C2%A1", "/c/\u00C2\u00A1%C2%A1", "id=%C2%A1");
+                "/b/%C2%A1/id=%C2%A1", null);
     }
 
 
@@ -450,8 +453,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Note %C2%A1 == \u00A1
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
-        doTestRewrite("RewriteRule ^/b/(.*) /c/\u00A1$1 [R,NE]",
-                "/b/%C2%A1", "/c/\u00C2\u00A1\u00C2\u00A1");
+        doTestRewrite("RewriteRule ^/b/(.*) /c/\u00A1$1 [R,NE]", "/b/%C2%A1", null);
     }
 
 
@@ -460,8 +462,7 @@ public class TestRewriteValve extends TomcatBaseTest {
         // Note %C2%A1 == \u00A1
         // Failing to escape the redirect means UTF-8 bytes in the Location
         // header which will be treated as if they are ISO-8859-1
-        doTestRewrite("RewriteRule ^/b/(.*) /c/\u00A1$1 [R,B,NE]",
-                "/b/%C2%A1", "/c/\u00C2\u00A1%C2%A1");
+        doTestRewrite("RewriteRule ^/b/(.*) /c/\u00A1$1 [R,B,NE]", "/b/%C2%A1", null);
     }
 
 
@@ -480,6 +481,88 @@ public class TestRewriteValve extends TomcatBaseTest {
         // the redirect
         doTestRewrite("RewriteRule ^/b(.*) http://%{HTTP_HOST}:%{SERVER_PORT}/a$1 [R]",
                 "/b/%255A", "/a/%255A");
+    }
+
+
+    @Test
+    public void testDefaultRedirect() throws Exception {
+         // Disable the following of redirects for this test only
+        boolean originalValue = HttpURLConnection.getFollowRedirects();
+        HttpURLConnection.setFollowRedirects(false);
+        try {
+            doTestRedirect("RewriteRule ^/from/a$ /to/b [R]", "/redirect/from/a", "/redirect/to/b",
+                302);
+        } finally {
+            HttpURLConnection.setFollowRedirects(originalValue);
+        }
+    }
+
+
+    @Test
+    public void testTempRedirect() throws Exception {
+         // Disable the following of redirects for this test only
+        boolean originalValue = HttpURLConnection.getFollowRedirects();
+        HttpURLConnection.setFollowRedirects(false);
+        try {
+            doTestRedirect("RewriteRule ^/from/a$ /to/b [R=temp]", "/redirect/from/a", "/redirect/to/b",
+                302);
+        } finally {
+            HttpURLConnection.setFollowRedirects(originalValue);
+        }
+    }
+
+
+    @Test
+    public void testPermanentRedirect() throws Exception {
+         // Disable the following of redirects for this test only
+        boolean originalValue = HttpURLConnection.getFollowRedirects();
+        HttpURLConnection.setFollowRedirects(false);
+        try {
+            doTestRedirect("RewriteRule ^/from/a$ /to/b [R=permanent]", "/redirect/from/a", "/redirect/to/b",
+                301);
+        } finally {
+            HttpURLConnection.setFollowRedirects(originalValue);
+        }
+    }
+
+
+    @Test
+    public void testSeeotherRedirect() throws Exception {
+         // Disable the following of redirects for this test only
+        boolean originalValue = HttpURLConnection.getFollowRedirects();
+        HttpURLConnection.setFollowRedirects(false);
+        try {
+            doTestRedirect("RewriteRule ^/from/a$ /to/b [R=seeother]", "/redirect/from/a", "/redirect/to/b",
+                303);
+        } finally {
+            HttpURLConnection.setFollowRedirects(originalValue);
+        }
+    }
+
+
+    @Test
+    public void test307Redirect() throws Exception {
+         // Disable the following of redirects for this test only
+        boolean originalValue = HttpURLConnection.getFollowRedirects();
+        HttpURLConnection.setFollowRedirects(false);
+        try {
+            doTestRedirect("RewriteRule ^/from/a$ /to/b [R=307]", "/redirect/from/a", "/redirect/to/b",
+                307);
+        } finally {
+            HttpURLConnection.setFollowRedirects(originalValue);
+        }
+    }
+
+
+    @Test
+    public void testBackReferenceRewrite() throws Exception {
+        doTestRewrite("RewriteRule ^/b/(rest)?$ /c/$1", "/b/rest", "/c/rest");
+    }
+
+
+    @Test
+    public void testEmptyBackReferenceRewrite() throws Exception {
+        doTestRewrite("RewriteRule ^/b/(rest)?$ /c/$1", "/b/", "/c/");
     }
 
 
@@ -515,22 +598,66 @@ public class TestRewriteValve extends TomcatBaseTest {
 
         tomcat.start();
 
-        ByteChunk res = getUrl("http://localhost:" + getPort() + request);
+        ByteChunk res = new ByteChunk();
+        int rc = getUrl("http://localhost:" + getPort() + request, res, null);
         res.setCharset(StandardCharsets.UTF_8);
 
-        String body = res.toString();
-        RequestDescriptor requestDesc = SnoopResult.parse(body);
-        String requestURI = requestDesc.getRequestInfo("REQUEST-URI");
-        Assert.assertEquals(expectedURI, requestURI);
+        if (expectedURI == null) {
+            // Rewrite is expected to fail. Probably because invalid characters
+            // were written into the request target
+            Assert.assertEquals(400, rc);
+        } else {
+            String body = res.toString();
+            RequestDescriptor requestDesc = SnoopResult.parse(body);
+            String requestURI = requestDesc.getRequestInfo("REQUEST-URI");
+            Assert.assertEquals(expectedURI, requestURI);
 
-        if (expectedQueryString != null) {
-            String queryString = requestDesc.getRequestInfo("REQUEST-QUERY-STRING");
-            Assert.assertEquals(expectedQueryString, queryString);
+            if (expectedQueryString != null) {
+                String queryString = requestDesc.getRequestInfo("REQUEST-QUERY-STRING");
+                Assert.assertEquals(expectedQueryString, queryString);
+            }
+
+            if (expectedAttributeValue != null) {
+                String attributeValue = requestDesc.getAttribute("X-Test");
+                Assert.assertEquals(expectedAttributeValue, attributeValue);
+            }
         }
+    }
 
-        if (expectedAttributeValue != null) {
-            String attributeValue = requestDesc.getAttribute("X-Test");
-            Assert.assertEquals(expectedAttributeValue, attributeValue);
+    private void doTestRedirect(String config, String request, String expectedURI,
+        int expectedStatusCode) throws Exception {
+
+        Tomcat tomcat = getTomcatInstance();
+
+        // No file system docBase required
+        Context ctx = tomcat.addContext("redirect", null);
+
+        RewriteValve rewriteValve = new RewriteValve();
+        ctx.getPipeline().addValve(rewriteValve);
+
+        rewriteValve.setConfiguration(config);
+
+        Tomcat.addServlet(ctx, "tester", new TesterServlet());
+        ctx.addServletMappingDecoded("/from/a", "tester");
+        ctx.addServletMappingDecoded("/to/b", "tester");
+
+        tomcat.start();
+
+        ByteChunk res = new ByteChunk();
+        Map<String, List<String>> resHead = new HashMap<>();
+        int rc = getUrl("http://localhost:" + getPort() + request, res, null, resHead);
+        res.setCharset(StandardCharsets.UTF_8);
+
+        if (expectedURI == null) {
+            // Rewrite is expected to fail. Probably because invalid characters
+            // were written into the request target
+            Assert.assertEquals(400, rc);
+        } else {
+            List<String> locations = resHead.get("Location");
+            Assert.assertFalse(locations.isEmpty());
+            String redirectURI = locations.get(0);
+            Assert.assertEquals(expectedURI, redirectURI);
+            Assert.assertEquals(expectedStatusCode, rc);
         }
     }
 }

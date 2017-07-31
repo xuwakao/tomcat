@@ -22,6 +22,7 @@ import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 
+import javax.servlet.AsyncContext;
 import javax.servlet.DispatcherType;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.Servlet;
@@ -32,9 +33,9 @@ import javax.servlet.ServletRequestWrapper;
 import javax.servlet.ServletResponse;
 import javax.servlet.ServletResponseWrapper;
 import javax.servlet.UnavailableException;
+import javax.servlet.http.HttpServletMapping;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Mapping;
 
 import org.apache.catalina.AsyncDispatcher;
 import org.apache.catalina.Context;
@@ -206,7 +207,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
      */
     public ApplicationDispatcher
         (Wrapper wrapper, String requestURI, String servletPath,
-         String pathInfo, String queryString, Mapping mapping, String name) {
+         String pathInfo, String queryString, HttpServletMapping mapping, String name) {
 
         super();
 
@@ -263,7 +264,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
     /**
      * The mapping for this RequestDispatcher.
      */
-    private final Mapping mapping;
+    private final HttpServletMapping mapping;
 
 
     /**
@@ -354,9 +355,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
         // Handle an HTTP path-based forward
         else {
 
-            ApplicationHttpRequest wrequest =
-                (ApplicationHttpRequest) wrapRequest(state);
-            String contextPath = context.getPath();
+            ApplicationHttpRequest wrequest = (ApplicationHttpRequest) wrapRequest(state);
             HttpServletRequest hrequest = state.hrequest;
             if (hrequest.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI) == null) {
                 wrequest.setAttribute(RequestDispatcher.FORWARD_REQUEST_URI,
@@ -369,10 +368,10 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
                                       hrequest.getPathInfo());
                 wrequest.setAttribute(RequestDispatcher.FORWARD_QUERY_STRING,
                                       hrequest.getQueryString());
-                wrequest.setAttribute(RequestDispatcher.FORWARD_MAPPING, hrequest.getMapping());
+                wrequest.setAttribute(RequestDispatcher.FORWARD_MAPPING, hrequest.getHttpServletMapping());
             }
 
-            wrequest.setContextPath(contextPath);
+            wrequest.setContextPath(context.getPath());
             wrequest.setRequestURI(requestURI);
             wrequest.setServletPath(servletPath);
             wrequest.setPathInfo(pathInfo);
@@ -393,7 +392,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
 
         // This is not a real close in order to support error processing
         if (wrapper.getLogger().isDebugEnabled() )
-            wrapper.getLogger().debug(" Disabling the response for futher output");
+            wrapper.getLogger().debug(" Disabling the response for further output");
 
         if  (response instanceof ResponseFacade) {
             ((ResponseFacade) response).finish();
@@ -612,17 +611,12 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
         // Create a wrapped response to use for this request
         wrapResponse(state);
 
-        ApplicationHttpRequest wrequest =
-            (ApplicationHttpRequest) wrapRequest(state);
+        ApplicationHttpRequest wrequest = (ApplicationHttpRequest) wrapRequest(state);
+        HttpServletRequest hrequest = state.hrequest;
 
-        if (queryString != null) {
-            wrequest.setQueryParams(queryString);
-        }
-
-        wrequest.setAttribute(Globals.DISPATCHER_TYPE_ATTR,
-                DispatcherType.ASYNC);
-        wrequest.setAttribute(Globals.DISPATCHER_REQUEST_PATH_ATTR,
-                getCombinedPath());
+        wrequest.setAttribute(Globals.DISPATCHER_TYPE_ATTR, DispatcherType.ASYNC);
+        wrequest.setAttribute(Globals.DISPATCHER_REQUEST_PATH_ATTR, getCombinedPath());
+        wrequest.setAttribute(AsyncContext.ASYNC_MAPPING, hrequest.getHttpServletMapping());
 
         wrequest.setContextPath(context.getPath());
         wrequest.setRequestURI(requestURI);
@@ -632,6 +626,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
             wrequest.setQueryString(queryString);
             wrequest.setQueryParams(queryString);
         }
+        wrequest.setMapping(mapping);
 
         invoke(state.outerRequest, state.outerResponse, state);
     }
@@ -927,7 +922,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
         else
             ((ServletRequestWrapper) previous).setRequest(wrapper);
         state.wrapRequest = wrapper;
-        return (wrapper);
+        return wrapper;
 
     }
 
@@ -972,7 +967,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
         else
             ((ServletResponseWrapper) previous).setResponse(wrapper);
         state.wrapResponse = wrapper;
-        return (wrapper);
+        return wrapper;
 
     }
 

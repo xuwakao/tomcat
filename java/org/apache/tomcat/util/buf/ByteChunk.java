@@ -84,7 +84,7 @@ public final class ByteChunk implements Cloneable, Serializable {
         public int realReadBytes() throws IOException;
     }
 
-    /** Same as java.nio.channel.WrittableByteChannel.
+    /** Same as java.nio.channel.WritableByteChannel.
      */
     public static interface ByteOutputChannel {
         /**
@@ -146,6 +146,11 @@ public final class ByteChunk implements Cloneable, Serializable {
 
     public ByteChunk( int initial ) {
         allocate( initial, -1 );
+    }
+
+    @Override
+    public Object clone() throws CloneNotSupportedException {
+        return super.clone();
     }
 
     public boolean isNull() {

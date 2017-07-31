@@ -42,7 +42,7 @@ import org.apache.catalina.tribes.util.StringManager;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
-public class NioReceiver extends ReceiverBase implements Runnable {
+public class NioReceiver extends ReceiverBase implements Runnable, NioReceiverMBean {
 
     private static final Log log = LogFactory.getLog(NioReceiver.class);
 
@@ -197,8 +197,7 @@ public class NioReceiver extends ReceiverBase implements Runnable {
         Selector tmpsel = this.selector.get();
         Set<SelectionKey> keys =  (isListening()&&tmpsel!=null)?tmpsel.keys():null;
         if ( keys == null ) return;
-        for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext();) {
-            SelectionKey key = iter.next();
+        for (SelectionKey key : keys) {
             try {
 //                if (key.interestOps() == SelectionKey.OP_READ) {
 //                    //only timeout sockets that we are waiting for a read from
@@ -369,10 +368,8 @@ public class NioReceiver extends ReceiverBase implements Runnable {
         Selector selector = this.selector.getAndSet(null);
         if (selector == null) return;
         try {
-            Iterator<SelectionKey> it = selector.keys().iterator();
             // look at each key in the selected set
-            while (it.hasNext()) {
-                SelectionKey key = it.next();
+            for (SelectionKey key : selector.keys()) {
                 key.channel().close();
                 key.attach(null);
                 key.cancel();

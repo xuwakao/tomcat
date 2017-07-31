@@ -21,7 +21,6 @@ package org.apache.tomcat.util.modeler.modules;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import javax.management.ObjectName;
@@ -157,7 +156,7 @@ public class MbeansDescriptorsDigesterSource extends ModelerSource
 
         InputStream stream = (InputStream) source;
 
-        ArrayList<ManagedBean> loadedMbeans = new ArrayList<>();
+        List<ManagedBean> loadedMbeans = new ArrayList<>();
         synchronized(dLock) {
             if (digester == null) {
                 digester = createDigester();
@@ -176,9 +175,8 @@ public class MbeansDescriptorsDigesterSource extends ModelerSource
             }
 
         }
-        Iterator<ManagedBean> iter = loadedMbeans.iterator();
-        while (iter.hasNext()) {
-            registry.addManagedBean(iter.next());
+        for (ManagedBean loadedMbean : loadedMbeans) {
+            registry.addManagedBean(loadedMbean);
         }
     }
 }

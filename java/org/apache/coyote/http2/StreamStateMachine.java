@@ -33,7 +33,7 @@ import org.apache.tomcat.util.res.StringManager;
  * </ul>
  *
  */
-public class StreamStateMachine {
+class StreamStateMachine {
 
     private static final Log log = LogFactory.getLog(StreamStateMachine.class);
     private static final StringManager sm = StringManager.getManager(StreamStateMachine.class);
@@ -42,41 +42,30 @@ public class StreamStateMachine {
     private State state;
 
 
-    public StreamStateMachine(Stream stream) {
+    StreamStateMachine(Stream stream) {
         this.stream = stream;
         stateChange(null, State.IDLE);
     }
 
 
-    public synchronized void sentPushPromise() {
+    final synchronized void sentPushPromise() {
         stateChange(State.IDLE, State.RESERVED_LOCAL);
     }
 
 
-    public synchronized void receivedPushPromise() {
-        stateChange(State.IDLE, State.RESERVED_REMOTE);
-    }
-
-
-    public synchronized void sentStartOfHeaders() {
-        stateChange(State.IDLE, State.OPEN);
-        stateChange(State.RESERVED_LOCAL, State.HALF_CLOSED_REMOTE);
-    }
-
-
-    public synchronized void receivedStartOfHeaders() {
+    final synchronized void receivedStartOfHeaders() {
         stateChange(State.IDLE, State.OPEN);
         stateChange(State.RESERVED_REMOTE, State.HALF_CLOSED_LOCAL);
     }
 
 
-    public synchronized void sentEndOfStream() {
+    final synchronized void sentEndOfStream() {
         stateChange(State.OPEN, State.HALF_CLOSED_LOCAL);
         stateChange(State.HALF_CLOSED_REMOTE, State.CLOSED_TX);
     }
 
 
-    public synchronized void recievedEndOfStream() {
+    final synchronized void receivedEndOfStream() {
         stateChange(State.OPEN, State.HALF_CLOSED_REMOTE);
         stateChange(State.HALF_CLOSED_LOCAL, State.CLOSED_RX);
     }
@@ -104,7 +93,7 @@ public class StreamStateMachine {
     }
 
 
-    public synchronized void receiveReset() {
+    final synchronized void receivedReset() {
         stateChange(state, State.CLOSED_RST_RX);
     }
 
@@ -120,7 +109,7 @@ public class StreamStateMachine {
     }
 
 
-    public synchronized void checkFrameType(FrameType frameType) throws Http2Exception {
+    final synchronized void checkFrameType(FrameType frameType) throws Http2Exception {
         // No state change. Checks that receiving the frame type is valid for
         // the current state of this stream.
         if (!isFrameTypePermitted(frameType)) {
@@ -137,31 +126,31 @@ public class StreamStateMachine {
     }
 
 
-    public synchronized boolean isFrameTypePermitted(FrameType frameType) {
+    final synchronized boolean isFrameTypePermitted(FrameType frameType) {
         return state.isFrameTypePermitted(frameType);
     }
 
 
-    public synchronized boolean isActive() {
+    final synchronized boolean isActive() {
         return state.isActive();
     }
 
 
-    public synchronized boolean canRead() {
+    final synchronized boolean canRead() {
         return state.canRead();
     }
 
 
-    public synchronized boolean canWrite() {
+    final synchronized boolean canWrite() {
         return state.canWrite();
     }
 
 
-    public synchronized boolean isClosedFinal() {
+    final synchronized boolean isClosedFinal() {
         return state == State.CLOSED_FINAL;
     }
 
-    public synchronized void closeIfIdle() {
+    final synchronized void closeIfIdle() {
         stateChange(State.IDLE, State.CLOSED_FINAL);
     }
 

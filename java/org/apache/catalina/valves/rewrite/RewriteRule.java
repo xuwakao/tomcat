@@ -17,6 +17,7 @@
 package org.apache.catalina.valves.rewrite;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -67,10 +68,7 @@ public class RewriteRule {
     }
 
     public void addCondition(RewriteCond condition) {
-        RewriteCond[] conditions = new RewriteCond[this.conditions.length + 1];
-        for (int i = 0; i < this.conditions.length; i++) {
-            conditions[i] = this.conditions[i];
-        }
+        RewriteCond[] conditions = Arrays.copyOf(this.conditions, this.conditions.length + 1);
         conditions[this.conditions.length] = condition;
         this.conditions = conditions;
     }
@@ -268,14 +266,6 @@ public class RewriteRule {
     protected boolean nosubreq = false;
 
     /**
-     *  This flag forces the substitution part to be internally forced as a proxy
-     *  request and immediately (i.e., rewriting rule processing stops here) put
-     *  through the proxy module. You have to make sure that the substitution string
-     *  is a valid URI (e.g., typically starting with http://hostname) which can be
-     *  handled by the Apache proxy module. If not you get an error from the proxy
-     *  module. Use this flag to achieve a more powerful implementation of the
-     *  ProxyPass directive, to map some remote stuff into the namespace of
-     *  the local server.
      *  Note: No proxy
      */
 
@@ -294,18 +284,18 @@ public class RewriteRule {
     /**
      *  Prefix Substitution with http://thishost[:thisport]/ (which makes the
      *  new URL a URI) to force a external redirection. If no code is given
-     *  a HTTP response of 302 (MOVED TEMPORARILY) is used. If you want to
-     *  use other response codes in the range 300-400 just specify them as
-     *  a number or use one of the following symbolic names: temp (default),
-     *  permanent, seeother. Use it for rules which should canonicalize the
-     *  URL and give it back to the client, e.g., translate ``/~'' into ``/u/''
-     *  or always append a slash to /u/user, etc. Note: When you use this flag,
-     *  make sure that the substitution field is a valid URL! If not, you are
-     *  redirecting to an invalid location! And remember that this flag itself
-     *  only prefixes the URL with http://thishost[:thisport]/, rewriting
-     *  continues. Usually you also want to stop and do the redirection
-     *  immediately. To stop the rewriting you also have to provide the
-     *  'L' flag.
+     *  an HTTP response of 302 (FOUND, previously MOVED TEMPORARILY) is used.
+     *  If you want to  use other response codes in the range 300-399 just
+     *  specify them as a number or use one of the following symbolic names:
+     *  temp (default), permanent, seeother. Use it for rules which should
+     *  canonicalize the URL and give it back to the client, e.g., translate
+     *  ``/~'' into ``/u/'' or always append a slash to /u/user, etc. Note:
+     *  When you use this flag, make sure that the substitution field is a
+     *  valid URL! If not, you are redirecting to an invalid location!
+     *  And remember that this flag itself only prefixes the URL with
+     *  http://thishost[:thisport]/, rewriting continues. Usually you also
+     *  want to stop and do the redirection immediately. To stop the
+     *  rewriting you also have to provide the 'L' flag.
      */
     protected boolean redirect = false;
     protected int redirectCode = 0;

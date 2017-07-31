@@ -36,8 +36,7 @@ import org.apache.tomcat.util.res.StringManager;
  */
 public class B2CConverter {
 
-    private static final StringManager sm =
-        StringManager.getManager(Constants.Package);
+    private static final StringManager sm = StringManager.getManager(B2CConverter.class);
 
     private static final Map<String, Charset> encodingToCharsetCache =
             new HashMap<>();
@@ -56,27 +55,21 @@ public class B2CConverter {
         }
     }
 
-    public static Charset getCharset(String enc)
-            throws UnsupportedEncodingException {
-
-        // Encoding names should all be ASCII
-        String lowerCaseEnc = enc.toLowerCase(Locale.ENGLISH);
-
-        return getCharsetLower(lowerCaseEnc);
-    }
 
     /**
-     * Only to be used when it is known that the encoding name is in lower case.
-     * @param lowerCaseEnc The name of the encoding for the required charset in
-     *                     lower case
+     * Obtain the Charset for the given encoding
+     *
+     * @param enc The name of the encoding for the required charset
      *
      * @return The Charset corresponding to the requested encoding
      *
      * @throws UnsupportedEncodingException If the requested Charset is not
      *                                      available
      */
-    public static Charset getCharsetLower(String lowerCaseEnc)
-            throws UnsupportedEncodingException {
+    public static Charset getCharset(String enc) throws UnsupportedEncodingException {
+
+        // Encoding names should all be ASCII
+        String lowerCaseEnc = enc.toLowerCase(Locale.ENGLISH);
 
         Charset charset = encodingToCharsetCache.get(lowerCaseEnc);
 
@@ -87,6 +80,7 @@ public class B2CConverter {
         }
         return charset;
     }
+
 
     private final CharsetDecoder decoder;
     private ByteBuffer bb = null;
