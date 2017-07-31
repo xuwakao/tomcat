@@ -33,11 +33,11 @@ import javax.servlet.ServletContext;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.Globals;
-import org.apache.catalina.Lifecycle;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Loader;
 import org.apache.catalina.util.LifecycleMBeanBase;
+import org.apache.catalina.util.ToStringUtil;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.ExceptionUtils;
@@ -223,7 +223,7 @@ public class WebappLoader extends LifecycleMBeanBase
      * @return the ClassLoader class name.
      */
     public String getLoaderClass() {
-        return (this.loaderClass);
+        return this.loaderClass;
     }
 
 
@@ -360,11 +360,7 @@ public class WebappLoader extends LifecycleMBeanBase
      */
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("WebappLoader[");
-        if (context != null)
-            sb.append(context.getName());
-        sb.append("]");
-        return (sb.toString());
+        return ToStringUtil.toString(this, context);
     }
 
 
@@ -399,7 +395,7 @@ public class WebappLoader extends LifecycleMBeanBase
 
             setPermissions();
 
-            ((Lifecycle) classLoader).start();
+            classLoader.start();
 
             String contextName = context.getName();
             if (!contextName.startsWith("/")) {

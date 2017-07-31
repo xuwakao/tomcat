@@ -28,6 +28,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.LogManager;
 
 import org.apache.catalina.Container;
@@ -125,6 +126,7 @@ public class Catalina {
 
     public Catalina() {
         setSecurityProtection();
+        ExceptionUtils.preload();
     }
 
 
@@ -161,7 +163,7 @@ public class Catalina {
 
     public ClassLoader getParentClassLoader() {
         if (parentClassLoader != null) {
-            return (parentClassLoader);
+            return parentClassLoader;
         }
         return ClassLoader.getSystemClassLoader();
     }
@@ -180,7 +182,7 @@ public class Catalina {
      * @return <code>true</code> if naming is enabled.
      */
     public boolean isUseNaming() {
-        return (this.useNaming);
+        return this.useNaming;
     }
 
 
@@ -256,7 +258,7 @@ public class Catalina {
         if (!file.isAbsolute()) {
             file = new File(Bootstrap.getCatalinaBase(), configFile);
         }
-        return (file);
+        return file;
 
     }
 
@@ -271,8 +273,8 @@ public class Catalina {
         Digester digester = new Digester();
         digester.setValidating(false);
         digester.setRulesValidation(true);
-        HashMap<Class<?>, List<String>> fakeAttributes = new HashMap<>();
-        ArrayList<String> attrs = new ArrayList<>();
+        Map<Class<?>, List<String>> fakeAttributes = new HashMap<>();
+        List<String> attrs = new ArrayList<>();
         attrs.add("className");
         fakeAttributes.put(Object.class, attrs);
         digester.setFakeAttributes(fakeAttributes);
@@ -385,7 +387,7 @@ public class Catalina {
         if (log.isDebugEnabled()) {
             log.debug("Digester for server.xml created " + ( t2-t1 ));
         }
-        return (digester);
+        return digester;
 
     }
 
@@ -430,7 +432,7 @@ public class Catalina {
                             "setServer",
                             "org.apache.catalina.Server");
 
-        return (digester);
+        return digester;
 
     }
 

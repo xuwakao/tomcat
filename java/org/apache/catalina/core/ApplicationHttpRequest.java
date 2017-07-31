@@ -21,19 +21,22 @@ package org.apache.catalina.core;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletMapping;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpSession;
-import javax.servlet.http.Mapping;
 import javax.servlet.http.PushBuilder;
 
 import org.apache.catalina.Context;
@@ -41,6 +44,7 @@ import org.apache.catalina.Globals;
 import org.apache.catalina.Manager;
 import org.apache.catalina.Session;
 import org.apache.catalina.util.ParameterMap;
+import org.apache.catalina.util.RequestUtil;
 import org.apache.tomcat.util.buf.B2CConverter;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.http.Parameters;
@@ -189,7 +193,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
     /**
      * The mapping for this request.
      */
-    private Mapping mapping = null;
+    private HttpServletMapping mapping = null;
 
 
     /**
@@ -258,7 +262,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public Enumeration<String> getAttributeNames() {
-        return (new AttributeNamesEnumerator());
+        return new AttributeNamesEnumerator();
     }
 
 
@@ -312,13 +316,13 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
     public RequestDispatcher getRequestDispatcher(String path) {
 
         if (context == null)
-            return (null);
+            return null;
 
         // If the path is already context-relative, just pass it through
         if (path == null)
-            return (null);
+            return null;
         else if (path.startsWith("/"))
-            return (context.getServletContext().getRequestDispatcher(path));
+            return context.getServletContext().getRequestDispatcher(path);
 
         // Convert a request-relative path to a context-relative one
         String servletPath =
@@ -344,7 +348,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
             relative = requestPath + path;
         }
 
-        return (context.getServletContext().getRequestDispatcher(relative));
+        return context.getServletContext().getRequestDispatcher(relative);
 
     }
 
@@ -368,9 +372,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public String getContextPath() {
-
-        return (this.contextPath);
-
+        return this.contextPath;
     }
 
 
@@ -381,7 +383,6 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public String getParameter(String name) {
-
         parseParameters();
 
         String[] value = parameters.get(name);
@@ -389,7 +390,6 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
             return null;
         }
         return value[0];
-
     }
 
 
@@ -399,10 +399,8 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public Map<String, String[]> getParameterMap() {
-
         parseParameters();
-        return (parameters);
-
+        return parameters;
     }
 
 
@@ -412,7 +410,6 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public Enumeration<String> getParameterNames() {
-
         parseParameters();
         return Collections.enumeration(parameters.keySet());
     }
@@ -426,10 +423,8 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public String[] getParameterValues(String name) {
-
         parseParameters();
         return parameters.get(name);
-
     }
 
 
@@ -438,9 +433,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public String getPathInfo() {
-
-        return (this.pathInfo);
-
+        return this.pathInfo;
     }
 
 
@@ -464,9 +457,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public String getQueryString() {
-
-        return (this.queryString);
-
+        return this.queryString;
     }
 
 
@@ -476,9 +467,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public String getRequestURI() {
-
-        return (this.requestURI);
-
+        return this.requestURI;
     }
 
 
@@ -488,25 +477,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public StringBuffer getRequestURL() {
-
-        StringBuffer url = new StringBuffer();
-        String scheme = getScheme();
-        int port = getServerPort();
-        if (port < 0)
-            port = 80; // Work around java.net.URL bug
-
-        url.append(scheme);
-        url.append("://");
-        url.append(getServerName());
-        if ((scheme.equals("http") && (port != 80))
-            || (scheme.equals("https") && (port != 443))) {
-            url.append(':');
-            url.append(port);
-        }
-        url.append(getRequestURI());
-
-        return (url);
-
+        return RequestUtil.getRequestURL(this);
     }
 
 
@@ -516,14 +487,12 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public String getServletPath() {
-
-        return (this.servletPath);
-
+        return this.servletPath;
     }
 
 
     @Override
-    public Mapping getMapping() {
+    public HttpServletMapping getHttpServletMapping() {
         return mapping;
     }
 
@@ -534,7 +503,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     @Override
     public HttpSession getSession() {
-        return (getSession(true));
+        return getSession(true);
     }
 
 
@@ -551,11 +520,11 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
 
             // There cannot be a session if no context has been assigned yet
             if (context == null)
-                return (null);
+                return null;
 
             // Return the current session if it exists and is valid
             if (session != null && session.isValid()) {
-                return (session.getSession());
+                return session.getSession();
             }
 
             HttpSession other = super.getSession(false);
@@ -634,7 +603,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
 
 
     @Override
-    public PushBuilder getPushBuilder() {
+    public PushBuilder newPushBuilder() {
         return new ApplicationPushBuilder(this);
     }
 
@@ -707,7 +676,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
         queryString = request.getQueryString();
         requestURI = request.getRequestURI();
         servletPath = request.getServletPath();
-        mapping = request.getMapping();
+        mapping = request.getHttpServletMapping();
     }
 
 
@@ -766,7 +735,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
     }
 
 
-    void setMapping(Mapping mapping) {
+    void setMapping(HttpServletMapping mapping) {
         this.mapping = mapping;
     }
 
@@ -799,10 +768,10 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
     protected int getSpecial(String name) {
         for (int i = 0; i < specials.length; i++) {
             if (specials[i].equals(name)) {
-                return (i);
+                return i;
             }
         }
-        return (-1);
+        return -1;
     }
 
 
@@ -846,7 +815,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
      */
     private String[] mergeValues(String[] values1, String[] values2) {
 
-        ArrayList<Object> results = new ArrayList<>();
+        List<Object> results = new ArrayList<>();
 
         if (values1 == null) {
             // Skip - nothing to merge
@@ -888,19 +857,26 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
         MessageBytes queryMB = MessageBytes.newInstance();
         queryMB.setString(queryParamString);
 
+        // TODO
+        // - Should only use body encoding if useBodyEncodingForURI is true
+        // - Otherwise, should use URIEncoding
+        // - The problem is that the connector is not available...
+        // - To add to the fun, the URI default changed in Servlet 4.0 to UTF-8
+
         String encoding = getCharacterEncoding();
-        // No need to process null value, as ISO-8859-1 is the default encoding
-        // in MessageBytes.toBytes().
+        Charset charset = null;
         if (encoding != null) {
             try {
-                queryMB.setCharset(B2CConverter.getCharset(encoding));
-            } catch (UnsupportedEncodingException ignored) {
-                // Fall-back to ISO-8859-1
+                charset = B2CConverter.getCharset(encoding);
+                queryMB.setCharset(charset);
+            } catch (UnsupportedEncodingException e) {
+                // Fall-back to default (ISO-8859-1)
+                charset = StandardCharsets.ISO_8859_1;
             }
         }
 
         paramParser.setQuery(queryMB);
-        paramParser.setQueryStringEncoding(encoding);
+        paramParser.setQueryStringCharset(charset);
         paramParser.handleQueryParameters();
 
         // Insert the additional parameters from the dispatch target
@@ -956,7 +932,7 @@ class ApplicationHttpRequest extends HttpServletRequestWrapper {
                 for (int i = pos + 1; i <= last; i++) {
                     if (getAttribute(specials[i]) != null) {
                         pos = i;
-                        return (specials[i]);
+                        return specials[i];
                     }
                 }
             }

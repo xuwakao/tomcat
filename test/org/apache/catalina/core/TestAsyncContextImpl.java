@@ -50,6 +50,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import org.apache.catalina.Context;
@@ -61,7 +62,6 @@ import org.apache.catalina.startup.TomcatBaseTest;
 import org.apache.catalina.valves.TesterAccessLogValve;
 import org.apache.tomcat.unittest.TesterContext;
 import org.apache.tomcat.util.buf.ByteChunk;
-import org.apache.tomcat.util.buf.UDecoder;
 import org.apache.tomcat.util.descriptor.web.ErrorPage;
 import org.easymock.EasyMock;
 
@@ -2225,7 +2225,20 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
 
     // https://bz.apache.org/bugzilla/show_bug.cgi?id=57559
     @Test
-    public void testAsyncRequestURI() throws Exception {
+    public void testAsyncRequestURI_24() throws Exception {
+        // '$' is permitted in a path
+        doTestAsyncRequestURI("/foo/$/bar");
+    }
+
+
+    // https://bz.apache.org/bugzilla/show_bug.cgi?id=60722
+    @Test
+    public void testAsyncRequestURI_25() throws Exception {
+        doTestAsyncRequestURI("/foo/%25/bar");
+    }
+
+
+    private void doTestAsyncRequestURI(String uri) throws Exception{
         // Setup Tomcat instance
         Tomcat tomcat = getTomcatInstance();
 
@@ -2239,9 +2252,7 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
 
         tomcat.start();
 
-        String uri = "/foo/%24/bar";
-
-        ByteChunk body = getUrl("http://localhost:" + getPort()+ uri);
+        ByteChunk body = getUrl("http://localhost:" + getPort() + uri);
 
         Assert.assertEquals(uri, body.toString());
     }
@@ -2413,7 +2424,7 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
                         HttpServletResponse response = (HttpServletResponse) event
                                 .getSuppliedResponse();
                         if (!response.isCommitted()) {
-                            ((HttpServletRequest) event.getSuppliedRequest())
+                            event.getSuppliedRequest()
                                     .setAttribute("timeout", Boolean.TRUE);
                             context.dispatch();
                         }
@@ -2470,7 +2481,7 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
         };
         final Context context = new TesterContext();
         final Response response = new Response();
-        final Request request = new Request();
+        final Request request = new Request(null);
         request.setCoyoteRequest(new org.apache.coyote.Request());
         request.getMappingData().context = context;
         final AsyncContextImpl ac = new AsyncContextImpl(request);
@@ -2534,7 +2545,6 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
             req.setAttribute("count", Integer.valueOf(count));
 
             String encodedUri = req.getRequestURI();
-            String decodedUri = UDecoder.URLDecode(encodedUri);
 
             try {
                 // Just here to trigger the error
@@ -2549,7 +2559,7 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
                 resp.getWriter().print("OK");
             } else {
                 AsyncContext ac = req.startAsync();
-                ac.dispatch(decodedUri);
+                ac.dispatch(encodedUri);
             }
         }
     }
@@ -2572,7 +2582,6 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
             req.setAttribute("count", Integer.valueOf(count));
 
             String encodedUri = req.getRequestURI();
-            String decodedUri = UDecoder.URLDecode(encodedUri);
 
             try {
                 // Just here to trigger the error
@@ -2586,9 +2595,65 @@ public class TestAsyncContextImpl extends TomcatBaseTest {
                 resp.setContentType("text/plain");
                 resp.getWriter().print("OK");
             } else {
-                RequestDispatcher rd = req.getRequestDispatcher(decodedUri);
+                RequestDispatcher rd = req.getRequestDispatcher(encodedUri);
                 rd.forward(req, resp);
             }
         }
+    }
+
+
+    @Override
+    @Before
+    public void setUp() throws Exception {
+        super.setUp();
+        // Required by testBug61185()
+        // Does not impact other tests in this class
+        System.setProperty("org.apache.tomcat.util.buf.UDecoder.ALLOW_ENCODED_SLASH", "true");
+    }
+
+
+    @Test
+    public void testBug61185() throws Exception {
+        // Setup Tomcat instance
+        Tomcat tomcat = getTomcatInstance();
+
+        // No file system docBase required
+        Context ctx = tomcat.addContext("", null);
+
+        EncodedDispatchServlet encodedDispatchServlet = new EncodedDispatchServlet();
+        Wrapper wrapper = Tomcat.addServlet(ctx, "encodedDispatchServlet", encodedDispatchServlet);
+        wrapper.setAsyncSupported(true);
+        ctx.addServletMappingDecoded("/*", "encodedDispatchServlet");
+
+        tomcat.start();
+
+        ByteChunk body = new ByteChunk();
+        int rc = getUrl("http://localhost:" + getPort() + EncodedDispatchServlet.ENCODED_URI, body, null);
+
+        assertEquals(HttpServletResponse.SC_OK, rc);
+        assertEquals("OK", body.toString());
+    }
+
+
+    private static final class EncodedDispatchServlet extends HttpServlet {
+
+        private static final long serialVersionUID = 1L;
+
+        private static final String ENCODED_URI = "/foo/vv%2F1234/add/2";
+
+        @Override
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+            if (DispatcherType.ASYNC == req.getDispatcherType()) {
+                if (ENCODED_URI.equals(req.getRequestURI())) {
+                    resp.getWriter().print("OK");
+                } else {
+                    resp.getWriter().print("FAIL");
+                }
+            } else {
+                AsyncContext ac = req.startAsync();
+                ac.dispatch();
+            }
+        }
+
     }
 }

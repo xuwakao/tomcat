@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -298,9 +299,7 @@ public class StandardWrapper extends ContainerBase
      */
     @Override
     public long getAvailable() {
-
-        return (this.available);
-
+        return this.available;
     }
 
 
@@ -315,7 +314,6 @@ public class StandardWrapper extends ContainerBase
      */
     @Override
     public void setAvailable(long available) {
-
         long oldAvailable = this.available;
         if (available > System.currentTimeMillis())
             this.available = available;
@@ -323,7 +321,6 @@ public class StandardWrapper extends ContainerBase
             this.available = 0L;
         support.firePropertyChange("available", Long.valueOf(oldAvailable),
                                    Long.valueOf(this.available));
-
     }
 
 
@@ -352,7 +349,7 @@ public class StandardWrapper extends ContainerBase
              */
              return Integer.MAX_VALUE;
         } else {
-            return (this.loadOnStartup);
+            return this.loadOnStartup;
         }
     }
 
@@ -406,9 +403,7 @@ public class StandardWrapper extends ContainerBase
      * thread model servlet is used.
      */
     public int getMaxInstances() {
-
-        return (this.maxInstances);
-
+        return this.maxInstances;
     }
 
 
@@ -454,9 +449,7 @@ public class StandardWrapper extends ContainerBase
      */
     @Override
     public String getRunAs() {
-
-        return (this.runAs);
-
+        return this.runAs;
     }
 
 
@@ -480,9 +473,7 @@ public class StandardWrapper extends ContainerBase
      */
     @Override
     public String getServletClass() {
-
-        return (this.servletClass);
-
+        return this.servletClass;
     }
 
 
@@ -570,7 +561,7 @@ public class StandardWrapper extends ContainerBase
             return DEFAULT_SERVLET_METHODS;
         }
 
-        HashSet<String> allow = new HashSet<>();
+        Set<String> allow = new HashSet<>();
         allow.add("TRACE");
         allow.add("OPTIONS");
 
@@ -1081,9 +1072,9 @@ public class StandardWrapper extends ContainerBase
             processServletSecurityAnnotation(servlet.getClass());
 
             // Special handling for ContainerServlet instances
-            if ((servlet instanceof ContainerServlet) &&
-                    (isContainerProvidedServlet(servletClass) ||
-                            ((Context) getParent()).getPrivileged() )) {
+            // Note: The InstanceManager checks if the application is permitted
+            //       to load ContainerServlets
+            if (servlet instanceof ContainerServlet) {
                 ((ContainerServlet) servlet).setWrapper(this);
             }
 
@@ -1255,25 +1246,6 @@ public class StandardWrapper extends ContainerBase
             referencesLock.writeLock().unlock();
         }
         fireContainerEvent("removeSecurityReference", name);
-
-    }
-
-
-    /**
-     * @return a String representation of this component.
-     */
-    @Override
-    public String toString() {
-
-        StringBuilder sb = new StringBuilder();
-        if (getParent() != null) {
-            sb.append(getParent().toString());
-            sb.append(".");
-        }
-        sb.append("StandardWrapper[");
-        sb.append(getName());
-        sb.append("]");
-        return (sb.toString());
 
     }
 
@@ -1454,9 +1426,7 @@ public class StandardWrapper extends ContainerBase
      */
     @Override
     public String getInitParameter(String name) {
-
-        return (findInitParameter(name));
-
+        return findInitParameter(name);
     }
 
 
@@ -1482,14 +1452,12 @@ public class StandardWrapper extends ContainerBase
      */
     @Override
     public ServletContext getServletContext() {
-
         if (parent == null)
-            return (null);
+            return null;
         else if (!(parent instanceof Context))
-            return (null);
+            return null;
         else
-            return (((Context) parent).getServletContext());
-
+            return ((Context) parent).getServletContext();
     }
 
 
@@ -1498,9 +1466,7 @@ public class StandardWrapper extends ContainerBase
      */
     @Override
     public String getServletName() {
-
-        return (getName());
-
+        return getName();
     }
 
     public long getProcessingTime() {
@@ -1574,30 +1540,6 @@ public class StandardWrapper extends ContainerBase
 
 
     // -------------------------------------------------------- protected Methods
-
-
-    /**
-     * @return <code>true</code> if the specified class name represents a
-     * container provided servlet class that should be loaded by the
-     * server class loader.
-     *
-     * @param classname Name of the class to be checked
-     */
-    protected boolean isContainerProvidedServlet(String classname) {
-
-        if (classname.startsWith("org.apache.catalina.")) {
-            return true;
-        }
-        try {
-            Class<?> clazz =
-                this.getClass().getClassLoader().loadClass(classname);
-            return (ContainerServlet.class.isAssignableFrom(clazz));
-        } catch (Throwable t) {
-            ExceptionUtils.handleThrowable(t);
-            return false;
-        }
-
-    }
 
 
     protected Method[] getAllDeclaredMethods(Class<?> c) {
@@ -1696,7 +1638,7 @@ public class StandardWrapper extends ContainerBase
         // Shut down this component
         super.stopInternal();
 
-        // Send j2ee.state.stoppped notification
+        // Send j2ee.state.stopped notification
         if (this.getObjectName() != null) {
             Notification notification =
                 new Notification("j2ee.state.stopped", this.getObjectName(),
@@ -1745,7 +1687,7 @@ public class StandardWrapper extends ContainerBase
             keyProperties.append(hostName);
         }
 
-        String contextName = ((Context) getParent()).getName();
+        String contextName = getParent().getName();
         if (!contextName.startsWith("/")) {
             keyProperties.append('/');
         }
@@ -1780,7 +1722,7 @@ public class StandardWrapper extends ContainerBase
 
 
     /**
-     * Remove a JMX notficationListener
+     * Remove a JMX notificationListener
      * @see javax.management.NotificationEmitter#removeNotificationListener(javax.management.NotificationListener, javax.management.NotificationFilter, java.lang.Object)
      */
     @Override

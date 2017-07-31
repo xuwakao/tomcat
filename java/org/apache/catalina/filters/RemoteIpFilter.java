@@ -19,7 +19,6 @@ package org.apache.catalina.filters;
 import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
@@ -44,6 +43,7 @@ import javax.servlet.http.PushBuilder;
 import org.apache.catalina.AccessLog;
 import org.apache.catalina.Globals;
 import org.apache.catalina.core.ApplicationPushBuilder;
+import org.apache.catalina.util.RequestUtil;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
@@ -585,7 +585,7 @@ public class RemoteIpFilter extends GenericFilter {
         }
 
         public void setHeader(String name, String value) {
-            List<String> values = Arrays.asList(value);
+            List<String> values = Collections.singletonList(value);
             Map.Entry<String, List<String>> header = getHeaderEntry(name);
             if (header == null) {
                 headers.put(name, values);
@@ -621,27 +621,11 @@ public class RemoteIpFilter extends GenericFilter {
 
         @Override
         public StringBuffer getRequestURL() {
-            StringBuffer url = new StringBuffer();
-            String scheme = getScheme();
-            int port = getServerPort();
-            if (port < 0) {
-                port = 80; // Work around java.net.URL bug
-            }
-            url.append(scheme);
-            url.append("://");
-            url.append(getServerName());
-            if ((scheme.equals("http") && (port != 80))
-                || (scheme.equals("https") && (port != 443))) {
-                url.append(':');
-                url.append(port);
-            }
-            url.append(getRequestURI());
-
-            return url;
+            return RequestUtil.getRequestURL(this);
         }
 
         @Override
-        public PushBuilder getPushBuilder() {
+        public PushBuilder newPushBuilder() {
             return new ApplicationPushBuilder(this);
         }
     }
@@ -892,7 +876,7 @@ public class RemoteIpFilter extends GenericFilter {
     }
 
     /**
-     * Wrap the incoming <code>request</code> in a {@link XForwardedRequest} if the http header <code>x-forwareded-for</code> is not empty.
+     * Wrap the incoming <code>request</code> in a {@link XForwardedRequest} if the http header <code>x-forwarded-for</code> is not empty.
      * {@inheritDoc}
      */
     @Override

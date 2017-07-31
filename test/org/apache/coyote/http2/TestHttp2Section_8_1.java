@@ -17,6 +17,8 @@
 package org.apache.coyote.http2;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -31,10 +33,67 @@ import org.junit.Test;
 public class TestHttp2Section_8_1 extends Http2TestBase {
 
     @Test
-    public void testPostWithContinuation() throws Exception {
-        http2Connect();
-
+    public void testPostWithTrailerHeaders() throws Exception {
+        doTestPostWithTrailerHeaders(true);
     }
+
+
+    @Test
+    public void testPostWithTrailerHeadersBlocked() throws Exception {
+        doTestPostWithTrailerHeaders(false);
+    }
+
+
+    private void doTestPostWithTrailerHeaders(boolean allowTrailerHeader) throws Exception{
+        http2Connect();
+        if (allowTrailerHeader) {
+            Http2Protocol http2Protocol =
+                    (Http2Protocol) getTomcatInstance().getConnector().findUpgradeProtocols()[0];
+            http2Protocol.setAllowedTrailerHeaders(TRAILER_HEADER_NAME);
+        }
+
+        byte[] headersFrameHeader = new byte[9];
+        ByteBuffer headersPayload = ByteBuffer.allocate(128);
+        byte[] dataFrameHeader = new byte[9];
+        ByteBuffer dataPayload = ByteBuffer.allocate(256);
+        byte[] trailerFrameHeader = new byte[9];
+        ByteBuffer trailerPayload = ByteBuffer.allocate(256);
+
+        buildPostRequest(headersFrameHeader, headersPayload, false, dataFrameHeader, dataPayload,
+                null, trailerFrameHeader, trailerPayload, 3);
+
+        // Write the headers
+        writeFrame(headersFrameHeader, headersPayload);
+        // Body
+        writeFrame(dataFrameHeader, dataPayload);
+        // Trailers
+        writeFrame(trailerFrameHeader, trailerPayload);
+
+        parser.readFrame(true);
+        parser.readFrame(true);
+        parser.readFrame(true);
+        parser.readFrame(true);
+
+        String len;
+        if (allowTrailerHeader) {
+            len = Integer.toString(256 + TRAILER_HEADER_VALUE.length());
+        } else {
+            len = "256";
+        }
+
+        Assert.assertEquals("0-WindowSize-[256]\n" +
+                "3-WindowSize-[256]\n" +
+                "3-HeadersStart\n" +
+                "3-Header-[:status]-[200]\n" +
+                "3-Header-[date]-["+ DEFAULT_DATE + "]\n" +
+                "3-HeadersEnd\n" +
+                "3-Body-" +
+                len +
+                "\n" +
+                "3-EndOfStream\n",
+                output.getTrace());
+    }
+
 
     @Test
     public void testSendAck() throws Exception {
@@ -55,7 +114,6 @@ public class TestHttp2Section_8_1 extends Http2TestBase {
 
         Assert.assertEquals("3-HeadersStart\n" +
                 "3-Header-[:status]-[100]\n" +
-                "3-Header-[date]-["+ DEFAULT_DATE + "]\n" +
                 "3-HeadersEnd\n",
                 output.getTrace());
         output.clearTrace();
@@ -77,6 +135,83 @@ public class TestHttp2Section_8_1 extends Http2TestBase {
                 "3-Body-256\n" +
                 "3-EndOfStream\n",
                 output.getTrace());
+    }
 
+
+    @Test
+    public void testUndefinedPseudoHeader() throws Exception {
+        List<Header> headers = new ArrayList<>(5);
+        headers.add(new Header(":method", "GET"));
+        headers.add(new Header(":scheme", "http"));
+        headers.add(new Header(":path", "/simple"));
+        headers.add(new Header(":authority", "localhost:" + getPort()));
+        headers.add(new Header(":foo", "bar"));
+
+        doInvalidPseudoHeaderTest(headers);
+    }
+
+
+    @Test
+    public void testInvalidPseudoHeader() throws Exception {
+        List<Header> headers = new ArrayList<>(5);
+        headers.add(new Header(":method", "GET"));
+        headers.add(new Header(":scheme", "http"));
+        headers.add(new Header(":path", "/simple"));
+        headers.add(new Header(":authority", "localhost:" + getPort()));
+        headers.add(new Header(":status", "200"));
+
+        doInvalidPseudoHeaderTest(headers);
+    }
+
+
+    @Test
+    public void testPseudoHeaderOrder() throws Exception {
+        // Need to do this in two frames because HPACK encoder automatically
+        // re-orders fields
+
+        http2Connect();
+
+        List<Header> headers = new ArrayList<>(4);
+        headers.add(new Header(":method", "GET"));
+        headers.add(new Header(":scheme", "http"));
+        headers.add(new Header(":path", "/simple"));
+        headers.add(new Header("x-test", "test"));
+
+        byte[] headersFrameHeader = new byte[9];
+        ByteBuffer headersPayload = ByteBuffer.allocate(128);
+
+        buildSimpleGetRequestPart1(headersFrameHeader, headersPayload, headers , 3);
+
+        writeFrame(headersFrameHeader, headersPayload);
+
+        headers.clear();
+        headers.add(new Header(":authority", "localhost:" + getPort()));
+        headersPayload.clear();
+
+        buildSimpleGetRequestPart2(headersFrameHeader, headersPayload, headers , 3);
+
+        writeFrame(headersFrameHeader, headersPayload);
+
+
+        parser.readFrame(true);
+
+        Assert.assertEquals("3-RST-[1]\n", output.getTrace());
+    }
+
+
+    private void doInvalidPseudoHeaderTest(List<Header> headers) throws Exception {
+        http2Connect();
+
+        byte[] headersFrameHeader = new byte[9];
+        ByteBuffer headersPayload = ByteBuffer.allocate(128);
+
+        buildGetRequest(headersFrameHeader, headersPayload, null, headers , 3);
+
+        // Write the headers
+        writeFrame(headersFrameHeader, headersPayload);
+
+        parser.readFrame(true);
+
+        Assert.assertEquals("3-RST-[1]\n", output.getTrace());
     }
 }

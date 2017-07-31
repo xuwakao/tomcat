@@ -96,7 +96,7 @@ the web application root directory + File.separator + this prefix.
 By default there is no value, which results in the web application root
 directory being used as the search path. The recommended value is
 <code>WEB-INF/cgi</code></li>
-<li><strong>executable</strong> - The of the executable to be used to
+<li><strong>executable</strong> - The name of the executable to be used to
 run the script. You may explicitly set this parameter to be an empty string
 if your script is itself executable (e.g. an exe file). Default is
 <code>perl</code>.</li>
@@ -121,6 +121,18 @@ the reading of stderr to complete before terminating the CGI process. Default
 is <code>2000</code>.</li>
 </ul>
 
+<p>The name and path of the CGI script to search for in the CGI search path
+depends on how the Servlet has been mapped. If the <strong>pathInfo</strong> is
+<code>null</code>, the <strong>servletPath</strong> will be used. If the
+<strong>pathInfo</strong> is not <code>null</code> then the
+<strong>servletPath</strong> is appended to the CGI search path and the
+<strong>pathInfo</strong> is used.</p>
+
+<p>The search will start with the first path segment and expand one path segment
+at a time until no path segments are left (resulting in a 404) or a matching
+script is found in the CGI search path. Any remaining path segments will be
+passed to the CGI executable in the <strong>PATH_INFO</strong> environment
+variable.</p>
 
 </section>
 

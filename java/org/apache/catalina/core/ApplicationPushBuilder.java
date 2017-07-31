@@ -16,11 +16,11 @@
  */
 package org.apache.catalina.core;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -38,16 +38,25 @@ import org.apache.catalina.Context;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.util.SessionConfig;
 import org.apache.coyote.ActionCode;
-import org.apache.coyote.PushToken;
-import org.apache.tomcat.util.buf.B2CConverter;
 import org.apache.tomcat.util.buf.HexUtils;
 import org.apache.tomcat.util.collections.CaseInsensitiveKeyMap;
 import org.apache.tomcat.util.http.CookieProcessor;
+import org.apache.tomcat.util.http.parser.HttpParser;
 import org.apache.tomcat.util.res.StringManager;
 
 public class ApplicationPushBuilder implements PushBuilder {
 
     private static final StringManager sm = StringManager.getManager(ApplicationPushBuilder.class);
+    private static final Set<String> DISALLOWED_METHODS = new HashSet<>();
+
+    static {
+        DISALLOWED_METHODS.add("POST");
+        DISALLOWED_METHODS.add("PUT");
+        DISALLOWED_METHODS.add("DELETE");
+        DISALLOWED_METHODS.add("CONNECT");
+        DISALLOWED_METHODS.add("OPTIONS");
+        DISALLOWED_METHODS.add("TRACE");
+    }
 
     private final HttpServletRequest baseRequest;
     private final Request catalinaRequest;
@@ -61,11 +70,8 @@ public class ApplicationPushBuilder implements PushBuilder {
     private final List<Cookie> cookies = new ArrayList<>();
     private String method = "GET";
     private String path;
-    private String etag;
-    private String lastModified;
     private String queryString;
     private String sessionId;
-    private boolean conditional;
 
 
     public ApplicationPushBuilder(HttpServletRequest request) {
@@ -76,7 +82,7 @@ public class ApplicationPushBuilder implements PushBuilder {
             current = ((ServletRequestWrapper) current).getRequest();
         }
         if (current instanceof Request) {
-            catalinaRequest = ((Request) current);
+            catalinaRequest = (Request) current;
             coyoteRequest = catalinaRequest.getCoyoteRequest();
         } else {
             throw new UnsupportedOperationException(sm.getString(
@@ -97,12 +103,8 @@ public class ApplicationPushBuilder implements PushBuilder {
 
         // Remove the headers
         headers.remove("if-match");
-        if (headers.remove("if-none-match") != null) {
-            conditional = true;
-        }
-        if (headers.remove("if-modified-since") != null) {
-            conditional = true;
-        }
+        headers.remove("if-none-match");
+        headers.remove("if-modified-since");
         headers.remove("if-unmodified-since");
         headers.remove("if-range");
         headers.remove("range");
@@ -193,6 +195,18 @@ public class ApplicationPushBuilder implements PushBuilder {
 
     @Override
     public PushBuilder method(String method) {
+        String upperMethod = method.trim().toUpperCase();
+        if (DISALLOWED_METHODS.contains(upperMethod)) {
+            throw new IllegalArgumentException(
+                    sm.getString("applicationPushBuilder.methodInvalid", upperMethod));
+        }
+        // Check a token was supplied
+        for (char c : upperMethod.toCharArray()) {
+            if (!HttpParser.isToken(c)) {
+                throw new IllegalArgumentException(
+                        sm.getString("applicationPushBuilder.methodNotToken", upperMethod));
+            }
+        }
         this.method = method;
         return this;
     }
@@ -201,32 +215,6 @@ public class ApplicationPushBuilder implements PushBuilder {
     @Override
     public String getMethod() {
         return method;
-    }
-
-
-    @Override
-    public PushBuilder etag(String etag) {
-        this.etag = etag;
-        return this;
-    }
-
-
-    @Override
-    public String getEtag() {
-        return etag;
-    }
-
-
-    @Override
-    public PushBuilder lastModified(String lastModified) {
-        this.lastModified = lastModified;
-        return this;
-    }
-
-
-    @Override
-    public String getLastModified() {
-        return lastModified;
     }
 
 
@@ -253,19 +241,6 @@ public class ApplicationPushBuilder implements PushBuilder {
     @Override
     public String getSessionId() {
         return sessionId;
-    }
-
-
-    @Override
-    public PushBuilder conditional(boolean conditional) {
-        this.conditional = conditional;
-        return this;
-    }
-
-
-    @Override
-    public boolean isConditional() {
-        return conditional;
     }
 
 
@@ -323,7 +298,7 @@ public class ApplicationPushBuilder implements PushBuilder {
 
 
     @Override
-    public boolean push() {
+    public void push() {
         if (path == null) {
             throw new IllegalStateException(sm.getString("pushBuilder.noPath"));
         }
@@ -370,7 +345,7 @@ public class ApplicationPushBuilder implements PushBuilder {
         // Undecoded path - just %nn encoded
         pushTarget.requestURI().setString(pushPath);
         pushTarget.decodedURI().setString(decode(pushPath,
-                catalinaRequest.getConnector().getURIEncodingLower()));
+                catalinaRequest.getConnector().getURICharset()));
 
         // Query string
         if (pushQueryString == null && queryString != null) {
@@ -381,35 +356,22 @@ public class ApplicationPushBuilder implements PushBuilder {
             pushTarget.queryString().setString(pushQueryString + "&" +queryString);
         }
 
-        if (conditional) {
-            if (etag != null) {
-                setHeader("if-none-match", etag);
-            } else if (lastModified != null) {
-                setHeader("if-modified-since", lastModified);
-            }
-        }
-
         // Cookies
         setHeader("cookie", generateCookieHeader(cookies,
                 catalinaRequest.getContext().getCookieProcessor()));
 
-        PushToken pushToken = new PushToken(pushTarget);
-        coyoteRequest.action(ActionCode.PUSH_REQUEST, pushToken);
+        coyoteRequest.action(ActionCode.PUSH_REQUEST, pushTarget);
 
         // Reset for next call to this method
         pushTarget = null;
         path = null;
-        etag = null;
-        lastModified = null;
         headers.remove("if-none-match");
         headers.remove("if-modified-since");
-
-        return pushToken.getResult();
     }
 
 
     // Package private so it can be tested. charsetName must be in lower case.
-    static String decode(String input, String charsetName) {
+    static String decode(String input, Charset charset) {
         int start = input.indexOf('%');
         int end = 0;
 
@@ -418,18 +380,9 @@ public class ApplicationPushBuilder implements PushBuilder {
             return input;
         }
 
-        Charset charset;
-        try {
-            charset = B2CConverter.getCharsetLower(charsetName);
-        } catch (UnsupportedEncodingException uee) {
-            // Impossible since original request would have triggered an error
-            // before reaching here
-            throw new IllegalStateException(uee);
-        }
-
         StringBuilder result = new StringBuilder(input.length());
         while (start != -1) {
-            // Found the start of a %nn sequence. Copy everything form the last
+            // Found the start of a %nn sequence. Copy everything from the last
             // end to this start to the output.
             result.append(input.substring(end, start));
             // Advance the end 3 characters: %nn
@@ -437,7 +390,7 @@ public class ApplicationPushBuilder implements PushBuilder {
             while (end <input.length() && input.charAt(end) == '%') {
                 end += 3;
             }
-            result.append(decode(input.substring(start, end), charset));
+            result.append(decodePercentSequence(input.substring(start, end), charset));
             start = input.indexOf('%', end);
         }
         // Append the remaining text
@@ -447,11 +400,11 @@ public class ApplicationPushBuilder implements PushBuilder {
     }
 
 
-    private static String decode(String percentSequence, Charset charset) {
-        byte[] bytes = new byte[percentSequence.length()/3];
+    private static String decodePercentSequence(String sequence, Charset charset) {
+        byte[] bytes = new byte[sequence.length()/3];
         for (int i = 0; i < bytes.length; i += 3) {
-            bytes[i] = (byte) (HexUtils.getDec(percentSequence.charAt(1 + 3 * i)) << 4 +
-                    HexUtils.getDec(percentSequence.charAt(2 + 3 * i)));
+            bytes[i] = (byte) ((HexUtils.getDec(sequence.charAt(1 + 3 * i)) << 4) +
+                    HexUtils.getDec(sequence.charAt(2 + 3 * i)));
         }
 
         return new String(bytes, charset);

@@ -277,8 +277,6 @@
     <attribute name="testOnBorrow" required="false">
       <p>(boolean) The indication of whether objects will be validated before being borrowed from the pool.
          If the object fails to validate, it will be dropped from the pool, and we will attempt to borrow another.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code>
-         or <code>validatorClassName</code> parameter must be set to a non-null string.
          In order to have a more efficient validation, see <code>validationInterval</code>.
          Default value is <code>false</code>
       </p>
@@ -287,16 +285,12 @@
     <attribute name="testOnConnect" required="false">
       <p>(boolean) The indication of whether objects will be validated when a connection is first created.
          If an object fails to validate, it will be throw <code>SQLException</code>.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code>, <code>initSQL</code>
-         or <code>validatorClassName</code> parameter must be set to a non-null string.
          Default value is <code>false</code>
       </p>
     </attribute>
 
     <attribute name="testOnReturn" required="false">
       <p>(boolean) The indication of whether objects will be validated before being returned to the pool.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code>
-         or <code>validatorClassName</code> parameter must be set to a non-null string.
          The default value is <code>false</code>.
       </p>
     </attribute>
@@ -304,8 +298,6 @@
     <attribute name="testWhileIdle" required="false">
       <p>(boolean) The indication of whether objects will be validated by the idle object evictor (if any).
          If an object fails to validate, it will be dropped from the pool.
-         NOTE - for a true value to have any effect, the <code>validationQuery</code>
-         or <code>validatorClassName</code> parameter must be set to a non-null string.
          The default value is <code>false</code> and this property has to be set in order for the
          pool cleaner/test thread is to run (also see <code>timeBetweenEvictionRunsMillis</code>)
       </p>
@@ -315,6 +307,7 @@
       <p>(String) The SQL query that will be used to validate connections from this pool before returning them to the caller.
          If specified, this query does not have to return any data, it just can't throw a <code>SQLException</code>.
          The default value is <code>null</code>.
+         If not specified, connections will be validation by the isValid() method.
          Example values are <code>SELECT 1</code>(mysql), <code>select 1 from dual</code>(oracle), <code>SELECT 1</code>(MS Sql Server)
       </p>
     </attribute>
@@ -414,7 +407,7 @@
       <p>(String) A semicolon separated list of classnames extending
          <code>org.apache.tomcat.jdbc.pool.JdbcInterceptor</code> class.
          See <a href="#Configuring_JDBC_interceptors">Configuring JDBC interceptors</a>
-         below for more detailed description of syntaz and examples.
+         below for more detailed description of syntax and examples.
       </p>
       <p>
          These interceptors will be inserted as an interceptor into the chain
@@ -437,7 +430,7 @@
     <attribute name="validationInterval" required="false">
       <p>(long) avoid excess validation, only run validation at most at this frequency - time in milliseconds.
          If a connection is due for validation, but has been validated previously within this interval, it will not be validated again.
-         The default value is <code>30000</code> (30 seconds).</p>
+         The default value is <code>3000</code> (3 seconds).</p>
     </attribute>
 
     <attribute name="jmxEnabled" required="false">
@@ -558,6 +551,13 @@
          The default value is <code>false</code>.
       </p>
     </attribute>
+    <attribute name="useStatementFacade" required="false">
+      <p>(boolean) Set this to true if you wish to wrap statements in order to
+         enable <code>equals()</code> and <code>hashCode()</code> methods to be
+         called on the closed statements if any statement proxy is set.
+         Default value is <code>true</code>.
+      </p>
+    </attribute>
 
   </attributes>
   </subsection>
@@ -571,7 +571,7 @@
     </p>
     <p>Further interceptors will be added to the core of the pool as the need arises. Contributions are always welcome!</p>
     <p>Interceptors are of course not limited to just <code>java.sql.Connection</code> but can be used to wrap any
-    of the results from a method invokation as well. You could build query performance analyzer that provides JMX notifications when a
+    of the results from a method invocation as well. You could build query performance analyzer that provides JMX notifications when a
     query is running longer than the expected time.</p>
   </subsection>
   <subsection name="Configuring JDBC interceptors">
@@ -889,7 +889,7 @@
 <source><![CDATA[  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable]]></source>
     <p>
        method to get invoked. The <code>Method method</code> is the actual method invoked, and <code>Object[] args</code> are the arguments.
-       To look at a very simple example, where we demonstrate how to make the invokation to <code>java.sql.Connection.close()</code> a noop
+       To look at a very simple example, where we demonstrate how to make the invocation to <code>java.sql.Connection.close()</code> a noop
        if the connection has been closed
     </p>
 <source><![CDATA[  if (CLOSE_VAL==method.getName()) {

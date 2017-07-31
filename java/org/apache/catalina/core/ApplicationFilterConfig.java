@@ -90,11 +90,14 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
      * @exception ServletException if thrown by the filter's init() method
      * @throws NamingException
      * @throws InvocationTargetException
+     * @throws SecurityException
+     * @throws NoSuchMethodException
+     * @throws IllegalArgumentException
      */
     ApplicationFilterConfig(Context context, FilterDef filterDef)
-        throws ClassCastException, ClassNotFoundException,
-               IllegalAccessException, InstantiationException,
-               ServletException, InvocationTargetException, NamingException {
+            throws ClassCastException, ClassNotFoundException, IllegalAccessException,
+            InstantiationException, ServletException, InvocationTargetException, NamingException,
+            IllegalArgumentException, NoSuchMethodException, SecurityException {
 
         super();
 
@@ -149,7 +152,7 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
      */
     @Override
     public String getFilterName() {
-        return (filterDef.getFilterName());
+        return filterDef.getFilterName();
     }
 
     /**
@@ -171,7 +174,7 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
 
         Map<String,String> map = filterDef.getParameterMap();
         if (map == null) {
-            return (null);
+            return null;
         }
 
         return map.get(name);
@@ -211,15 +214,13 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
      */
     @Override
     public String toString() {
-
         StringBuilder sb = new StringBuilder("ApplicationFilterConfig[");
         sb.append("name=");
         sb.append(filterDef.getFilterName());
         sb.append(", filterClass=");
         sb.append(filterDef.getFilterClass());
         sb.append("]");
-        return (sb.toString());
-
+        return sb.toString();
     }
 
     // --------------------------------------------------------- Public Methods
@@ -244,14 +245,17 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
      * @exception ServletException if thrown by the filter's init() method
      * @throws NamingException
      * @throws InvocationTargetException
+     * @throws SecurityException
+     * @throws NoSuchMethodException
+     * @throws IllegalArgumentException
      */
-    Filter getFilter() throws ClassCastException, ClassNotFoundException,
-        IllegalAccessException, InstantiationException, ServletException,
-        InvocationTargetException, NamingException {
+    Filter getFilter() throws ClassCastException, ClassNotFoundException, IllegalAccessException,
+            InstantiationException, ServletException, InvocationTargetException, NamingException,
+            IllegalArgumentException, NoSuchMethodException, SecurityException {
 
         // Return the existing filter instance, if any
         if (this.filter != null)
-            return (this.filter);
+            return this.filter;
 
         // Identify the class loader we will be using
         String filterClass = filterDef.getFilterClass();
@@ -259,7 +263,7 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
 
         initFilter();
 
-        return (this.filter);
+        return this.filter;
 
     }
 
@@ -287,9 +291,7 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
      * Return the filter definition we are configured for.
      */
     FilterDef getFilterDef() {
-
-        return (this.filterDef);
-
+        return this.filterDef;
     }
 
     /**
@@ -320,7 +322,7 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
             }
             if (!context.getIgnoreAnnotations()) {
                 try {
-                    ((StandardContext) context).getInstanceManager().destroyInstance(this.filter);
+                    context.getInstanceManager().destroyInstance(this.filter);
                 } catch (Exception e) {
                     Throwable t = ExceptionUtils
                             .unwrapInvocationTargetException(e);
@@ -341,7 +343,7 @@ public final class ApplicationFilterConfig implements FilterConfig, Serializable
     private InstanceManager getInstanceManager() {
         if (instanceManager == null) {
             if (context instanceof StandardContext) {
-                instanceManager = ((StandardContext)context).getInstanceManager();
+                instanceManager = context.getInstanceManager();
             } else {
                 instanceManager = new DefaultInstanceManager(null,
                         new HashMap<String, Map<String, String>>(),

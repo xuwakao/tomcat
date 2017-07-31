@@ -19,7 +19,7 @@ package org.apache.jasper.compiler;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Vector;
 
@@ -127,9 +127,9 @@ class TagFileProcessor {
 
         private static final String TAG_DYNAMIC = "the dynamic-attributes attribute of the tag directive";
 
-        private HashMap<String,NameEntry> nameTable = new HashMap<>();
+        private Map<String,NameEntry> nameTable = new HashMap<>();
 
-        private HashMap<String,NameEntry> nameFromTable = new HashMap<>();
+        private Map<String,NameEntry> nameFromTable = new HashMap<>();
 
         public TagFileDirectiveVisitor(Compiler compiler,
                 TagLibraryInfo tagLibInfo, String name, String path) {
@@ -422,7 +422,7 @@ class TagFileProcessor {
         private void checkUniqueName(String name, String type, Node n,
                 TagAttributeInfo attr) throws JasperException {
 
-            HashMap<String, NameEntry> table = (VAR_NAME_FROM.equals(type)) ? nameFromTable : nameTable;
+            Map<String, NameEntry> table = (VAR_NAME_FROM.equals(type)) ? nameFromTable : nameTable;
             NameEntry nameEntry = table.get(name);
             if (nameEntry != null) {
                 if (!TAG_DYNAMIC.equals(type) ||
@@ -595,10 +595,8 @@ class TagFileProcessor {
                     try {
                         Object tagIns = tagClazz.newInstance();
                         if (tagIns instanceof JspSourceDependent) {
-                            Iterator<Entry<String,Long>> iter = ((JspSourceDependent)
-                                    tagIns).getDependants().entrySet().iterator();
-                            while (iter.hasNext()) {
-                                Entry<String,Long> entry = iter.next();
+                            for (Entry<String, Long> entry : ((JspSourceDependent)
+                                    tagIns).getDependants().entrySet()) {
                                 parentPageInfo.addDependant(entry.getKey(),
                                         entry.getValue());
                             }
@@ -702,9 +700,7 @@ class TagFileProcessor {
      *            If non-null, remove only the class file with with this name.
      */
     public void removeProtoTypeFiles(String classFileName) {
-        Iterator<Compiler> iter = tempVector.iterator();
-        while (iter.hasNext()) {
-            Compiler c = iter.next();
+        for (Compiler c : tempVector) {
             if (classFileName == null) {
                 c.removeGeneratedClassFiles();
             } else if (classFileName.equals(c.getCompilationContext()

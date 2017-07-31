@@ -18,6 +18,7 @@ package org.apache.coyote.http11;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.apache.coyote.ActionCode;
 import org.apache.coyote.OutputBuffer;
@@ -134,10 +135,7 @@ public class Http11OutputBuffer implements OutputBuffer {
      */
     public void addFilter(OutputFilter filter) {
 
-        OutputFilter[] newFilterLibrary = new OutputFilter[filterLibrary.length + 1];
-        for (int i = 0; i < filterLibrary.length; i++) {
-            newFilterLibrary[i] = filterLibrary[i];
-        }
+        OutputFilter[] newFilterLibrary = Arrays.copyOf(filterLibrary, filterLibrary.length + 1);
         newFilterLibrary[filterLibrary.length] = filter;
         filterLibrary = newFilterLibrary;
 
@@ -244,7 +242,7 @@ public class Http11OutputBuffer implements OutputBuffer {
      * headers so the error response can be written.
      */
     void resetHeaderBuffer() {
-        headerBuffer.position(0);
+        headerBuffer.position(0).limit(headerBuffer.capacity());
     }
 
 
@@ -272,7 +270,7 @@ public class Http11OutputBuffer implements OutputBuffer {
         // Recycle response object
         response.recycle();
         // Reset pointers
-        headerBuffer.position(0);
+        headerBuffer.position(0).limit(headerBuffer.capacity());
         lastActiveFilter = -1;
         responseFinished = false;
         byteCount = 0;
@@ -325,8 +323,11 @@ public class Http11OutputBuffer implements OutputBuffer {
         if (headerBuffer.position() > 0) {
             // Sending the response header buffer
             headerBuffer.flip();
-            socketWrapper.write(isBlocking(), headerBuffer);
-            headerBuffer.position(0).limit(headerBuffer.capacity());
+            try {
+                socketWrapper.write(isBlocking(), headerBuffer);
+            } finally {
+                headerBuffer.position(0).limit(headerBuffer.capacity());
+            }
         }
     }
 
@@ -352,7 +353,7 @@ public class Http11OutputBuffer implements OutputBuffer {
             write(Constants._404_BYTES);
             break;
         default:
-            write(String.valueOf(status));
+            write(status);
         }
 
         headerBuffer.put(Constants.SP);
@@ -449,29 +450,18 @@ public class Http11OutputBuffer implements OutputBuffer {
 
 
     /**
-     * This method will write the contents of the specified String to the
-     * output stream, without filtering. This method is meant to be used to
-     * write the response header.
+     * This method will write the specified integer to the output stream. This
+     * method is meant to be used to write the response header.
      *
-     * @param s data to be written
+     * @param value data to be written
      */
-    private void write(String s) {
-        if (s == null) {
-            return;
-        }
-
+    private void write(int value) {
         // From the Tomcat 3.3 HTTP/1.0 connector
+        String s = Integer.toString(value);
         int len = s.length();
         checkLengthBeforeWrite(len);
         for (int i = 0; i < len; i++) {
             char c = s.charAt (i);
-            // Note:  This is clearly incorrect for many strings,
-            // but is the only consistent approach within the current
-            // servlet framework.  It must suffice until servlet output
-            // streams properly encode their output.
-            if (((c <= 31) && (c != 9)) || c == 127 || c > 255) {
-                c = ' ';
-            }
             headerBuffer.put((byte) c);
         }
     }
@@ -534,6 +524,16 @@ public class Http11OutputBuffer implements OutputBuffer {
     }
 
 
+    boolean isChunking() {
+        for (int i = 0; i < lastActiveFilter; i++) {
+            if (activeFilters[i] == filterLibrary[Constants.CHUNKED_FILTER]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
     // ------------------------------------------ SocketOutputBuffer Inner Class
 
     /**
@@ -546,11 +546,17 @@ public class Http11OutputBuffer implements OutputBuffer {
          */
         @Override
         public int doWrite(ByteBuffer chunk) throws IOException {
-            int len = chunk.remaining();
-            socketWrapper.write(isBlocking(), chunk);
-            len -= chunk.remaining();
-            byteCount += len;
-            return len;
+            try {
+                int len = chunk.remaining();
+                socketWrapper.write(isBlocking(), chunk);
+                len -= chunk.remaining();
+                byteCount += len;
+                return len;
+            } catch (IOException ioe) {
+                response.action(ActionCode.CLOSE_NOW, ioe);
+                // Re-throw
+                throw ioe;
+            }
         }
 
         @Override

@@ -34,7 +34,6 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -115,6 +114,7 @@ public class JspC extends Task implements Options {
     protected static final String SWITCH_CLASS_NAME = "-c";
     protected static final String SWITCH_FULL_STOP = "--";
     protected static final String SWITCH_COMPILE = "-compile";
+    protected static final String SWITCH_FAIL_FAST = "-failFast";
     protected static final String SWITCH_SOURCE = "-source";
     protected static final String SWITCH_TARGET = "-target";
     protected static final String SWITCH_URI_BASE = "-uribase";
@@ -167,7 +167,7 @@ public class JspC extends Task implements Options {
 
     protected String classPath = null;
     protected ClassLoader loader = null;
-    protected boolean trimSpaces = false;
+    protected TrimSpacesOption trimSpaces = TrimSpacesOption.FALSE;
     protected boolean genStringAsCharArray = false;
     protected boolean validateTld;
     protected boolean validateXml;
@@ -186,6 +186,7 @@ public class JspC extends Task implements Options {
     protected int dieLevel;
     protected boolean helpNeeded = false;
     protected boolean compile = false;
+    protected boolean failFast = false;
     protected boolean smapSuppressed = true;
     protected boolean smapDumped = false;
     protected boolean caching = true;
@@ -203,6 +204,11 @@ public class JspC extends Task implements Options {
      * Default is true to preserve old behavior.
      */
     protected boolean failOnError = true;
+
+    /**
+     * Should a separate process be forked to perform the compilation?
+     */
+    private boolean fork = false;
 
     /**
      * The file extensions to be handled as JSP files.
@@ -314,6 +320,8 @@ public class JspC extends Task implements Options {
                 targetPackage = nextArg();
             } else if (tok.equals(SWITCH_COMPILE)) {
                 compile=true;
+            } else if (tok.equals(SWITCH_FAIL_FAST)) {
+                failFast = true;
             } else if (tok.equals(SWITCH_CLASS_NAME)) {
                 targetClassName = nextArg();
             } else if (tok.equals(SWITCH_URI_BASE)) {
@@ -345,7 +353,13 @@ public class JspC extends Task implements Options {
             } else if (tok.equals(SWITCH_XPOWERED_BY)) {
                 xpoweredBy = true;
             } else if (tok.equals(SWITCH_TRIM_SPACES)) {
-                setTrimSpaces(true);
+                tok = nextArg();
+                if (TrimSpacesOption.SINGLE.toString().equalsIgnoreCase(tok)) {
+                    setTrimSpaces(TrimSpacesOption.SINGLE);
+                } else {
+                    setTrimSpaces(TrimSpacesOption.TRUE);
+                    argPos--;
+                }
             } else if (tok.equals(SWITCH_CACHE)) {
                 tok = nextArg();
                 if ("false".equals(tok)) {
@@ -426,20 +440,23 @@ public class JspC extends Task implements Options {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public boolean getTrimSpaces() {
+    public TrimSpacesOption getTrimSpaces() {
         return trimSpaces;
     }
 
+    public void setTrimSpaces(TrimSpacesOption trimSpaces) {
+        this.trimSpaces = trimSpaces;
+    }
+
     /**
-     * Sets the option to trim white spaces between directives or actions.
+     * Sets the option to control handling of template text that consists
+     * entirely of whitespace.
+     *
      * @param ts New value
      */
-    public void setTrimSpaces(boolean ts) {
-        this.trimSpaces = ts;
+    public void setTrimSpaces(String ts) {
+        this.trimSpaces = TrimSpacesOption.valueOf(ts);
     }
 
     /**
@@ -780,7 +797,11 @@ public class JspC extends Task implements Options {
      */
     @Override
     public boolean getFork() {
-        return false;
+        return fork;
+    }
+
+    public void setFork(boolean fork) {
+        this.fork = fork;
     }
 
     /**
@@ -1240,7 +1261,7 @@ public class JspC extends Task implements Options {
                 targetClassName = null;
             }
             if (targetPackage != null) {
-                clctxt.setServletPackageName(targetPackage);
+                clctxt.setBasePackageName(targetPackage);
             }
 
             originalClassLoader = Thread.currentThread().getContextClassLoader();
@@ -1280,14 +1301,7 @@ public class JspC extends Task implements Options {
                                                file),
                           rootCause);
             }
-
-            // Bugzilla 35114.
-            if(getFailOnError()) {
-                throw je;
-            } else {
-                log.error(je.getMessage());
-            }
-
+            throw je;
         } catch (Exception e) {
             if ((e instanceof FileNotFoundException) && log.isWarnEnabled()) {
                 log.warn(Localizer.getMessage("jspc.error.fileDoesNotExist",
@@ -1390,9 +1404,10 @@ public class JspC extends Task implements Options {
 
             initWebXml();
 
-            Iterator<String> iter = pages.iterator();
-            while (iter.hasNext()) {
-                String nextjsp = iter.next();
+            int errorCount = 0;
+            long start = System.currentTimeMillis();
+
+            for (String nextjsp : pages) {
                 File fjsp = new File(nextjsp);
                 if (!fjsp.isAbsolute()) {
                     fjsp = new File(uriRootF, nextjsp);
@@ -1412,7 +1427,25 @@ public class JspC extends Task implements Options {
                 if (nextjsp.startsWith("." + File.separatorChar)) {
                     nextjsp = nextjsp.substring(2);
                 }
-                processFile(nextjsp);
+                try {
+                    processFile(nextjsp);
+                } catch (JasperException e) {
+                    if (failFast) {
+                        throw e;
+                    }
+                    errorCount++;
+                    log.error(nextjsp + ":" + e.getMessage());
+                }
+            }
+
+            long time = System.currentTimeMillis() - start;
+            String msg = Localizer.getMessage("jspc.compilation.result",
+                    Integer.toString(errorCount), Long.toString(time));
+            if (failOnError && errorCount > 0) {
+                System.out.println("Error Count: " + errorCount);
+                throw new BuildException(msg);
+            } else {
+                log.info(msg);
             }
 
             completeWebXml();
@@ -1425,15 +1458,9 @@ public class JspC extends Task implements Options {
             throw new BuildException(ioe);
 
         } catch (JasperException je) {
-            Throwable rootCause = je;
-            while (rootCause instanceof JasperException
-                    && ((JasperException) rootCause).getRootCause() != null) {
-                rootCause = ((JasperException) rootCause).getRootCause();
+            if (failOnError) {
+                throw new BuildException(je);
             }
-            if (rootCause != je) {
-                rootCause.printStackTrace();
-            }
-            throw new BuildException(je);
         } finally {
             if (loader != null) {
                 LogFactory.release(loader);
@@ -1566,7 +1593,7 @@ public class JspC extends Task implements Options {
         }
 
         // Turn the classPath into URLs
-        ArrayList<URL> urls = new ArrayList<>();
+        List<URL> urls = new ArrayList<>();
         StringTokenizer tokenizer = new StringTokenizer(classPath,
                                                         File.pathSeparator);
         while (tokenizer.hasMoreTokens()) {

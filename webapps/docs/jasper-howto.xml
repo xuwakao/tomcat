@@ -191,8 +191,12 @@ application. This option is ignored if running under a SecurityManager.</li>
 debugging be suppressed? <code>true</code> or <code>false</code>, default
 <code>false</code>.</li>
 
-<li><strong>trimSpaces</strong> - Should white spaces in template text between
-actions or directives be trimmed ?, default <code>false</code>.</li>
+<li><strong>trimSpaces</strong> - Should template text that consists entirely of
+whitespace be removed from the output (<code>true</code>), replaced with a
+single space (<code>single</code>) or left unchanged (<code>false</code>)? Note
+that if a JSP page or tag file specifies a <code>trimDirectiveWhitespaces</code>
+value of <code>true</code>, that will take precedence over this configuration
+setting for that page/tag. Default <code>false</code>.</li>
 
 <li><strong>xpoweredBy</strong> - Determines whether X-Powered-By response
 header is added by generated servlet. <code>true</code> or <code>false</code>,
@@ -218,6 +222,17 @@ for even large JSP  pages.</p>
 <p>Apache Ant, which was used in previous Tomcat releases, can be used instead
 of the new compiler by configuring the compiler attribute as explained above.
 </p>
+
+<p>If you need to change the JSP Servlet settings for an application you can
+override the default configuration by re-defining the JSP Servlet in
+<code>/WEB-INF/web.xml</code>. However, this may cause problems if you attempt
+to deploy the application on another container as the JSP Servlet class may
+not be recognised. You can work-around this problem by using the Tomact specific
+<code>/WEB-INF/tomcat-web.xml</code> deployment descriptor. The format is
+identical to <code>/WEB-INF/web.xml</code>. It will override any default
+settings but not those in <code>/WEB-INF/web.xml</code>. Since it is Tomcat
+specific, it will only be processed when the application is deployed on
+Tomcat.</p>
 
 </section>
 

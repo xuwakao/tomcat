@@ -72,12 +72,6 @@ public class DataSourceRealm extends RealmBase {
 
 
     /**
-     * Descriptive information about this Realm implementation.
-     */
-    protected static final String name = "DataSourceRealm";
-
-
-    /**
      * The column in the user role table that names a role
      */
     protected String roleNameCol = null;
@@ -105,6 +99,12 @@ public class DataSourceRealm extends RealmBase {
      * The table that holds user data.
      */
     protected String userTable = null;
+
+
+    /**
+     * Last connection attempt.
+     */
+    private volatile boolean connectionSuccess = true;
 
 
     // ------------------------------------------------------------- Properties
@@ -270,6 +270,11 @@ public class DataSourceRealm extends RealmBase {
     }
 
 
+    @Override
+    public boolean isAvailable() {
+        return connectionSuccess;
+    }
+
     // -------------------------------------------------------- Package Methods
 
 
@@ -378,22 +383,15 @@ public class DataSourceRealm extends RealmBase {
                 context = getServer().getGlobalNamingContext();
             }
             DataSource dataSource = (DataSource)context.lookup(dataSourceName);
-        return dataSource.getConnection();
+            Connection connection = dataSource.getConnection();
+            connectionSuccess = true;
+            return connection;
         } catch (Exception e) {
+            connectionSuccess = false;
             // Log the problem for posterity
             containerLog.error(sm.getString("dataSourceRealm.exception"), e);
         }
         return null;
-    }
-
-    /**
-     * Return a short name for this Realm implementation.
-     */
-    @Override
-    protected String getName() {
-
-        return (name);
-
     }
 
     /**
@@ -458,9 +456,9 @@ public class DataSourceRealm extends RealmBase {
             return new GenericPrincipal(username, null, null);
         }
         try {
-            return (new GenericPrincipal(username,
+            return new GenericPrincipal(username,
                     getPassword(dbConnection, username),
-                    getRoles(dbConnection, username)));
+                    getRoles(dbConnection, username));
         } finally {
             close(dbConnection);
         }
@@ -542,7 +540,7 @@ public class DataSourceRealm extends RealmBase {
             dbConnection.prepareStatement(preparedCredentials);
 
         credentials.setString(1, username);
-        return (credentials);
+        return credentials;
 
     }
 
@@ -562,7 +560,7 @@ public class DataSourceRealm extends RealmBase {
             dbConnection.prepareStatement(preparedRoles);
 
         roles.setString(1, username);
-        return (roles);
+        return roles;
 
     }
 

@@ -16,31 +16,31 @@
  */
 package org.apache.tomcat.util.descriptor.web;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 /**
  * Base class for those elements that need to track the encoding used in the
  * source XML.
  */
 public abstract class XmlEncodingBase {
 
-    private String encoding = null;
+    private Charset charset = StandardCharsets.UTF_8;
 
 
-    public void setEncoding(String encoding) {
-        this.encoding = encoding;
+    public void setCharset(Charset charset) {
+        this.charset = charset;
     }
 
 
     /**
-     * Obtain the encoding of the XML source that was used to populated this
-     * object.
+     * Obtain the character encoding of the XML source that was used to
+     * populated this object.
      *
-     * @return The encoding of the associated XML source or <code>UTF-8</code>
-     *         if the encoding could not be determined
+     * @return The character encoding of the associated XML source or
+     *         <code>UTF-8</code> if the encoding could not be determined
      */
-    public String getEncoding() {
-        if (encoding == null || encoding.length() == 0) {
-            return "UTF-8";
-        }
-        return encoding;
+    public Charset getCharset() {
+        return charset;
     }
 }

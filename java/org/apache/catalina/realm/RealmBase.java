@@ -49,6 +49,7 @@ import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.util.LifecycleMBeanBase;
 import org.apache.catalina.util.SessionConfig;
+import org.apache.catalina.util.ToStringUtil;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.IntrospectionUtils;
@@ -190,9 +191,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
      */
     @Override
     public Container getContainer() {
-
-        return (container);
-
+        return container;
     }
 
 
@@ -420,7 +419,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
 
         if (log.isDebugEnabled()) {
             log.debug("Digest : " + clientDigest + " Username:" + username
-                    + " ClientSigest:" + clientDigest + " nonce:" + nonce
+                    + " ClientDigest:" + clientDigest + " nonce:" + nonce
                     + " nc:" + nc + " cnonce:" + cnonce + " qop:" + qop
                     + " realm:" + realm + "md5a2:" + md5a2
                     + " Server digest:" + serverDigest);
@@ -445,7 +444,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
     public Principal authenticate(X509Certificate certs[]) {
 
         if ((certs == null) || (certs.length < 1))
-            return (null);
+            return null;
 
         // Check the validity of each certificate in the chain
         if (log.isDebugEnabled())
@@ -460,14 +459,13 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
                 } catch (Exception e) {
                     if (log.isDebugEnabled())
                         log.debug("  Validity exception", e);
-                    return (null);
+                    return null;
                 }
             }
         }
 
         // Check the existence of the client Principal in our database
-        return (getPrincipal(certs[0]));
-
+        return getPrincipal(certs[0]);
     }
 
 
@@ -475,7 +473,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
      * {@inheritDoc}
      */
     @Override
-    public Principal authenticate(GSSContext gssContext, boolean storeCred) {
+    public Principal authenticate(GSSContext gssContext, boolean storeCreds) {
         if (gssContext.isEstablished()) {
             GSSName gssName = null;
             try {
@@ -495,7 +493,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
                     }
                 }
                 GSSCredential gssCredential = null;
-                if (storeCred && gssContext.getCredDelegState()) {
+                if (storeCreds && gssContext.getCredDelegState()) {
                     try {
                         gssCredential = gssContext.getDelegCred();
                     } catch (GSSException e) {
@@ -508,6 +506,8 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
                 }
                 return getPrincipal(name, gssCredential);
             }
+        } else {
+            log.error(sm.getString("realmBase.gssContextNotEstablished"));
         }
 
         // Fail in all other cases
@@ -543,7 +543,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
         if ((constraints == null) || (constraints.length == 0)) {
             if (log.isDebugEnabled())
                 log.debug("  No applicable constraints defined");
-            return (null);
+            return null;
         }
 
         // Check each defined security constraint
@@ -774,7 +774,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
     }
 
     /**
-     * Convert an ArrayList to a SecurityContraint [].
+     * Convert an ArrayList to a SecurityConstraint [].
      */
     private SecurityConstraint [] resultsToArray(
             ArrayList<SecurityConstraint> results) {
@@ -908,32 +908,30 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
 
 
     /**
-     * Return <code>true</code> if the specified Principal has the specified
-     * security role, within the context of this Realm; otherwise return
-     * <code>false</code>.  This method can be overridden by Realm
-     * implementations, but the default is adequate when an instance of
-     * <code>GenericPrincipal</code> is used to represent authenticated
-     * Principals from this Realm.
+     * {@inheritDoc}
      *
-     * @param principal Principal for whom the role is to be checked
-     * @param role Security role to be checked
+     * This method or {@link #hasRoleInternal(Principal,
+     * String)} can be overridden by Realm implementations, but the default is
+     * adequate when an instance of <code>GenericPrincipal</code> is used to
+     * represent authenticated Principals from this Realm.
      */
     @Override
     public boolean hasRole(Wrapper wrapper, Principal principal, String role) {
         // Check for a role alias defined in a <security-role-ref> element
         if (wrapper != null) {
             String realRole = wrapper.findSecurityReference(role);
-            if (realRole != null)
+            if (realRole != null) {
                 role = realRole;
+            }
         }
 
         // Should be overridden in JAASRealm - to avoid pretty inefficient conversions
-        if ((principal == null) || (role == null) ||
-            !(principal instanceof GenericPrincipal))
+        if (principal == null || role == null) {
             return false;
+        }
 
-        GenericPrincipal gp = (GenericPrincipal) principal;
-        boolean result = gp.hasRole(role);
+        boolean result = hasRoleInternal(principal, role);
+
         if (log.isDebugEnabled()) {
             String name = principal.getName();
             if (result)
@@ -941,8 +939,35 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
             else
                 log.debug(sm.getString("realmBase.hasRoleFailure", name, role));
         }
-        return (result);
 
+        return result;
+    }
+
+
+    /**
+     * Check if the specified Principal has the specified
+     * security role, within the context of this Realm.
+     *
+     * This method or {@link #hasRoleInternal(Principal,
+     * String)} can be overridden by Realm implementations, but the default is
+     * adequate when an instance of <code>GenericPrincipal</code> is used to
+     * represent authenticated Principals from this Realm.
+     *
+     * @param principal Principal for whom the role is to be checked
+     * @param role Security role to be checked
+     *
+     * @return <code>true</code> if the specified Principal has the specified
+     *         security role, within the context of this Realm; otherwise return
+     *         <code>false</code>.
+     */
+    protected boolean hasRoleInternal(Principal principal, String role) {
+        // Should be overridden in JAASRealm - to avoid pretty inefficient conversions
+        if (!(principal instanceof GenericPrincipal)) {
+            return false;
+        }
+
+        GenericPrincipal gp = (GenericPrincipal) principal;
+        return gp.hasRole(role);
     }
 
 
@@ -1101,10 +1126,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
      */
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("Realm[");
-        sb.append(getName());
-        sb.append(']');
-        return sb.toString();
+        return ToStringUtil.toString(this);
     }
 
 
@@ -1166,13 +1188,6 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
 
 
     /**
-     * @return a short name for this Realm implementation, for use in
-     * log messages.
-     */
-    protected abstract String getName();
-
-
-    /**
      * Get the password for the specified user.
      * @param username The user name
      * @return the password associated with the given principal's user name.
@@ -1191,7 +1206,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
         if(log.isDebugEnabled())
             log.debug(sm.getString("realmBase.gotX509Username", username));
 
-        return(getPrincipal(username));
+        return getPrincipal(username);
     }
 
 
@@ -1270,7 +1285,7 @@ public abstract class RealmBase extends LifecycleMBeanBase implements Realm {
             }
 
             // Digest the credentials and return as hexadecimal
-            return (HexUtils.toHexString(md.digest()));
+            return HexUtils.toHexString(md.digest());
         } catch(Exception ex) {
             log.error(ex);
             return credentials;

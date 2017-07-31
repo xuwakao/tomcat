@@ -24,7 +24,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Iterator;
 
 import org.apache.catalina.Engine;
 import org.apache.catalina.Host;
@@ -426,7 +425,7 @@ public class DeltaManager extends ClusterManagerBase{
         if (log.isDebugEnabled())
             log.debug(sm.getString("deltaManager.createSession.newSession",
                     session.getId(), Integer.valueOf(sessions.size())));
-        return (session);
+        return session;
     }
 
     /**
@@ -756,19 +755,17 @@ public class DeltaManager extends ClusterManagerBase{
                 waitForSendAllSessions(beforeSendTime);
             } finally {
                 synchronized(receivedMessageQueue) {
-                    for (Iterator<SessionMessage> iter = receivedMessageQueue.iterator();
-                            iter.hasNext();) {
-                        SessionMessage smsg = iter.next();
+                    for (SessionMessage smsg : receivedMessageQueue) {
                         if (!stateTimestampDrop) {
                             messageReceived(smsg,
-                                    smsg.getAddress() != null ? (Member) smsg.getAddress() : null);
+                                    smsg.getAddress() != null ? smsg.getAddress() : null);
                         } else {
                             if (smsg.getEventType() != SessionMessage.EVT_GET_ALL_SESSIONS &&
                                     smsg.getTimestamp() >= stateTransferCreateSendTime) {
                                 // FIXME handle EVT_GET_ALL_SESSIONS later
                                 messageReceived(smsg,
                                         smsg.getAddress() != null ?
-                                                (Member) smsg.getAddress() :
+                                                smsg.getAddress() :
                                                 null);
                             } else {
                                 if (log.isWarnEnabled()) {
@@ -920,7 +917,7 @@ public class DeltaManager extends ClusterManagerBase{
                     break;
             } //switch
 
-            messageReceived(msg, msg.getAddress() != null ? (Member) msg.getAddress() : null);
+            messageReceived(msg, msg.getAddress() != null ? msg.getAddress() : null);
         }
     }
 

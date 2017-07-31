@@ -280,7 +280,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
     protected boolean delegate = false;
 
 
-    private final HashMap<String,Long> jarModificationTimes = new HashMap<>();
+    private final Map<String,Long> jarModificationTimes = new HashMap<>();
 
 
     /**
@@ -426,9 +426,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
      *   the parent first. The default in Tomcat is <code>false</code>.
      */
     public boolean getDelegate() {
-
-        return (this.delegate);
-
+        return this.delegate;
     }
 
 
@@ -522,7 +520,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
      * @return the clearReferencesStopThreads flag for this Context.
      */
     public boolean getClearReferencesStopThreads() {
-        return (this.clearReferencesStopThreads);
+        return this.clearReferencesStopThreads;
     }
 
 
@@ -541,7 +539,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
      * @return the clearReferencesStopTimerThreads flag for this Context.
      */
     public boolean getClearReferencesStopTimerThreads() {
-        return (this.clearReferencesStopTimerThreads);
+        return this.clearReferencesStopTimerThreads;
     }
 
 
@@ -560,7 +558,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
      * @return the clearReferencesLogFactoryRelease flag for this Context.
      */
     public boolean getClearReferencesLogFactoryRelease() {
-        return (this.clearReferencesLogFactoryRelease);
+        return this.clearReferencesLogFactoryRelease;
     }
 
 
@@ -581,7 +579,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
      * Context.
      */
     public boolean getClearReferencesHttpClientKeepAliveThread() {
-        return (this.clearReferencesHttpClientKeepAliveThread);
+        return this.clearReferencesHttpClientKeepAliveThread;
     }
 
 
@@ -645,9 +643,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
         if (this.transformers.remove(transformer)) {
             log.info(sm.getString("webappClassLoader.removeTransformer",
                     transformer, getContextName()));
-            return;
         }
-
     }
 
     protected void copyStateWithoutTransformers(WebappClassLoaderBase base) {
@@ -743,7 +739,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                 sb.append(transformer).append("\r\n");
             }
         }
-        return (sb.toString());
+        return sb.toString();
     }
 
 
@@ -849,7 +845,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
             }
             log.debug("      Loaded by " + cl.toString());
         }
-        return (clazz);
+        return clazz;
 
     }
 
@@ -987,7 +983,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
             if (url != null) {
                 if (log.isDebugEnabled())
                     log.debug("  --> Returning '" + url.toString() + "'");
-                return (url);
+                return url;
             }
         }
 
@@ -996,7 +992,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
         if (url != null) {
             if (log.isDebugEnabled())
                 log.debug("  --> Returning '" + url.toString() + "'");
-            return (url);
+            return url;
         }
 
         // (3) Delegate to parent unconditionally if not already attempted
@@ -1005,14 +1001,14 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
             if (url != null) {
                 if (log.isDebugEnabled())
                     log.debug("  --> Returning '" + url.toString() + "'");
-                return (url);
+                return url;
             }
         }
 
         // (4) Resource was not found
         if (log.isDebugEnabled())
             log.debug("  --> Resource not found, returning null");
-        return (null);
+        return null;
 
     }
 
@@ -1105,9 +1101,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
      */
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
-
-        return (loadClass(name, false));
-
+        return loadClass(name, false);
     }
 
 
@@ -1154,7 +1148,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                     log.debug("  Returning class from cache");
                 if (resolve)
                     resolveClass(clazz);
-                return (clazz);
+                return clazz;
             }
 
             // (0.1) Check our previously loaded class cache
@@ -1164,7 +1158,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                     log.debug("  Returning class from cache");
                 if (resolve)
                     resolveClass(clazz);
-                return (clazz);
+                return clazz;
             }
 
             // (0.2) Try loading the class with the system class loader, to prevent
@@ -1195,7 +1189,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                     if (clazz != null) {
                         if (resolve)
                             resolveClass(clazz);
-                        return (clazz);
+                        return clazz;
                     }
                 } catch (ClassNotFoundException e) {
                     // Ignore
@@ -1230,7 +1224,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                             log.debug("  Loading class from parent");
                         if (resolve)
                             resolveClass(clazz);
-                        return (clazz);
+                        return clazz;
                     }
                 } catch (ClassNotFoundException e) {
                     // Ignore
@@ -1247,7 +1241,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                         log.debug("  Loading class from local repository");
                     if (resolve)
                         resolveClass(clazz);
-                    return (clazz);
+                    return clazz;
                 }
             } catch (ClassNotFoundException e) {
                 // Ignore
@@ -1264,7 +1258,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                             log.debug("  Loading class from parent");
                         if (resolve)
                             resolveClass(clazz);
-                        return (clazz);
+                        return clazz;
                     }
                 } catch (ClassNotFoundException e) {
                     // Ignore
@@ -1308,22 +1302,18 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
      */
     @Override
     protected PermissionCollection getPermissions(CodeSource codeSource) {
-
         String codeUrl = codeSource.getLocation().toString();
         PermissionCollection pc;
         if ((pc = loaderPC.get(codeUrl)) == null) {
             pc = super.getPermissions(codeSource);
             if (pc != null) {
-                Iterator<Permission> perms = permissionList.iterator();
-                while (perms.hasNext()) {
-                    Permission p = perms.next();
+                for (Permission p : permissionList) {
                     pc.add(p);
                 }
                 loaderPC.put(codeUrl,pc);
             }
         }
-        return (pc);
-
+        return pc;
     }
 
 
@@ -1860,10 +1850,17 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                 }
             }
         } catch (Throwable t) {
-            ExceptionUtils.handleThrowable(t);
-            log.warn(sm.getString(
-                    "webappClassLoader.checkThreadLocalsForLeaksFail",
-                    getContextName()), t);
+            JreCompat jreCompat = JreCompat.getInstance();
+            if (jreCompat.isInstanceOfInaccessibleObjectException(t)) {
+                // Must be running on Java 9 without the necessary command line
+                // options.
+                log.warn(sm.getString("webappClassLoader.addExportsThreadLocal"));
+            } else {
+                ExceptionUtils.handleThrowable(t);
+                log.warn(sm.getString(
+                        "webappClassLoader.checkThreadLocalsForLeaksFail",
+                        getContextName()), t);
+            }
         }
     }
 
@@ -2070,37 +2067,39 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
                 return;
             }
 
-            // Iterate over the values in the table
-            if (objTable instanceof Map<?,?>) {
-                Iterator<?> iter = ((Map<?,?>) objTable).values().iterator();
-                while (iter.hasNext()) {
-                    Object obj = iter.next();
-                    Object cclObject = cclField.get(obj);
-                    if (this == cclObject) {
-                        iter.remove();
-                        Object stubObject = stubField.get(obj);
-                        log.error(sm.getString("webappClassLoader.clearRmi",
-                                stubObject.getClass().getName(), stubObject));
+            synchronized (objTable) {
+                // Iterate over the values in the table
+                if (objTable instanceof Map<?,?>) {
+                    Iterator<?> iter = ((Map<?,?>) objTable).values().iterator();
+                    while (iter.hasNext()) {
+                        Object obj = iter.next();
+                        Object cclObject = cclField.get(obj);
+                        if (this == cclObject) {
+                            iter.remove();
+                            Object stubObject = stubField.get(obj);
+                            log.error(sm.getString("webappClassLoader.clearRmi",
+                                    stubObject.getClass().getName(), stubObject));
+                        }
                     }
                 }
-            }
 
-            // Clear the implTable map
-            Field implTableField = objectTableClass.getDeclaredField("implTable");
-            implTableField.setAccessible(true);
-            Object implTable = implTableField.get(null);
-            if (implTable == null) {
-                return;
-            }
+                // Clear the implTable map
+                Field implTableField = objectTableClass.getDeclaredField("implTable");
+                implTableField.setAccessible(true);
+                Object implTable = implTableField.get(null);
+                if (implTable == null) {
+                    return;
+                }
 
-            // Iterate over the values in the table
-            if (implTable instanceof Map<?,?>) {
-                Iterator<?> iter = ((Map<?,?>) implTable).values().iterator();
-                while (iter.hasNext()) {
-                    Object obj = iter.next();
-                    Object cclObject = cclField.get(obj);
-                    if (this == cclObject) {
-                        iter.remove();
+                // Iterate over the values in the table
+                if (implTable instanceof Map<?,?>) {
+                    Iterator<?> iter = ((Map<?,?>) implTable).values().iterator();
+                    while (iter.hasNext()) {
+                        Object obj = iter.next();
+                        Object cclObject = cclField.get(obj);
+                        if (this == cclObject) {
+                            iter.remove();
+                        }
                     }
                 }
             }
@@ -2116,7 +2115,7 @@ public abstract class WebappClassLoaderBase extends URLClassLoader
             if (jreCompat.isInstanceOfInaccessibleObjectException(e)) {
                 // Must be running on Java 9 without the necessary command line
                 // options.
-                log.warn(sm.getString("webappClassLoader.addExports"));
+                log.warn(sm.getString("webappClassLoader.addExportsRmi"));
             } else {
                 // Re-throw all other exceptions
                 throw e;

@@ -17,6 +17,8 @@
 package org.apache.tomcat.util.descriptor.web;
 
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import org.apache.tomcat.util.buf.UDecoder;
 
@@ -34,28 +36,9 @@ import org.apache.tomcat.util.buf.UDecoder;
  *
  * @author Craig R. McClanahan
  */
-public class SecurityCollection implements Serializable {
+public class SecurityCollection extends XmlEncodingBase implements Serializable {
 
     private static final long serialVersionUID = 1L;
-
-    private String encoding = null;
-    public void setEncoding(String encoding) {
-        this.encoding = encoding;
-    }
-    /**
-     * Obtain the encoding of the XML source that was used to populated this
-     * object.
-     *
-     * @return The encoding of the associated XML source or <code>UTF-8</code>
-     *         if the encoding could not be determined
-     */
-    public String getEncoding() {
-        if (encoding == null || encoding.length() == 0) {
-            return "UTF-8";
-        }
-        return encoding;
-    }
-
 
     // ----------------------------------------------------------- Constructors
 
@@ -130,9 +113,7 @@ public class SecurityCollection implements Serializable {
      * @return the description of this web resource collection.
      */
     public String getDescription() {
-
-        return (this.description);
-
+        return this.description;
     }
 
 
@@ -142,9 +123,7 @@ public class SecurityCollection implements Serializable {
      * @param description The new description
      */
     public void setDescription(String description) {
-
         this.description = description;
-
     }
 
 
@@ -152,9 +131,7 @@ public class SecurityCollection implements Serializable {
      * @return the name of this web resource collection.
      */
     public String getName() {
-
-        return (this.name);
-
+        return this.name;
     }
 
 
@@ -164,9 +141,7 @@ public class SecurityCollection implements Serializable {
      * @param name The new name
      */
     public void setName(String name) {
-
         this.name = name;
-
     }
 
 
@@ -199,9 +174,7 @@ public class SecurityCollection implements Serializable {
 
         if (method == null)
             return;
-        String results[] = new String[methods.length + 1];
-        for (int i = 0; i < methods.length; i++)
-            results[i] = methods[i];
+        String[] results = Arrays.copyOf(methods, methods.length + 1);
         results[methods.length] = method;
         methods = results;
 
@@ -216,9 +189,7 @@ public class SecurityCollection implements Serializable {
     public void addOmittedMethod(String method) {
         if (method == null)
             return;
-        String results[] = new String[omittedMethods.length + 1];
-        for (int i = 0; i < omittedMethods.length; i++)
-            results[i] = omittedMethods[i];
+        String[] results = Arrays.copyOf(omittedMethods, omittedMethods.length + 1);
         results[omittedMethods.length] = method;
         omittedMethods = results;
     }
@@ -228,7 +199,7 @@ public class SecurityCollection implements Serializable {
      * @param pattern The pattern
      */
     public void addPattern(String pattern) {
-        addPatternDecoded(UDecoder.URLDecode(pattern, "UTF-8"));
+        addPatternDecoded(UDecoder.URLDecode(pattern, StandardCharsets.UTF_8));
     }
     public void addPatternDecoded(String pattern) {
 
@@ -236,10 +207,7 @@ public class SecurityCollection implements Serializable {
             return;
 
         String decodedPattern = UDecoder.URLDecode(pattern);
-        String results[] = new String[patterns.length + 1];
-        for (int i = 0; i < patterns.length; i++) {
-            results[i] = patterns[i];
-        }
+        String[] results = Arrays.copyOf(patterns, patterns.length + 1);
         results[patterns.length] = decodedPattern;
         patterns = results;
     }
@@ -278,9 +246,7 @@ public class SecurityCollection implements Serializable {
      * explicitly included.
      */
     public String[] findMethods() {
-
-        return (methods);
-
+        return methods;
     }
 
 
@@ -290,9 +256,7 @@ public class SecurityCollection implements Serializable {
      * methods are excluded.
      */
     public String[] findOmittedMethods() {
-
-        return (omittedMethods);
-
+        return omittedMethods;
     }
 
 
@@ -303,13 +267,11 @@ public class SecurityCollection implements Serializable {
      * @return <code>true</code> if the pattern is part of the collection
      */
     public boolean findPattern(String pattern) {
-
         for (int i = 0; i < patterns.length; i++) {
             if (patterns[i].equals(pattern))
                 return true;
         }
         return false;
-
     }
 
 
@@ -319,9 +281,7 @@ public class SecurityCollection implements Serializable {
      * returned.
      */
     public String[] findPatterns() {
-
-        return (patterns);
-
+        return patterns;
     }
 
 
@@ -420,7 +380,6 @@ public class SecurityCollection implements Serializable {
      */
     @Override
     public String toString() {
-
         StringBuilder sb = new StringBuilder("SecurityCollection[");
         sb.append(name);
         if (description != null) {
@@ -428,8 +387,7 @@ public class SecurityCollection implements Serializable {
             sb.append(description);
         }
         sb.append("]");
-        return (sb.toString());
-
+        return sb.toString();
     }
 
 

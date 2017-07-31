@@ -187,9 +187,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public javax.naming.Context getGlobalNamingContext() {
-
-        return (this.globalNamingContext);
-
+        return this.globalNamingContext;
     }
 
 
@@ -198,11 +196,8 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      *
      * @param globalNamingContext The new global naming resource context
      */
-    public void setGlobalNamingContext
-        (javax.naming.Context globalNamingContext) {
-
+    public void setGlobalNamingContext(javax.naming.Context globalNamingContext) {
         this.globalNamingContext = globalNamingContext;
-
     }
 
 
@@ -211,9 +206,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public NamingResourcesImpl getGlobalNamingResources() {
-
-        return (this.globalNamingResources);
-
+        return this.globalNamingResources;
     }
 
 
@@ -269,9 +262,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public int getPort() {
-
-        return (this.port);
-
+        return this.port;
     }
 
 
@@ -282,9 +273,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public void setPort(int port) {
-
         this.port = port;
-
     }
 
 
@@ -293,9 +282,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public String getAddress() {
-
-        return (this.address);
-
+        return this.address;
     }
 
 
@@ -306,9 +293,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public void setAddress(String address) {
-
         this.address = address;
-
     }
 
     /**
@@ -316,9 +301,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public String getShutdown() {
-
-        return (this.shutdown);
-
+        return this.shutdown;
     }
 
 
@@ -329,9 +312,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public void setShutdown(String shutdown) {
-
         this.shutdown = shutdown;
-
     }
 
 
@@ -500,8 +481,10 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
                             log.warn("StandardServer.await: read: ", e);
                             ch = -1;
                         }
-                        if (ch < 32)  // Control character or EOF terminates loop
+                        // Control character or EOF (-1) terminates loop
+                        if (ch < 32 || ch == 127) {
                             break;
+                        }
                         command.append((char) ch);
                         expected--;
                     }
@@ -550,19 +533,17 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public Service findService(String name) {
-
         if (name == null) {
-            return (null);
+            return null;
         }
         synchronized (servicesLock) {
             for (int i = 0; i < services.length; i++) {
                 if (name.equals(services[i].getName())) {
-                    return (services[i]);
+                    return services[i];
                 }
             }
         }
-        return (null);
-
+        return null;
     }
 
 
@@ -687,12 +668,10 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public String toString() {
-
         StringBuilder sb = new StringBuilder("StandardServer[");
         sb.append(getPort());
         sb.append("]");
-        return (sb.toString());
-
+        return sb.toString();
     }
 
 
@@ -896,11 +875,11 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
     @Override
     public ClassLoader getParentClassLoader() {
         if (parentClassLoader != null)
-            return (parentClassLoader);
+            return parentClassLoader;
         if (catalina != null) {
-            return (catalina.getParentClassLoader());
+            return catalina.getParentClassLoader();
         }
-        return (ClassLoader.getSystemClassLoader());
+        return ClassLoader.getSystemClassLoader();
     }
 
     /**

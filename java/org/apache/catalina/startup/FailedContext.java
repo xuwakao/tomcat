@@ -241,6 +241,9 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
     public Log getLogger() { return null; }
 
     @Override
+    public String getLogName() { return null; }
+
+    @Override
     public Manager getManager() { return null; }
     @Override
     public void setManager(Manager manager) { /* NO-OP */ }
@@ -786,4 +789,14 @@ public class FailedContext extends LifecycleMBeanBase implements Context {
     public void setDispatchersUseEncodedPaths(boolean dispatchersUseEncodedPaths) { /* NO-OP */ }
     @Override
     public boolean getDispatchersUseEncodedPaths() { return true; }
+
+    @Override
+    public void setRequestCharacterEncoding(String encoding) { /* NO-OP */ }
+    @Override
+    public String getRequestCharacterEncoding() { return null; }
+
+    @Override
+    public void setResponseCharacterEncoding(String encoding) { /* NO-OP */ }
+    @Override
+    public String getResponseCharacterEncoding() { return null; }
 }

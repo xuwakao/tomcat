@@ -34,6 +34,8 @@ import org.apache.catalina.security.SecurityUtil;
 import org.apache.coyote.ActionCode;
 import org.apache.coyote.ContainerThreadMarker;
 import org.apache.coyote.Request;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.buf.B2CConverter;
 import org.apache.tomcat.util.buf.ByteChunk;
 import org.apache.tomcat.util.collections.SynchronizedStack;
@@ -55,6 +57,8 @@ public class InputBuffer extends Reader
      * The string manager for this package.
      */
     protected static final StringManager sm = StringManager.getManager(InputBuffer.class);
+
+    private static final Log log = LogFactory.getLog(InputBuffer.class);
 
     public static final int DEFAULT_BUFFER_SIZE = 8 * 1024;
 
@@ -94,12 +98,6 @@ public class InputBuffer extends Reader
      * Flag which indicates if the input buffer is closed.
      */
     private boolean closed = false;
-
-
-    /**
-     * Encoding to use.
-     */
-    private String enc;
 
 
     /**
@@ -201,8 +199,6 @@ public class InputBuffer extends Reader
             encoders.get(conv.getCharset()).push(conv);
             conv = null;
         }
-
-        enc = null;
     }
 
 
@@ -271,7 +267,10 @@ public class InputBuffer extends Reader
 
     public boolean isReady() {
         if (coyoteRequest.getReadListener() == null) {
-            throw new IllegalStateException(sm.getString("inputBuffer.requiresNonBlocking"));
+            if (log.isDebugEnabled()) {
+                log.debug(sm.getString("inputBuffer.requiresNonBlocking"));
+            }
+            return false;
         }
         if (isFinished()) {
             // If this is a non-container thread, need to trigger a read
@@ -378,12 +377,6 @@ public class InputBuffer extends Reader
 
 
     // ------------------------------------------------- Chars Handling Methods
-
-
-    public void setEncoding(String s) {
-        enc = s;
-    }
-
 
     public int realReadChars() throws IOException {
         checkConverter();
@@ -549,22 +542,19 @@ public class InputBuffer extends Reader
 
 
     public void checkConverter() throws IOException {
-        if (conv == null) {
-            setConverter();
+        if (conv != null) {
+            return;
         }
-    }
 
-
-    private void setConverter() throws IOException {
+        Charset charset = null;
         if (coyoteRequest != null) {
-            enc = coyoteRequest.getCharacterEncoding();
+            charset = coyoteRequest.getCharset();
         }
 
-        if (enc == null) {
-            enc = org.apache.coyote.Constants.DEFAULT_CHARACTER_ENCODING;
+        if (charset == null) {
+            charset = org.apache.coyote.Constants.DEFAULT_BODY_CHARSET;
         }
 
-        Charset charset = B2CConverter.getCharset(enc);
         SynchronizedStack<B2CConverter> stack = encoders.get(charset);
         if (stack == null) {
             stack = new SynchronizedStack<>();
@@ -582,13 +572,7 @@ public class InputBuffer extends Reader
     private static B2CConverter createConverter(Charset charset) throws IOException {
         if (SecurityUtil.isPackageProtectionEnabled()) {
             try {
-                return AccessController.doPrivileged(new PrivilegedExceptionAction<B2CConverter>() {
-
-                    @Override
-                    public B2CConverter run() throws IOException {
-                        return new B2CConverter(charset);
-                    }
-                });
+                return AccessController.doPrivileged(new PrivilegedCreateConverter(charset));
             } catch (PrivilegedActionException ex) {
                 Exception e = ex.getException();
                 if (e instanceof IOException) {
@@ -666,10 +650,28 @@ public class InputBuffer extends Reader
         }
 
         CharBuffer tmp = CharBuffer.allocate(newSize);
+        int oldPosition = cb.position();
         cb.position(0);
         tmp.put(cb);
         tmp.flip();
+        tmp.position(oldPosition);
         cb = tmp;
         tmp = null;
+    }
+
+
+    private static class PrivilegedCreateConverter
+            implements PrivilegedExceptionAction<B2CConverter> {
+
+        private final Charset charset;
+
+        public PrivilegedCreateConverter(Charset charset) {
+            this.charset = charset;
+        }
+
+        @Override
+        public B2CConverter run() throws IOException {
+            return new B2CConverter(charset);
+        }
     }
 }

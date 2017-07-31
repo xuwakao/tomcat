@@ -16,15 +16,15 @@
  */
 package org.apache.catalina.connector;
 
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Locale;
 
 import javax.management.ObjectName;
 
-import org.apache.catalina.Globals;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Service;
@@ -33,10 +33,12 @@ import org.apache.catalina.util.LifecycleMBeanBase;
 import org.apache.coyote.Adapter;
 import org.apache.coyote.ProtocolHandler;
 import org.apache.coyote.UpgradeProtocol;
+import org.apache.coyote.ajp.AbstractAjpProtocol;
 import org.apache.coyote.http11.AbstractHttp11JsseProtocol;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.IntrospectionUtils;
+import org.apache.tomcat.util.buf.B2CConverter;
 import org.apache.tomcat.util.net.SSLHostConfig;
 import org.apache.tomcat.util.net.openssl.OpenSSLImplementation;
 import org.apache.tomcat.util.res.StringManager;
@@ -58,6 +60,9 @@ public class Connector extends LifecycleMBeanBase  {
      */
     public static final boolean RECYCLE_FACADES =
         Boolean.parseBoolean(System.getProperty("org.apache.catalina.connector.RECYCLE_FACADES", "false"));
+
+
+    public static final String INTERNAL_EXECUTOR_NAME = "Internal";
 
 
     // ------------------------------------------------------------ Constructor
@@ -94,17 +99,12 @@ public class Connector extends LifecycleMBeanBase  {
         ProtocolHandler p = null;
         try {
             Class<?> clazz = Class.forName(protocolHandlerClassName);
-            p = (ProtocolHandler) clazz.newInstance();
+            p = (ProtocolHandler) clazz.getConstructor().newInstance();
         } catch (Exception e) {
             log.error(sm.getString(
                     "coyoteConnector.protocolHandlerInstantiationFailed"), e);
         } finally {
             this.protocolHandler = p;
-        }
-
-        if (!Globals.STRICT_SERVLET_COMPLIANCE) {
-            URIEncoding = "UTF-8";
-            URIEncodingLower = URIEncoding.toLowerCase(Locale.ENGLISH);
         }
 
         // Default for Connector depends on this system property
@@ -196,6 +196,12 @@ public class Connector extends LifecycleMBeanBase  {
 
 
     /**
+     * The maximum number of cookies permitted for a request. Use a value less
+     * than zero for no limit. Defaults to 200.
+     */
+    private int maxCookieCount = 200;
+
+    /**
      * The maximum number of parameters (GET plus POST) which will be
      * automatically parsed by the container. 10000 by default. A value of less
      * than 0 means no limit.
@@ -252,26 +258,13 @@ public class Connector extends LifecycleMBeanBase  {
     protected Adapter adapter = null;
 
 
-    /**
-     * URI encoding.
-     */
-    protected String URIEncoding = null;
-    protected String URIEncodingLower = null;
+    private Charset uriCharset = StandardCharsets.UTF_8;
 
 
     /**
      * URI encoding as body.
      */
     protected boolean useBodyEncodingForURI = false;
-
-
-    protected static final HashMap<String,String> replacements = new HashMap<>();
-    static {
-        replacements.put("acceptCount", "backlog");
-        replacements.put("connectionLinger", "soLinger");
-        replacements.put("connectionTimeout", "soTimeout");
-        replacements.put("rootFile", "rootfile");
-    }
 
 
     // ------------------------------------------------------------- Properties
@@ -286,11 +279,7 @@ public class Connector extends LifecycleMBeanBase  {
         if (protocolHandler == null) {
             return null;
         }
-        String repl = name;
-        if (replacements.get(name) != null) {
-            repl = replacements.get(name);
-        }
-        return IntrospectionUtils.getProperty(protocolHandler, repl);
+        return IntrospectionUtils.getProperty(protocolHandler, name);
     }
 
 
@@ -305,11 +294,7 @@ public class Connector extends LifecycleMBeanBase  {
         if (protocolHandler == null) {
             return false;
         }
-        String repl = name;
-        if (replacements.get(name) != null) {
-            repl = replacements.get(name);
-        }
-        return IntrospectionUtils.setProperty(protocolHandler, repl, value);
+        return IntrospectionUtils.setProperty(protocolHandler, name, value);
     }
 
 
@@ -408,6 +393,16 @@ public class Connector extends LifecycleMBeanBase  {
     public void setEnableLookups(boolean enableLookups) {
         this.enableLookups = enableLookups;
         setProperty("enableLookups", String.valueOf(enableLookups));
+    }
+
+
+    public int getMaxCookieCount() {
+        return maxCookieCount;
+    }
+
+
+    public void setMaxCookieCount(int maxCookieCount) {
+        this.maxCookieCount = maxCookieCount;
     }
 
 
@@ -687,21 +682,22 @@ public class Connector extends LifecycleMBeanBase  {
 
 
     /**
-     * @return the character encoding to be used for the URI using the original
-     * case.
+     * @return the name of character encoding to be used for the URI using the
+     * original case.
      */
     public String getURIEncoding() {
-        return this.URIEncoding;
+        return uriCharset.name();
     }
 
 
     /**
-     * @return the character encoding to be used for the URI using lower case.
+     *
+     * @return The Charset to use to convert raw URI bytes (after %nn decoding)
+     *         to characters. This will never be null
      */
-    public String getURIEncodingLower() {
-        return this.URIEncodingLower;
+    public Charset getURICharset() {
+        return uriCharset;
     }
-
 
     /**
      * Set the URI encoding to be used for the URI.
@@ -709,13 +705,12 @@ public class Connector extends LifecycleMBeanBase  {
      * @param URIEncoding The new URI character encoding.
      */
     public void setURIEncoding(String URIEncoding) {
-        this.URIEncoding = URIEncoding;
-        if (URIEncoding == null) {
-            URIEncodingLower = null;
-        } else {
-            this.URIEncodingLower = URIEncoding.toLowerCase(Locale.ENGLISH);
+        try {
+            uriCharset = B2CConverter.getCharset(URIEncoding);
+        } catch (UnsupportedEncodingException e) {
+            log.warn(sm.getString("coyoteConnector.invalidEncoding",
+                    URIEncoding, uriCharset.name()), e);
         }
-        setProperty("uRIEncoding", URIEncoding);
     }
 
 
@@ -790,7 +785,7 @@ public class Connector extends LifecycleMBeanBase  {
         if (obj instanceof org.apache.catalina.Executor) {
             return ((org.apache.catalina.Executor) obj).getName();
         }
-        return "Internal";
+        return INTERNAL_EXECUTOR_NAME;
     }
 
 
@@ -823,11 +818,7 @@ public class Connector extends LifecycleMBeanBase  {
      * @return a new Servlet request object
      */
     public Request createRequest() {
-
-        Request request = new Request();
-        request.setConnector(this);
-        return (request);
-
+        return new Request(this);
     }
 
 
@@ -838,11 +829,12 @@ public class Connector extends LifecycleMBeanBase  {
      * @return a new Servlet response object
      */
     public Response createResponse() {
-
-        Response response = new Response();
-        response.setConnector(this);
-        return (response);
-
+        if (protocolHandler instanceof AbstractAjpProtocol<?>) {
+            int packetSize = ((AbstractAjpProtocol<?>) protocolHandler).getPacketSize();
+            return new Response(packetSize - org.apache.coyote.ajp.Constants.SEND_HEAD_LEN);
+        } else {
+            return new Response();
+        }
     }
 
 

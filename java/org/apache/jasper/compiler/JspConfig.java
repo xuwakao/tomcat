@@ -19,7 +19,6 @@ package org.apache.jasper.compiler;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Vector;
 
 import javax.servlet.ServletContext;
@@ -255,10 +254,7 @@ public class JspConfig {
         JspPropertyGroup bufferMatch = null;
         JspPropertyGroup errorOnUndeclaredNamespaceMatch = null;
 
-        Iterator<JspPropertyGroup> iter = jspProperties.iterator();
-        while (iter.hasNext()) {
-
-            JspPropertyGroup jpg = iter.next();
+        for (JspPropertyGroup jpg : jspProperties) {
             JspProperty jp = jpg.getJspProperty();
 
             // (arrays will be the same length)
@@ -339,7 +335,7 @@ public class JspConfig {
         String isTrimDirectiveWhitespaces = defaultTrimDirectiveWhitespaces;
         String defaultContentType = defaultDefaultContentType;
         String buffer = defaultBuffer;
-        String errorOnUndelcaredNamespace = defaultErrorOnUndeclaredNamespace;
+        String errorOnUndeclaredNamespace = defaultErrorOnUndeclaredNamespace;
 
         if (isXmlMatch != null) {
             isXml = isXmlMatch.getJspProperty().isXml();
@@ -370,14 +366,14 @@ public class JspConfig {
             buffer = bufferMatch.getJspProperty().getBuffer();
         }
         if (errorOnUndeclaredNamespaceMatch != null) {
-            errorOnUndelcaredNamespace =
+            errorOnUndeclaredNamespace =
                 errorOnUndeclaredNamespaceMatch.getJspProperty().isErrorOnUndeclaredNamespace();
         }
 
         return new JspProperty(isXml, isELIgnored, isScriptingInvalid,
                 pageEncoding, includePreludes, includeCodas,
                 isDeferedSyntaxAllowedAsLiteral, isTrimDirectiveWhitespaces,
-                defaultContentType, buffer, errorOnUndelcaredNamespace);
+                defaultContentType, buffer, errorOnUndeclaredNamespace);
     }
 
     /**
@@ -404,10 +400,7 @@ public class JspConfig {
             uriExtension = uri.substring(index+1);
         }
 
-        Iterator<JspPropertyGroup> iter = jspProperties.iterator();
-        while (iter.hasNext()) {
-
-            JspPropertyGroup jpg = iter.next();
+        for (JspPropertyGroup jpg : jspProperties) {
 
             String extension = jpg.getExtension();
             String path = jpg.getPath();

@@ -20,6 +20,8 @@ package org.apache.catalina.core;
 
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 import javax.management.ObjectName;
 
@@ -32,6 +34,7 @@ import org.apache.catalina.LifecycleState;
 import org.apache.catalina.Pipeline;
 import org.apache.catalina.Valve;
 import org.apache.catalina.util.LifecycleBase;
+import org.apache.catalina.util.ToStringUtil;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.ExceptionUtils;
@@ -50,8 +53,7 @@ import org.apache.tomcat.util.ExceptionUtils;
  * @author Craig R. McClanahan
  */
 
-public class StandardPipeline extends LifecycleBase
-        implements Pipeline, Contained {
+public class StandardPipeline extends LifecycleBase implements Pipeline {
 
     private static final Log log = LogFactory.getLog(StandardPipeline.class);
 
@@ -117,17 +119,26 @@ public class StandardPipeline extends LifecycleBase
     }
 
 
-    // ------------------------------------------------------ Contained Methods
+    @Override
+    public void findNonAsyncValves(Set<String> result) {
+        Valve valve = (first!=null) ? first : basic;
+        while (valve != null) {
+            if (!valve.isAsyncSupported()) {
+                result.add(valve.getClass().getName());
+            }
+            valve = valve.getNext();
+        }
+    }
 
+
+    // ------------------------------------------------------ Contained Methods
 
     /**
      * Return the Container with which this Pipeline is associated.
      */
     @Override
     public Container getContainer() {
-
-        return (this.container);
-
+        return this.container;
     }
 
 
@@ -138,9 +149,7 @@ public class StandardPipeline extends LifecycleBase
      */
     @Override
     public void setContainer(Container container) {
-
         this.container = container;
-
     }
 
 
@@ -214,10 +223,7 @@ public class StandardPipeline extends LifecycleBase
      */
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder("Pipeline[");
-        sb.append(container);
-        sb.append(']');
-        return sb.toString();
+        return ToStringUtil.toString(this);
     }
 
 
@@ -230,9 +236,7 @@ public class StandardPipeline extends LifecycleBase
      */
     @Override
     public Valve getBasic() {
-
-        return (this.basic);
-
+        return this.basic;
     }
 
 
@@ -369,7 +373,7 @@ public class StandardPipeline extends LifecycleBase
     @Override
     public Valve[] getValves() {
 
-        ArrayList<Valve> valveList = new ArrayList<>();
+        List<Valve> valveList = new ArrayList<>();
         Valve current = first;
         if (current == null) {
             current = basic;
@@ -385,7 +389,7 @@ public class StandardPipeline extends LifecycleBase
 
     public ObjectName[] getValveObjectNames() {
 
-        ArrayList<ObjectName> valveList = new ArrayList<>();
+        List<ObjectName> valveList = new ArrayList<>();
         Valve current = first;
         if (current == null) {
             current = basic;

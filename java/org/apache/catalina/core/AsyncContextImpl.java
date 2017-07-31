@@ -17,6 +17,7 @@
 package org.apache.catalina.core;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.InstanceManager;
 import org.apache.tomcat.util.ExceptionUtils;
+import org.apache.tomcat.util.buf.UDecoder;
 import org.apache.tomcat.util.res.StringManager;
 
 public class AsyncContextImpl implements AsyncContext, AsyncContextCallback {
@@ -111,6 +113,7 @@ public class AsyncContextImpl implements AsyncContext, AsyncContextCallback {
                 }
             }
         } finally {
+            context.fireRequestDestroyEvent(request.getRequest());
             clearServletRequestResponse();
             context.unbind(Globals.IS_SECURITY_ENABLED, oldCL);
         }
@@ -148,18 +151,21 @@ public class AsyncContextImpl implements AsyncContext, AsyncContextCallback {
     public void dispatch() {
         check();
         String path;
-        String pathInfo;
+        String cpath;
         ServletRequest servletRequest = getRequest();
         if (servletRequest instanceof HttpServletRequest) {
             HttpServletRequest sr = (HttpServletRequest) servletRequest;
-            path = sr.getServletPath();
-            pathInfo = sr.getPathInfo();
+            path = sr.getRequestURI();
+            cpath = sr.getContextPath();
         } else {
-            path = request.getServletPath();
-            pathInfo = request.getPathInfo();
+            path = request.getRequestURI();
+            cpath = request.getContextPath();
         }
-        if (pathInfo != null) {
-            path += pathInfo;
+        if (cpath.length() > 1) {
+            path = path.substring(cpath.length());
+        }
+        if (!context.getDispatchersUseEncodedPaths()) {
+            path = UDecoder.URLDecode(path, StandardCharsets.UTF_8);
         }
         dispatch(path);
     }
@@ -401,6 +407,10 @@ public class AsyncContextImpl implements AsyncContext, AsyncContextCallback {
         if (result.get()) {
             // No listener called dispatch() or complete(). This is an error.
             // SRV.2.3.3.3 (search for "error dispatch")
+            // Take a local copy to avoid threading issues if another thread
+            // clears this (can happen during error handling with non-container
+            // threads)
+            ServletResponse servletResponse = this.servletResponse;
             if (servletResponse instanceof HttpServletResponse) {
                 ((HttpServletResponse) servletResponse).setStatus(
                         HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -480,7 +490,7 @@ public class AsyncContextImpl implements AsyncContext, AsyncContextCallback {
     private InstanceManager getInstanceManager() {
         if (instanceManager == null) {
             if (context instanceof StandardContext) {
-                instanceManager = ((StandardContext)context).getInstanceManager();
+                instanceManager = context.getInstanceManager();
             } else {
                 instanceManager = new DefaultInstanceManager(null,
                         new HashMap<String, Map<String, String>>(),

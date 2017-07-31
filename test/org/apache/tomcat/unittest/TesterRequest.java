@@ -44,6 +44,7 @@ public class TesterRequest extends Request {
 
 
     public TesterRequest(boolean withSession) {
+        super(null);
         context = new TesterContext();
         servletContext = new TesterServletContext();
         context.setServletContext(servletContext);
@@ -137,5 +138,10 @@ public class TesterRequest extends Request {
     @Override
     public Enumeration<String> getHeaderNames() {
         return Collections.enumeration(headers.keySet());
+    }
+
+    @Override
+    public String getRemoteAddr() {
+        return "127.0.0.1";
     }
 }

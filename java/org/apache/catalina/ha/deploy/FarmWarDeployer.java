@@ -98,7 +98,7 @@ public class FarmWarDeployer extends ClusterListener
 
     /**
      * Frequency of the Farm watchDir check. Cluster wide deployment will be
-     * done once for the specified amount of backgrondProcess calls (ie, the
+     * done once for the specified amount of backgroundProcess calls (ie, the
      * lower the amount, the most often the checks will occur).
      */
     protected int processDeployFrequency = 2;
@@ -275,7 +275,7 @@ public class FarmWarDeployer extends ClusterListener
                                     contextName));
                     } else
                         log.error(sm.getString(
-                                "farmWarDeployer.servicingUneploy",
+                                "farmWarDeployer.servicingUndeploy",
                                 contextName));
                 } catch (Exception ex) {
                     log.error(ex);
@@ -700,9 +700,7 @@ public class FarmWarDeployer extends ClusterListener
      * @return the frequency of watcher checks.
      */
     public int getProcessDeployFrequency() {
-
-        return (this.processDeployFrequency);
-
+        return this.processDeployFrequency;
     }
 
     /**
@@ -748,7 +746,7 @@ public class FarmWarDeployer extends ClusterListener
         }
 
         try (java.io.FileInputStream is = new java.io.FileInputStream(from);
-                java.io.FileOutputStream os = new java.io.FileOutputStream(to, false);) {
+                java.io.FileOutputStream os = new java.io.FileOutputStream(to, false)) {
             byte[] buf = new byte[4096];
             while (true) {
                 int len = is.read(buf);

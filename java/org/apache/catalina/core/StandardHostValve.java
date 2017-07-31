@@ -123,7 +123,7 @@ final class StandardHostValve extends ValveBase {
         try {
             context.bind(Globals.IS_SECURITY_ENABLED, MY_CLASSLOADER);
 
-            if (!asyncAtStart && !context.fireRequestInitEvent(request)) {
+            if (!asyncAtStart && !context.fireRequestInitEvent(request.getRequest())) {
                 // Don't fire listeners during async processing (the listener
                 // fired for the request that called startAsync()).
                 // If a request init listener throws an exception, the request
@@ -178,8 +178,8 @@ final class StandardHostValve extends ValveBase {
                 }
             }
 
-            if (!request.isAsync() && (!asyncAtStart || !response.isErrorReportRequired())) {
-                context.fireRequestDestroyEvent(request);
+            if (!request.isAsync() && !asyncAtStart) {
+                context.fireRequestDestroyEvent(request.getRequest());
             }
         } finally {
             // Access a session (if present) to update last accessed time, based
@@ -424,14 +424,14 @@ final class StandardHostValve extends ValveBase {
         (Context context, Throwable exception) {
 
         if (exception == null) {
-            return (null);
+            return null;
         }
         Class<?> clazz = exception.getClass();
         String name = clazz.getName();
         while (!Object.class.equals(clazz)) {
             ErrorPage errorPage = context.findErrorPage(name);
             if (errorPage != null) {
-                return (errorPage);
+                return errorPage;
             }
             clazz = clazz.getSuperclass();
             if (clazz == null) {
@@ -439,7 +439,7 @@ final class StandardHostValve extends ValveBase {
             }
             name = clazz.getName();
         }
-        return (null);
+        return null;
 
     }
 }

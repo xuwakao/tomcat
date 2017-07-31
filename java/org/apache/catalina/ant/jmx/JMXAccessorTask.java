@@ -23,7 +23,6 @@ import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -60,7 +59,7 @@ import org.apache.tools.ant.Project;
  * <li>Bind Get, Call, Query result at Ant properties</li>
  * </ul>
  *
- * Examples: open server with reference and autorisation
+ * Examples: open server with reference and authorisation
  *
  * <pre>
  *
@@ -131,7 +130,7 @@ public class JMXAccessorTask extends BaseRedirectorHelperTask {
      * @return the name used at remote MbeanServer
      */
     public String getName() {
-        return (this.name);
+        return this.name;
     }
 
     public void setName(String objectName) {
@@ -200,7 +199,7 @@ public class JMXAccessorTask extends BaseRedirectorHelperTask {
      * @return The login password for the <code>Manager</code> application.
      */
     public String getPassword() {
-        return (this.password);
+        return this.password;
     }
 
     public void setPassword(String password) {
@@ -211,7 +210,7 @@ public class JMXAccessorTask extends BaseRedirectorHelperTask {
      * @return The login username for the <code>JMX</code> MBeanServer.
      */
     public String getUsername() {
-        return (this.username);
+        return this.username;
     }
 
     public void setUsername(String username) {
@@ -222,7 +221,7 @@ public class JMXAccessorTask extends BaseRedirectorHelperTask {
      * @return The URL of the <code>JMX JSR 160</code> MBeanServer to be used.
      */
     public String getUrl() {
-        return (this.url);
+        return this.url;
     }
 
     public void setUrl(String url) {
@@ -233,7 +232,7 @@ public class JMXAccessorTask extends BaseRedirectorHelperTask {
      * @return The Host of the <code>JMX JSR 160</code> MBeanServer to be used.
      */
     public String getHost() {
-        return (this.host);
+        return this.host;
     }
 
     public void setHost(String host) {
@@ -244,7 +243,7 @@ public class JMXAccessorTask extends BaseRedirectorHelperTask {
      * @return The Port of the <code>JMX JSR 160</code> MBeanServer to be used.
      */
     public String getPort() {
-        return (this.port);
+        return this.port;
     }
 
     public void setPort(String port) {
@@ -617,8 +616,7 @@ public class JMXAccessorTask extends BaseRedirectorHelperTask {
             CompositeDataSupport data = (CompositeDataSupport) result;
             CompositeType compositeType = data.getCompositeType();
             Set<String> keys = compositeType.keySet();
-            for (Iterator<String> iter = keys.iterator(); iter.hasNext();) {
-                String key = iter.next();
+            for (String key : keys) {
                 Object value = data.get(key);
                 OpenType<?> type = compositeType.getType(key);
                 if (type instanceof SimpleType<?>) {
@@ -629,10 +627,8 @@ public class JMXAccessorTask extends BaseRedirectorHelperTask {
             }
         } else if (result instanceof TabularDataSupport) {
             TabularDataSupport data = (TabularDataSupport) result;
-            for (Iterator<Object> iter = data.keySet().iterator(); iter.hasNext();) {
-                Object key = iter.next();
-                for (Iterator<?> iter1 = ((List<?>) key).iterator(); iter1.hasNext();) {
-                    Object key1 = iter1.next();
+            for (Object key : data.keySet()) {
+                for (Object key1 : ((List<?>) key)) {
                     CompositeData valuedata = data.get(new Object[] { key1 });
                     Object value = valuedata.get("value");
                     OpenType<?> type = valuedata.getCompositeType().getType(

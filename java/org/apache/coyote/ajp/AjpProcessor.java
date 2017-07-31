@@ -41,7 +41,6 @@ import org.apache.tomcat.util.buf.ByteChunk;
 import org.apache.tomcat.util.buf.HexUtils;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.http.MimeHeaders;
-import org.apache.tomcat.util.net.AbstractEndpoint;
 import org.apache.tomcat.util.net.AbstractEndpoint.Handler.SocketState;
 import org.apache.tomcat.util.net.ApplicationBufferHandler;
 import org.apache.tomcat.util.net.SSLSupport;
@@ -123,6 +122,8 @@ public class AjpProcessor extends AbstractProcessor {
 
 
     // ----------------------------------------------------- Instance Variables
+
+    private final AbstractAjpProtocol<?> protocol;
 
 
     /**
@@ -243,14 +244,14 @@ public class AjpProcessor extends AbstractProcessor {
 
     // ------------------------------------------------------------ Constructor
 
-    public AjpProcessor(int packetSize, AbstractEndpoint<?> endpoint) {
+    public AjpProcessor(AbstractAjpProtocol<?> protocol) {
+        super();
+        this.protocol = protocol;
 
-        super(endpoint);
-
+        int packetSize = protocol.getPacketSize();
         // Calculate maximum chunk size as packetSize may have been changed from
         // the default (Constants.MAX_PACKET_SIZE)
-        this.outputMaxChunkSize =
-                Constants.MAX_SEND_SIZE + packetSize - Constants.MAX_PACKET_SIZE;
+        this.outputMaxChunkSize = packetSize - Constants.SEND_HEAD_LEN;
 
         request.setInputBuffer(new SocketInputBuffer());
 
@@ -271,79 +272,6 @@ public class AjpProcessor extends AbstractProcessor {
                 0, getBodyMessage.getLen());
 
         response.setOutputBuffer(new SocketOutputBuffer());
-    }
-
-
-    // ------------------------------------------------------------- Properties
-
-
-    /**
-     * Send AJP flush packet when flushing.
-     * An flush packet is a zero byte AJP13 SEND_BODY_CHUNK
-     * packet. mod_jk and mod_proxy_ajp interprete this as
-     * a request to flush data to the client.
-     * AJP always does flush at the and of the response, so if
-     * it is not important, that the packets get streamed up to
-     * the client, do not use extra flush packets.
-     * For compatibility and to stay on the safe side, flush
-     * packets are enabled by default.
-     */
-    protected boolean ajpFlush = true;
-    public boolean getAjpFlush() { return ajpFlush; }
-    public void setAjpFlush(boolean ajpFlush) {
-        this.ajpFlush = ajpFlush;
-    }
-
-
-    /**
-     * The number of milliseconds Tomcat will wait for a subsequent request
-     * before closing the connection. The default is -1 which is an infinite
-     * timeout.
-     */
-    private int keepAliveTimeout = -1;
-    public int getKeepAliveTimeout() { return keepAliveTimeout; }
-    public void setKeepAliveTimeout(int timeout) { keepAliveTimeout = timeout; }
-
-
-    /**
-     * Use Tomcat authentication ?
-     */
-    private boolean tomcatAuthentication = true;
-    public boolean getTomcatAuthentication() { return tomcatAuthentication; }
-    public void setTomcatAuthentication(boolean tomcatAuthentication) {
-        this.tomcatAuthentication = tomcatAuthentication;
-    }
-
-
-    /**
-     * Use Tomcat authorization ?
-     */
-    private boolean tomcatAuthorization = false;
-    public boolean getTomcatAuthorization() { return tomcatAuthorization; }
-    public void setTomcatAuthorization(boolean tomcatAuthorization) {
-        this.tomcatAuthorization = tomcatAuthorization;
-    }
-
-
-    /**
-     * Required secret.
-     */
-    private String requiredSecret = null;
-    public void setRequiredSecret(String requiredSecret) {
-        this.requiredSecret = requiredSecret;
-    }
-
-
-    /**
-     * When client certificate information is presented in a form other than
-     * instances of {@link java.security.cert.X509Certificate} it needs to be
-     * converted before it can be used and this property controls which JSSE
-     * provider is used to perform the conversion.
-     */
-    private String clientCertProvider = null;
-    public String getClientCertProvider() { return clientCertProvider; }
-    public void setClientCertProvider(String clientCertProvider) {
-        this.clientCertProvider = clientCertProvider;
     }
 
 
@@ -374,10 +302,8 @@ public class AjpProcessor extends AbstractProcessor {
 
     @Override
     protected SocketState dispatchEndRequest() {
-        // Set keep alive timeout for next request if enabled
-        if (keepAliveTimeout > 0) {
-            socketWrapper.setReadTimeout(keepAliveTimeout);
-        }
+        // Set keep alive timeout for next request
+        socketWrapper.setReadTimeout(protocol.getKeepAliveTimeout());
         recycle();
         return SocketState.OPEN;
     }
@@ -392,27 +318,26 @@ public class AjpProcessor extends AbstractProcessor {
         // Setting up the socket
         this.socketWrapper = socket;
 
-        int soTimeout = endpoint.getSoTimeout();
         boolean cping = false;
-
         boolean keptAlive = false;
 
-        while (!getErrorState().isError() && !endpoint.isPaused()) {
+        while (!getErrorState().isError() && !protocol.isPaused()) {
             // Parsing the request header
             try {
                 // Get first message of the request
                 if (!readMessage(requestHeaderMessage, !keptAlive)) {
                     break;
                 }
-                // Set back timeout if keep alive timeout is enabled
-                if (keepAliveTimeout > 0) {
-                    socketWrapper.setReadTimeout(soTimeout);
-                }
+
+                // Processing the request so make sure the connection rather
+                // than keep-alive timeout is used
+                socketWrapper.setReadTimeout(protocol.getConnectionTimeout());
+
                 // Check message type, process right away and break if
                 // not regular request processing
                 int type = requestHeaderMessage.getByte();
                 if (type == Constants.JK_AJP13_CPING_REQUEST) {
-                    if (endpoint.isPaused()) {
+                    if (protocol.isPaused()) {
                         recycle();
                         break;
                     }
@@ -463,7 +388,7 @@ public class AjpProcessor extends AbstractProcessor {
                 }
             }
 
-            if (!getErrorState().isError() && !cping && endpoint.isPaused()) {
+            if (!getErrorState().isError() && !cping && protocol.isPaused()) {
                 // 503 - Service unavailable
                 response.setStatus(503);
                 setErrorState(ErrorState.CLOSE_CLEAN, null);
@@ -513,17 +438,16 @@ public class AjpProcessor extends AbstractProcessor {
             request.updateCounters();
 
             rp.setStage(org.apache.coyote.Constants.STAGE_KEEPALIVE);
-            // Set keep alive timeout for next request if enabled
-            if (keepAliveTimeout > 0) {
-                socketWrapper.setReadTimeout(keepAliveTimeout);
-            }
+
+            // Set keep alive timeout for next request
+            socketWrapper.setReadTimeout(protocol.getKeepAliveTimeout());
 
             recycle();
         }
 
         rp.setStage(org.apache.coyote.Constants.STAGE_ENDED);
 
-        if (getErrorState().isError() || endpoint.isPaused()) {
+        if (getErrorState().isError() || protocol.isPaused()) {
             return SocketState.CLOSED;
         } else {
             if (isAsync()) {
@@ -721,8 +645,7 @@ public class AjpProcessor extends AbstractProcessor {
         MimeHeaders headers = request.getMimeHeaders();
 
         // Set this every time in case limit has been changed via JMX
-        headers.setLimit(endpoint.getMaxHeaderCount());
-        request.getCookies().setLimit(getMaxCookieCount());
+        headers.setLimit(protocol.getMaxHeaderCount());
 
         boolean contentLengthSet = false;
         int hCount = requestHeaderMessage.getInt();
@@ -779,6 +702,7 @@ public class AjpProcessor extends AbstractProcessor {
         }
 
         // Decode extra attributes
+        String requiredSecret = protocol.getRequiredSecret();
         boolean secret = false;
         byte attributeCode;
         while ((attributeCode = requestHeaderMessage.getByte())
@@ -824,7 +748,8 @@ public class AjpProcessor extends AbstractProcessor {
                 break;
 
             case Constants.SC_A_REMOTE_USER :
-                if (tomcatAuthorization || !tomcatAuthentication) {
+                boolean tomcatAuthorization  = protocol.getTomcatAuthorization();
+                if (tomcatAuthorization || !protocol.getTomcatAuthentication()) {
                     // Implies tomcatAuthentication == false
                     requestHeaderMessage.getBytes(request.getRemoteUser());
                     request.setRemoteUserNeedsAuthorization(tomcatAuthorization);
@@ -835,7 +760,7 @@ public class AjpProcessor extends AbstractProcessor {
                 break;
 
             case Constants.SC_A_AUTH_TYPE :
-                if (tomcatAuthentication) {
+                if (protocol.getTomcatAuthentication()) {
                     // ignore server
                     requestHeaderMessage.getBytes(tmpMB);
                 } else {
@@ -1090,7 +1015,7 @@ public class AjpProcessor extends AbstractProcessor {
         // non-blocking writes.
         // TODO Validate the assertion above
         if (!responseFinished) {
-            if (ajpFlush) {
+            if (protocol.getAjpFlush()) {
                 // Send the flush message
                 socketWrapper.write(true, flushMessageArray, 0, flushMessageArray.length);
             }
@@ -1215,7 +1140,7 @@ public class AjpProcessor extends AbstractProcessor {
             // Fill the  elements.
             try {
                 CertificateFactory cf;
-                String clientCertProvider = getClientCertProvider();
+                String clientCertProvider = protocol.getClientCertProvider();
                 if (clientCertProvider == null) {
                     cf = CertificateFactory.getInstance("X.509");
                 } else {
@@ -1266,8 +1191,10 @@ public class AjpProcessor extends AbstractProcessor {
 
 
     @Override
-    protected final void executeDispatches(SocketWrapperBase<?> wrapper) {
-        wrapper.executeNonBlockingDispatches(getIteratorAndClearDispatches());
+    protected boolean isTrailerFieldsReady() {
+        // AJP does not support trailers so return true so app can request the
+        // trailers and find out that there are none.
+        return true;
     }
 
 
@@ -1393,9 +1320,15 @@ public class AjpProcessor extends AbstractProcessor {
 
             int len = 0;
             if (!swallowResponse) {
-                len = chunk.remaining();
-                writeData(chunk);
-                len -= chunk.remaining();
+                try {
+                    len = chunk.remaining();
+                    writeData(chunk);
+                    len -= chunk.remaining();
+                } catch (IOException ioe) {
+                    setErrorState(ErrorState.CLOSE_CONNECTION_NOW, ioe);
+                    // Re-throw
+                    throw ioe;
+                }
             }
             return len;
         }

@@ -22,7 +22,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import javax.el.ELException;
 import javax.el.ExpressionFactory;
@@ -997,7 +999,7 @@ class Validator {
             }
 
             if (doctypePublic != null && doctypeSystem == null) {
-                err.jspError(n, "jsp.error.jspoutput.doctypepulicsystem");
+                err.jspError(n, "jsp.error.jspoutput.doctypepublicsystem");
             }
 
             if (omitXmlDecl != null) {
@@ -1660,7 +1662,7 @@ class Validator {
                 throws JasperException {
             FunctionInfo funcInfo = func.getFunctionInfo();
             String signature = funcInfo.getFunctionSignature();
-            ArrayList<String> params = new ArrayList<>();
+            List<String> params = new ArrayList<>();
             // Signature is of the form
             // <return-type> S <method-name S? '('
             // < <arg-type> ( ',' <arg-type> )* )? ')'
@@ -1693,7 +1695,7 @@ class Validator {
 
             class ValidateFunctionMapper extends FunctionMapper {
 
-                private HashMap<String, Method> fnmap = new HashMap<>();
+                private Map<String, Method> fnmap = new HashMap<>();
 
                 @Override
                 public void mapFunction(String prefix, String localName,
@@ -1718,7 +1720,7 @@ class Validator {
                 @Override
                 public void visit(ELNode.Function n) throws JasperException {
 
-                    // Lambda / ImportHandler defined fucntion
+                    // Lambda / ImportHandler defined function
                     if (n.getFunctionInfo() == null) {
                         return;
                     }
@@ -1819,7 +1821,7 @@ class Validator {
         PageInfo pageInfo = compiler.getPageInfo();
         String contentType = pageInfo.getContentType();
 
-        if (contentType == null || contentType.indexOf("charset=") < 0) {
+        if (contentType == null || !contentType.contains("charset=")) {
             boolean isXml = page.getRoot().isXmlSyntax();
             String defaultType;
             if (contentType == null) {

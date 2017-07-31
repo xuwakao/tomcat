@@ -26,7 +26,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -69,6 +68,7 @@ public abstract class Compiler {
 
     protected Node.Nodes pageNodes;
 
+
     // ------------------------------------------------------------ Constructor
 
     public void init(JspCompilationContext ctxt, JspServletWrapper jsw) {
@@ -77,30 +77,35 @@ public abstract class Compiler {
         this.options = ctxt.getOptions();
     }
 
+
     // --------------------------------------------------------- Public Methods
 
-    /**
-     * <p>
-     * Retrieves the parsed nodes of the JSP page, if they are available. May
-     * return null. Used in development mode for generating detailed error
-     * messages. http://bz.apache.org/bugzilla/show_bug.cgi?id=37062.
-     * </p>
-     * @return the page nodes
-     */
-    public Node.Nodes getPageNodes() {
-        return this.pageNodes;
+    public SmapStratum getSmap(String className) {
+
+        Map<String,SmapStratum> smaps = ctxt.getRuntimeContext().getSmaps();
+        SmapStratum smap = smaps.get(className);
+
+        if (smap == null && !options.isSmapSuppressed()) {
+            // Tomcat was restarted so cached SMAP has been lost. However, it
+            // was written to the class file so it can be recovered.
+            smap = SmapUtil.loadSmap(className, ctxt.getJspLoader());
+            if (smap != null) {
+                smaps.put(className, smap);
+            }
+        }
+
+        return smap;
     }
+
 
     /**
      * Compile the jsp file into equivalent servlet in .java file
      *
-     * @return a smap for the current JSP page, if one is generated, null
-     *         otherwise
      * @throws Exception Error generating Java source
+     *
+     * @return A map of class names to JSR 045 source maps
      */
-    protected String[] generateJava() throws Exception {
-
-        String[] smapStr = null;
+    protected Map<String,SmapStratum> generateJava() throws Exception {
 
         long t1, t2, t3, t4;
 
@@ -210,7 +215,6 @@ public abstract class Compiler {
                 // generate prototype .java file for the tag file
                 try (ServletWriter writer = setupContextWriter(javaFileName)) {
                     Generator.generate(writer, this, pageNodes);
-                    return null;
                 }
             }
 
@@ -276,9 +280,14 @@ public abstract class Compiler {
             throw e;
         }
 
+        Map<String,SmapStratum> smaps = null;
+
         // JSR45 Support
         if (!options.isSmapSuppressed()) {
-            smapStr = SmapUtil.generateSmap(ctxt, pageNodes);
+            smaps = SmapUtil.generateSmap(ctxt, pageNodes);
+            // Add them to the web application wide cache for future lookup in
+            // error handling etc.
+            ctxt.getRuntimeContext().getSmaps().putAll(smaps);
         }
 
         // If any proto type .java and .class files was generated,
@@ -288,7 +297,7 @@ public abstract class Compiler {
         // generate .class again from the new .java file just generated.
         tfp.removeProtoTypeFiles(ctxt.getClassFileName());
 
-        return smapStr;
+        return smaps;
     }
 
     private ServletWriter setupContextWriter(String javaFileName)
@@ -314,12 +323,15 @@ public abstract class Compiler {
     /**
      * Servlet compilation. This compiles the generated sources into
      * Servlets.
-     * @param smap The SMAP files for source debugging
+     *
+     * @param smaps The source maps for the class(es) generated from the source
+     *              file
+     *
      * @throws FileNotFoundException Source files not found
      * @throws JasperException Compilation error
      * @throws Exception Some other error
      */
-    protected abstract void generateClass(String[] smap)
+    protected abstract void generateClass(Map<String,SmapStratum> smaps)
             throws FileNotFoundException, JasperException, Exception;
 
     /**
@@ -369,12 +381,12 @@ public abstract class Compiler {
         }
 
         try {
-            String[] smap = generateJava();
+            Map<String,SmapStratum> smaps = generateJava();
             File javaFile = new File(ctxt.getServletJavaFileName());
             Long jspLastModified = ctxt.getLastModified(ctxt.getJspFile());
             javaFile.setLastModified(jspLastModified.longValue());
             if (compileClass) {
-                generateClass(smap);
+                generateClass(smaps);
                 // Fix for bugzilla 41606
                 // Set JspServletWrapper.servletClassLastModifiedTime after successful compile
                 File targetFile = new File(ctxt.getClassFileName());
@@ -397,14 +409,7 @@ public abstract class Compiler {
             tfp = null;
             errDispatcher = null;
             pageInfo = null;
-
-            // Only get rid of the pageNodes if in production.
-            // In development mode, they are used for detailed
-            // error messages.
-            // http://bz.apache.org/bugzilla/show_bug.cgi?id=37062
-            if (!this.options.getDevelopment()) {
-                pageNodes = null;
-            }
+            pageNodes = null;
 
             if (ctxt.getWriter() != null) {
                 ctxt.getWriter().close();
@@ -491,9 +496,7 @@ public abstract class Compiler {
             return false;
         }
 
-        Iterator<Entry<String,Long>> it = depends.entrySet().iterator();
-        while (it.hasNext()) {
-            Entry<String,Long> include = it.next();
+        for (Entry<String, Long> include : depends.entrySet()) {
             try {
                 String key = include.getKey();
                 URL includeUrl;

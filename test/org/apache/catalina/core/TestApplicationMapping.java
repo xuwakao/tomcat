@@ -19,17 +19,19 @@ package org.apache.catalina.core;
 import java.io.IOException;
 import java.io.PrintWriter;
 
+import javax.servlet.AsyncContext;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletMapping;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Mapping;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.catalina.Context;
+import org.apache.catalina.Wrapper;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.startup.TomcatBaseTest;
 import org.apache.tomcat.util.buf.ByteChunk;
@@ -43,22 +45,32 @@ public class TestApplicationMapping extends TomcatBaseTest {
 
     @Test
     public void testContextNonRootMappingDefault() throws Exception {
-        doTestMapping("/dummy", "/", "/foo", "/", "DEFAULT");
+        doTestMapping("/dummy", "/", "/foo", "", "DEFAULT");
     }
 
     @Test
     public void testContextNonRootMappingExtension() throws Exception {
-        doTestMapping("/dummy", "*.test", "/foo/bar.test", "/foo/bar", "EXTENSION");
+        doTestMapping("/dummy", "*.test", "/foo/bar.test", "foo/bar", "EXTENSION");
     }
 
     @Test
     public void testContextNonRootMappingExact() throws Exception {
-        doTestMapping("/dummy", "/foo/bar", "/foo/bar", "/foo/bar", "EXACT");
+        doTestMapping("/dummy", "/foo/bar", "/foo/bar", "foo/bar", "EXACT");
+    }
+
+    @Test
+    public void testContextNonRootMappingPathNone() throws Exception {
+        doTestMapping("/dummy", "/foo/bar/*", "/foo/bar", null, "PATH");
+    }
+
+    @Test
+    public void testContextNonRootMappingPathSeparatorOnly() throws Exception {
+        doTestMapping("/dummy", "/foo/bar/*", "/foo/bar/", "", "PATH");
     }
 
     @Test
     public void testContextNonRootMappingPath() throws Exception {
-        doTestMapping("/dummy", "/foo/bar/*", "/foo/bar/foo2", "/foo2", "PATH");
+        doTestMapping("/dummy", "/foo/bar/*", "/foo/bar/foo2", "foo2", "PATH");
     }
 
     @Test
@@ -68,22 +80,22 @@ public class TestApplicationMapping extends TomcatBaseTest {
 
     @Test
     public void testContextRootMappingDefault() throws Exception {
-        doTestMapping("", "/", "/foo", "/", "DEFAULT");
+        doTestMapping("", "/", "/foo", "", "DEFAULT");
     }
 
     @Test
     public void testContextRootMappingExtension() throws Exception {
-        doTestMapping("", "*.test", "/foo/bar.test", "/foo/bar", "EXTENSION");
+        doTestMapping("", "*.test", "/foo/bar.test", "foo/bar", "EXTENSION");
     }
 
     @Test
     public void testContextRootMappingExact() throws Exception {
-        doTestMapping("", "/foo/bar", "/foo/bar", "/foo/bar", "EXACT");
+        doTestMapping("", "/foo/bar", "/foo/bar", "foo/bar", "EXACT");
     }
 
     @Test
     public void testContextRootMappingPath() throws Exception {
-        doTestMapping("", "/foo/bar/*", "/foo/bar/foo2", "/foo2", "PATH");
+        doTestMapping("", "/foo/bar/*", "/foo/bar/foo2", "foo2", "PATH");
     }
 
     private void doTestMapping(String contextPath, String mapping, String requestPath,
@@ -101,6 +113,9 @@ public class TestApplicationMapping extends TomcatBaseTest {
         tearDown();
         setUp();
         doTestMappingNamedForward(contextPath, mapping, requestPath, matchValue, matchType);
+        tearDown();
+        setUp();
+        doTestMappingAsync(contextPath, mapping, requestPath, matchValue, matchType);
     }
 
     private void doTestMappingDirect(String contextPath, String mapping, String requestPath,
@@ -146,7 +161,7 @@ public class TestApplicationMapping extends TomcatBaseTest {
         Assert.assertTrue(body, body.contains("MatchType=[" + matchType + "]"));
         Assert.assertTrue(body, body.contains("ServletName=[Include]"));
 
-        Assert.assertTrue(body, body.contains("IncludeMatchValue=[/mapping]"));
+        Assert.assertTrue(body, body.contains("IncludeMatchValue=[mapping]"));
         Assert.assertTrue(body, body.contains("IncludePattern=[/mapping]"));
         Assert.assertTrue(body, body.contains("IncludeMatchType=[EXACT]"));
         Assert.assertTrue(body, body.contains("IncludeServletName=[Mapping]"));
@@ -192,7 +207,7 @@ public class TestApplicationMapping extends TomcatBaseTest {
         ByteChunk bc = getUrl("http://localhost:" + getPort() + contextPath + requestPath);
         String body = bc.toString();
 
-        Assert.assertTrue(body, body.contains("MatchValue=[/mapping]"));
+        Assert.assertTrue(body, body.contains("MatchValue=[mapping]"));
         Assert.assertTrue(body, body.contains("Pattern=[/mapping]"));
         Assert.assertTrue(body, body.contains("MatchType=[EXACT]"));
         Assert.assertTrue(body, body.contains("ServletName=[Mapping]"));
@@ -224,6 +239,35 @@ public class TestApplicationMapping extends TomcatBaseTest {
         Assert.assertTrue(body, body.contains("Pattern=[" + mapping + "]"));
         Assert.assertTrue(body, body.contains("MatchType=[" + matchType + "]"));
         Assert.assertTrue(body, body.contains("ServletName=[Forward]"));
+    }
+
+    private void doTestMappingAsync(String contextPath, String mapping, String requestPath,
+            String matchValue, String matchType) throws Exception {
+        Tomcat tomcat = getTomcatInstance();
+
+        // No file system docBase required
+        Context ctx = tomcat.addContext(contextPath, null);
+
+        Wrapper w = Tomcat.addServlet(ctx, "Async", new AsyncServlet());
+        w.setAsyncSupported(true);
+        ctx.addServletMappingDecoded(mapping, "Async");
+        Tomcat.addServlet(ctx, "Mapping", new MappingServlet());
+        ctx.addServletMappingDecoded("/mapping", "Mapping");
+
+        tomcat.start();
+
+        ByteChunk bc = getUrl("http://localhost:" + getPort() + contextPath + requestPath);
+        String body = bc.toString();
+
+        Assert.assertTrue(body, body.contains("MatchValue=[mapping]"));
+        Assert.assertTrue(body, body.contains("Pattern=[/mapping]"));
+        Assert.assertTrue(body, body.contains("MatchType=[EXACT]"));
+        Assert.assertTrue(body, body.contains("ServletName=[Mapping]"));
+
+        Assert.assertTrue(body, body.contains("AsyncMatchValue=[" + matchValue + "]"));
+        Assert.assertTrue(body, body.contains("AsyncPattern=[" + mapping + "]"));
+        Assert.assertTrue(body, body.contains("AsyncMatchType=[" + matchType + "]"));
+        Assert.assertTrue(body, body.contains("AsyncServletName=[Async]"));
     }
 
 
@@ -275,6 +319,18 @@ public class TestApplicationMapping extends TomcatBaseTest {
     }
 
 
+    private static class AsyncServlet extends HttpServlet {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+                throws ServletException, IOException {
+            AsyncContext ac = req.startAsync();
+            ac.dispatch("/mapping");
+        }
+    }
+
+
     private static class MappingServlet extends HttpServlet {
 
         private static final long serialVersionUID = 1L;
@@ -284,12 +340,13 @@ public class TestApplicationMapping extends TomcatBaseTest {
                 throws ServletException, IOException {
             resp.setContentType("text/plain;charset=UTF-8");
             PrintWriter pw = resp.getWriter();
-            Mapping mapping = req.getMapping();
+            HttpServletMapping mapping = req.getHttpServletMapping();
             pw.println("MatchValue=[" + mapping.getMatchValue() + "]");
             pw.println("Pattern=[" + mapping.getPattern() + "]");
             pw.println("MatchType=[" + mapping.getMappingMatch() + "]");
             pw.println("ServletName=[" + mapping.getServletName() + "]");
-            Mapping includeMapping = (Mapping) req.getAttribute(RequestDispatcher.INCLUDE_MAPPING);
+            HttpServletMapping includeMapping =
+                    (HttpServletMapping) req.getAttribute(RequestDispatcher.INCLUDE_MAPPING);
             if (includeMapping != null) {
                 pw.println("IncludeMatchValue=[" + includeMapping.getMatchValue() + "]");
                 pw.println("IncludePattern=[" + includeMapping.getPattern() + "]");
@@ -297,12 +354,21 @@ public class TestApplicationMapping extends TomcatBaseTest {
                 pw.println("IncludeServletName=[" + includeMapping.getServletName() + "]");
 
             }
-            Mapping forwardMapping = (Mapping) req.getAttribute(RequestDispatcher.FORWARD_MAPPING);
+            HttpServletMapping forwardMapping =
+                    (HttpServletMapping) req.getAttribute(RequestDispatcher.FORWARD_MAPPING);
             if (forwardMapping != null) {
                 pw.println("ForwardMatchValue=[" + forwardMapping.getMatchValue() + "]");
                 pw.println("ForwardPattern=[" + forwardMapping.getPattern() + "]");
                 pw.println("ForwardMatchType=[" + forwardMapping.getMappingMatch() + "]");
                 pw.println("ForwardServletName=[" + forwardMapping.getServletName() + "]");
+            }
+            HttpServletMapping asyncMapping =
+                    (HttpServletMapping) req.getAttribute(AsyncContext.ASYNC_MAPPING);
+            if (asyncMapping != null) {
+                pw.println("AsyncMatchValue=[" + asyncMapping.getMatchValue() + "]");
+                pw.println("AsyncPattern=[" + asyncMapping.getPattern() + "]");
+                pw.println("AsyncMatchType=[" + asyncMapping.getMappingMatch() + "]");
+                pw.println("AsyncServletName=[" + asyncMapping.getServletName() + "]");
             }
         }
     }

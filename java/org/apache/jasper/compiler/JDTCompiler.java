@@ -29,6 +29,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.StringTokenizer;
@@ -68,7 +69,7 @@ public class JDTCompiler extends org.apache.jasper.compiler.Compiler {
      * Compile the servlet from .java file to .class file
      */
     @Override
-    protected void generateClass(String[] smap)
+    protected void generateClass(Map<String,SmapStratum> smaps)
         throws FileNotFoundException, JasperException, Exception {
 
         long t1 = 0;
@@ -85,7 +86,7 @@ public class JDTCompiler extends org.apache.jasper.compiler.Compiler {
         final ClassLoader classLoader = ctxt.getJspLoader();
         String[] fileNames = new String[] {sourceFile};
         String[] classNames = new String[] {targetClassName};
-        final ArrayList<JavacErrorDetail> problemList = new ArrayList<>();
+        final List<JavacErrorDetail> problemList = new ArrayList<>();
 
         class CompilationUnit implements ICompilationUnit {
 
@@ -420,7 +421,7 @@ public class JDTCompiler extends org.apache.jasper.compiler.Compiler {
                                 classFileName.append(".class");
                                 try (FileOutputStream fout = new FileOutputStream(
                                         classFileName.toString());
-                                        BufferedOutputStream bos = new BufferedOutputStream(fout);) {
+                                        BufferedOutputStream bos = new BufferedOutputStream(fout)) {
                                     bos.write(bytes);
                                 }
                             }
@@ -469,7 +470,7 @@ public class JDTCompiler extends org.apache.jasper.compiler.Compiler {
 
         // JSR45 Support
         if (! options.isSmapSuppressed()) {
-            SmapUtil.installSmap(smap);
+            SmapUtil.installSmap(smaps);
         }
     }
 }

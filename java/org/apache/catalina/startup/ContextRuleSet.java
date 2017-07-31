@@ -14,14 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 package org.apache.catalina.startup;
 
-
 import org.apache.tomcat.util.digester.Digester;
-import org.apache.tomcat.util.digester.RuleSetBase;
-
+import org.apache.tomcat.util.digester.RuleSet;
 
 /**
  * <p><strong>RuleSet</strong> for processing the contents of a
@@ -29,11 +25,9 @@ import org.apache.tomcat.util.digester.RuleSetBase;
  *
  * @author Craig R. McClanahan
  */
-public class ContextRuleSet extends RuleSetBase {
-
+public class ContextRuleSet implements RuleSet {
 
     // ----------------------------------------------------- Instance Variables
-
 
     /**
      * The matching pattern prefix to use for recognizing our elements.
@@ -48,7 +42,6 @@ public class ContextRuleSet extends RuleSetBase {
 
 
     // ------------------------------------------------------------ Constructor
-
 
     /**
      * Construct an instance of this <code>RuleSet</code> with the default
@@ -81,14 +74,12 @@ public class ContextRuleSet extends RuleSetBase {
      *  created
      */
     public ContextRuleSet(String prefix, boolean create) {
-        this.namespaceURI = null;
         this.prefix = prefix;
         this.create = create;
     }
 
 
     // --------------------------------------------------------- Public Methods
-
 
     /**
      * <p>Add the set of Rule instances defined in this RuleSet to the
@@ -250,5 +241,4 @@ public class ContextRuleSet extends RuleSetBase {
                             "setCookieProcessor",
                             "org.apache.tomcat.util.http.CookieProcessor");
     }
-
 }

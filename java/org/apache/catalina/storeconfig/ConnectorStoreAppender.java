@@ -25,8 +25,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.catalina.connector.Connector;
 import org.apache.coyote.ProtocolHandler;
@@ -36,26 +37,27 @@ import org.apache.tomcat.util.net.SocketProperties;
 /**
  * Store the Connector attributes. Connector has really special design. A
  * Connector is only a startup Wrapper for a ProtocolHandler. This meant that
- * ProtocolHandler get all there attribtues from the Connector attribtue map.
+ * ProtocolHandler get all there attributes from the Connector attribute map.
  * Strange is that some attributes change there name and the attribute
- * sslProtocol need a sepzial handling
+ * sslProtocol need a special handling
  */
 public class ConnectorStoreAppender extends StoreAppender {
 
     protected static final HashMap<String, String> replacements = new HashMap<>();
+    protected static final Set<String> internalExecutorAttributes = new HashSet<>();
     static {
-        replacements.put("backlog", "acceptCount");
-        replacements.put("soLinger", "connectionLinger");
-        replacements.put("soTimeout", "connectionTimeout");
         replacements.put("timeout", "connectionUploadTimeout");
         replacements.put("clientauth", "clientAuth");
         replacements.put("keystore", "keystoreFile");
         replacements.put("randomfile", "randomFile");
-        replacements.put("rootfile", "rootFile");
         replacements.put("keypass", "keystorePass");
         replacements.put("keytype", "keystoreType");
         replacements.put("protocol", "sslProtocol");
         replacements.put("protocols", "sslProtocols");
+
+        internalExecutorAttributes.add("maxThreads");
+        internalExecutorAttributes.add("minSpareThreads");
+        internalExecutorAttributes.add("threadPriority");
     }
 
     @Override
@@ -75,9 +77,7 @@ public class ConnectorStoreAppender extends StoreAppender {
         List<String> propertyKeys = getPropertyKeys(connector);
         // Create blank instance
         Object bean2 = new Connector(protocol);//defaultInstance(bean);
-        Iterator<String> propertyIterator = propertyKeys.iterator();
-        while (propertyIterator.hasNext()) {
-            String key = propertyIterator.next();
+        for (String key : propertyKeys) {
             Object value = IntrospectionUtils.getProperty(bean, key);
             if (desc.isTransientAttribute(key)) {
                 continue; // Skip the specified exceptions
@@ -97,8 +97,13 @@ public class ConnectorStoreAppender extends StoreAppender {
                 printValue(writer, indent, key, value);
             }
         }
-        if (protocol != null && !"HTTP/1.1".equals(protocol))
+        if (protocol != null && !"HTTP/1.1".equals(protocol)) {
             super.printValue(writer, indent, "protocol", protocol);
+        }
+        String executorName = connector.getExecutorName();
+        if (!Connector.INTERNAL_EXECUTOR_NAME.equals(executorName)) {
+            super.printValue(writer, indent, "executor", executorName);
+        }
 
     }
 
@@ -107,11 +112,11 @@ public class ConnectorStoreAppender extends StoreAppender {
      *
      * @param bean The connector
      * @return List of Connector property names
-     * @throws IntrospectionException Error intropecting connector
+     * @throws IntrospectionException Error introspecting connector
      */
     protected List<String> getPropertyKeys(Connector bean)
             throws IntrospectionException {
-        ArrayList<String> propertyKeys = new ArrayList<>();
+        List<String> propertyKeys = new ArrayList<>();
         // Acquire the list of properties for this bean
         ProtocolHandler protocolHandler = bean.getProtocolHandler();
         // Acquire the list of properties for this bean
@@ -151,6 +156,10 @@ public class ConnectorStoreAppender extends StoreAppender {
                 continue; // Must be a read-write primitive or String
             }
             String key = descriptor.getName();
+            if (!Connector.INTERNAL_EXECUTOR_NAME.equals(bean.getExecutorName()) &&
+                    internalExecutorAttributes.contains(key)) {
+                continue;
+            }
             if (replacements.get(key) != null) {
                 key = replacements.get(key);
             }
@@ -196,7 +205,7 @@ public class ConnectorStoreAppender extends StoreAppender {
      * @param aDesc The connector description
      * @throws Exception Store error occurred
      */
-    protected void storeConnectorAttribtues(PrintWriter aWriter, int indent,
+    protected void storeConnectorAttributes(PrintWriter aWriter, int indent,
             Object bean, StoreDescription aDesc) throws Exception {
         if (aDesc.isAttributes()) {
             printAttributes(aWriter, indent, false, bean, aDesc);
@@ -215,7 +224,7 @@ public class ConnectorStoreAppender extends StoreAppender {
             StoreDescription aDesc) throws Exception {
         aWriter.print("<");
         aWriter.print(aDesc.getTag());
-        storeConnectorAttribtues(aWriter, indent, bean, aDesc);
+        storeConnectorAttributes(aWriter, indent, bean, aDesc);
         aWriter.println(">");
     }
 
@@ -231,7 +240,7 @@ public class ConnectorStoreAppender extends StoreAppender {
             StoreDescription aDesc) throws Exception {
         aWriter.print("<");
         aWriter.print(aDesc.getTag());
-        storeConnectorAttribtues(aWriter, indent, bean, aDesc);
+        storeConnectorAttributes(aWriter, indent, bean, aDesc);
         aWriter.println("/>");
     }
 
@@ -252,7 +261,7 @@ public class ConnectorStoreAppender extends StoreAppender {
     }
 
     /**
-     * Print Connector Values. <ul><li> Spezial handling to default jkHome.
+     * Print Connector Values. <ul><li> Special handling to default jkHome.
      * </li><li> Don't save catalina.base path at server.xml</li><li></ul>
      *
      * @see org.apache.catalina.storeconfig.StoreAppender#isPrintValue(java.lang.Object,
@@ -265,7 +274,7 @@ public class ConnectorStoreAppender extends StoreAppender {
         boolean isPrint = super.isPrintValue(bean, bean2, attrName, desc);
         if (isPrint) {
             if ("jkHome".equals(attrName)) {
-                Connector connector = ((Connector) bean);
+                Connector connector = (Connector) bean;
                 File catalinaBase = getCatalinaBase();
                 File jkHomeBase = getJkHomeBase((String) connector
                         .getProperty("jkHome"), catalinaBase);
@@ -283,7 +292,7 @@ public class ConnectorStoreAppender extends StoreAppender {
             file = file.getCanonicalFile();
         } catch (IOException e) {
         }
-        return (file);
+        return file;
     }
 
     protected File getJkHomeBase(String jkHome, File appBase) {
@@ -297,7 +306,7 @@ public class ConnectorStoreAppender extends StoreAppender {
         } catch (IOException e) {
             jkHomeBase = file;
         }
-        return (jkHomeBase);
+        return jkHomeBase;
     }
 
 }

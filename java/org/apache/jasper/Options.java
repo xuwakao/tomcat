@@ -98,10 +98,13 @@ public interface Options {
     public boolean isSmapDumped();
 
     /**
-     * @return <code>true</code> to trim white spaces between
-     *  directives or actions.
+     * @return {@link TrimSpacesOption#TRUE} to remove template text that
+     *         consists only of whitespace from the output completely,
+     *         {@link TrimSpacesOption#SINGLE} to replace such template text
+     *         with a single space or {@link TrimSpacesOption#FALSE} to leave
+     *         such template text unchanged
      */
-    public boolean getTrimSpaces();
+    public TrimSpacesOption getTrimSpaces();
 
     /**
      * Gets the class-id value that is sent to Internet Explorer when using

@@ -227,6 +227,11 @@ public class TesterServletContext implements ServletContext {
     }
 
     @Override
+    public Dynamic addJspFile(String jspName, String jspFile) {
+        throw new RuntimeException("Not implemented");
+    }
+
+    @Override
     public <T extends Servlet> T createServlet(Class<T> c)
             throws ServletException {
         throw new RuntimeException("Not implemented");
@@ -341,5 +346,35 @@ public class TesterServletContext implements ServletContext {
     @Override
     public String getVirtualServerName() {
         return "localhost";
+    }
+
+    @Override
+    public int getSessionTimeout() {
+        throw new RuntimeException("Not implemented");
+    }
+
+    @Override
+    public void setSessionTimeout(int sessionTimeout) {
+        throw new RuntimeException("Not implemented");
+    }
+
+    @Override
+    public String getRequestCharacterEncoding() {
+        throw new RuntimeException("Not implemented");
+    }
+
+    @Override
+    public void setRequestCharacterEncoding(String encoding) {
+        throw new RuntimeException("Not implemented");
+    }
+
+    @Override
+    public String getResponseCharacterEncoding() {
+        throw new RuntimeException("Not implemented");
+    }
+
+    @Override
+    public void setResponseCharacterEncoding(String encoding) {
+        throw new RuntimeException("Not implemented");
     }
 }

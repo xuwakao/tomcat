@@ -101,7 +101,7 @@
 
   <p>If no version is specified then the <em>context name</em> is always the
   same as the <em>context path</em>. If the <em>context path</em> is the empty
-  string them the <em>base name</em> will be ROOT (always in upper case)
+  string then the <em>base name</em> will be ROOT (always in upper case)
   otherwise the <em>base name</em> will be the <em>context path</em> with the
   leading '/' removed and any remaining '/' characters replaced with '#'.</p>
 
@@ -267,6 +267,12 @@
         Note that any setting other than <code>false</code> causes Tomcat
         to behave in a way that is not technically spec-compliant.
         The default is <code>false</code></p>
+      </attribute>
+
+      <attribute name="altDDName" required="false">
+        <p>The absolute path to the alternative deployment descriptor for this
+        context. This overrides the default deployment descriptor located at
+        <code>/WEB-INF/web.xml</code>.</p>
       </attribute>
 
       <attribute name="backgroundProcessorDelay" required="false">
@@ -509,7 +515,7 @@
         security risk. However, it should be noted that RFC 6265, section 8.5
         makes clear that path alone should not be view as sufficient to prevent
         untrusted applications accessing cookies from other applications. To
-        mitigate this risk, this attribute may bet ste to <code>true</code> and
+        mitigate this risk, this attribute may be set to <code>true</code> and
         Tomcat will add a trailing slash to the path associated with the session
         cookie so, in the above example, the cookie path becomes /foo/. However,
         with a cookie path of /foo/, browsers will no longer send the cookie
@@ -612,23 +618,23 @@
 
       <attribute name="xmlBlockExternal" required="false">
         <p>If the value of this flag is <code>true</code>, the parsing of
-        <code>web.xml</code>, <code>web-fragment.xml</code>, <code>*.tld</code>,
-        <code>*.jspx</code>, <code>*.tagx</code> and <code>tagPlugins.xml</code>
-        files for this web application will not permit external entities to be
-        loaded. If not specified, the default value of <code>true</code> will
-        be used.</p>
+        <code>web.xml</code>, <code>web-fragment.xml</code>,
+        <code>tomcat-web.xml</code>, <code>*.tld</code>, <code>*.jspx</code>,
+        <code>*.tagx</code> and <code>tagPlugins.xml</code> files for this web
+        application will not permit external entities to be loaded. If not
+        specified, the default value of <code>true</code> will be used.</p>
       </attribute>
 
       <attribute name="xmlNamespaceAware" required="false">
         <p>If the value of this flag is <code>true</code>, the parsing of
-        <code>web.xml</code> and <code>web-fragment.xml</code> files for this
-        web application will be namespace-aware. Note that <code>*.tld</code>,
-        <code>*.jspx</code> and <code>*.tagx</code> files are always parsed
-        using a namespace-aware parser and that the <code>tagPlugins.xml</code>
-        file (if any) is never parsed using a namespace-aware parser. Note also
-        that if you turn this flag on, you should probably also turn
-        <code>xmlValidation</code> on. If the
-        <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
+        <code>web.xml</code>, <code>web-fragment.xml</code> and
+        <code>tomcat-web.xml</code> files for this web application will be
+        namespace-aware. Note that <code>*.tld</code>, <code>*.jspx</code> and
+        <code>*.tagx</code> files are always parsed using a namespace-aware
+        parser and that the <code>tagPlugins.xml</code> file (if any) is never
+        parsed using a namespace-aware parser. Note also that if you turn this
+        flag on, you should probably also turn <code>xmlValidation</code> on. If
+        the <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
         <a href="systemprops.html">system property</a> is set to
         <code>true</code>, the default value of this attribute will be
         <code>true</code>, else the default value will be <code>false</code>.
@@ -638,8 +644,9 @@
 
       <attribute name="xmlValidation" required="false">
         <p>If the value of this flag is <code>true</code>, the parsing of
-        <code>web.xml</code> and <code>web-fragment.xml</code> files for this
-        web application will use a validating parser. If the
+        <code>web.xml</code>, <code>web-fragment.xml</code> and
+        <code>tomcat-web.xml</code> files for this web application will use a
+        validating parser. If the
         <code>org.apache.catalina.STRICT_SERVLET_COMPLIANCE</code>
         <a href="systemprops.html">system property</a> is set to
         <code>true</code>, the default value of this attribute will be
@@ -757,7 +764,7 @@
         createSubContext(), destroySubContext() or close() will trigger a
         <code>javax.naming.OperationNotSupportedException</code> as required by
         section EE.5.3.4 of the Java EE specification. This exception can be
-        disabled by setting this attribute to true in which case any calls to
+        disabled by setting this attribute to false in which case any calls to
         modify the JNDI context will return <b>without</b> making any changes
         and methods that return values will return <code>null</code>. If not
         specified, the specification compliant default of <code>true</code> will
@@ -849,7 +856,7 @@
       for JAR files and directories of class files. It is typically used during
       web application start to identify configuration files such as TLDs o
       web-fragment.xml files that must be processed as part of the web
-      application initialisation..  Normally, the default Jar Scanner
+      application initialisation.  Normally, the default Jar Scanner
       configuration will be sufficient.</li>
   </ul>
 
@@ -917,6 +924,10 @@
         to establish default mappings (such as mapping the <code>*.jsp</code>
         extension to the corresponding JSP servlet), and other standard
         features that apply to all web applications.</li>
+    <li>The web application properties listed in the
+        <code>/WEB-INF/tomcat-web.xml</code> resource for this web application
+        will be processed (if this resource exists), taking precedence over the
+        defaults.</li>
     <li>The web application properties listed in the
         <code>/WEB-INF/web.xml</code> resource for this web application
         will be processed (if this resource exists).</li>
@@ -1138,7 +1149,7 @@
 
       <attribute name="auth" required="false">
         <p>Specify whether the web Application code signs on to the
-        corresponding resource manager programatically, or whether the
+        corresponding resource manager programmatically, or whether the
         Container will sign on to the resource manager on behalf of the
         application.  The value of this attribute must be
         <code>Application</code> or <code>Container</code>.  This
@@ -1153,7 +1164,7 @@
         it is no longer required. This is intended to speed up clean-up of
         resources that would otherwise happen as part of garbage collection.
         This attribute is ignored if the <code>singleton</code> attribute is
-        false. If not specificed, no default is defined and no close method will
+        false. If not specified, no default is defined and no close method will
         be called.</p>
         <p>For Apache Commons DBCP and Apache Tomcat JDBC connection pools
         you can use <code>closeMethod="close"</code>.</p>

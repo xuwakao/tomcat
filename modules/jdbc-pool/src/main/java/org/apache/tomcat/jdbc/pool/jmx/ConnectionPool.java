@@ -73,9 +73,9 @@ public class ConnectionPool extends NotificationBroadcasterSupport implements Co
     public static final String NOTIFY_ABANDON = "CONNECTION ABANDONED";
     public static final String SLOW_QUERY_NOTIFICATION = "SLOW QUERY";
     public static final String FAILED_QUERY_NOTIFICATION = "FAILED QUERY";
-    public static final String SUSPECT_ABANDONED_NOTIFICATION = "SUSPECT CONNETION ABANDONED";
+    public static final String SUSPECT_ABANDONED_NOTIFICATION = "SUSPECT CONNECTION ABANDONED";
     public static final String POOL_EMPTY = "POOL EMPTY";
-    public static final String SUSPECT_RETURNED_NOTIFICATION = "SUSPECT CONNETION RETURNED";
+    public static final String SUSPECT_RETURNED_NOTIFICATION = "SUSPECT CONNECTION RETURNED";
 
     @Override
     public MBeanNotificationInfo[] getNotificationInfo() {
@@ -166,6 +166,41 @@ public class ConnectionPool extends NotificationBroadcasterSupport implements Co
         return pool.getWaitCount();
     }
 
+    @Override
+    public long getBorrowedCount() {
+        return pool.getBorrowedCount();
+    }
+
+    @Override
+    public long getReturnedCount() {
+        return pool.getReturnedCount();
+    }
+
+    @Override
+    public long getCreatedCount() {
+        return pool.getCreatedCount();
+    }
+
+    @Override
+    public long getReleasedCount() {
+        return pool.getReleasedCount();
+    }
+
+    @Override
+    public long getReconnectedCount() {
+        return pool.getReconnectedCount();
+    }
+
+    @Override
+    public long getRemoveAbandonedCount() {
+        return pool.getRemoveAbandonedCount();
+    }
+
+    @Override
+    public long getReleasedIdleCount() {
+        return pool.getReleasedIdleCount();
+    }
+
     //=================================================================
     //       POOL OPERATIONS
     //=================================================================
@@ -183,6 +218,12 @@ public class ConnectionPool extends NotificationBroadcasterSupport implements Co
     public void testIdle() {
         pool.testAllIdle();
     }
+
+    @Override
+    public void resetStats() {
+        pool.resetStats();
+    }
+
     //=================================================================
     //       POOL PROPERTIES
     //=================================================================
@@ -872,6 +913,22 @@ public class ConnectionPool extends NotificationBroadcasterSupport implements Co
     public void setIgnoreExceptionOnPreLoad(boolean ignoreExceptionOnPreLoad) {
         // noop - this pool is already running
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean getUseStatementFacade() {
+        return getPoolProperties().getUseStatementFacade();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setUseStatementFacade(boolean useStatementFacade) {
+        getPoolProperties().setUseStatementFacade(useStatementFacade);
     }
 
     /**

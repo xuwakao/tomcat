@@ -44,6 +44,7 @@ import org.apache.catalina.WebResourceSet;
 import org.apache.catalina.util.LifecycleMBeanBase;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.buf.UriUtil;
 import org.apache.tomcat.util.http.RequestUtil;
 import org.apache.tomcat.util.res.StringManager;
 
@@ -141,7 +142,7 @@ public class StandardRoot extends LifecycleMBeanBase implements WebResourceRoot 
         path = validate(path);
 
         // Set because we don't want duplicates
-        HashSet<String> result = new HashSet<>();
+        Set<String> result = new HashSet<>();
         for (List<WebResourceSet> list : allResources) {
             for (WebResourceSet webResourceSet : list) {
                 if (!webResourceSet.getClassLoaderOnly()) {
@@ -237,7 +238,7 @@ public class StandardRoot extends LifecycleMBeanBase implements WebResourceRoot 
      * can be normalized without stepping outside of the root.
      *
      * @param path
-     * @return  the normlized path
+     * @return  the normalized path
      */
     private String validate(String path) {
         if (!getState().isAvailable()) {
@@ -343,7 +344,7 @@ public class StandardRoot extends LifecycleMBeanBase implements WebResourceRoot 
         return listResources(path, true);
     }
 
-    private WebResource[] listResources(String path, boolean validate) {
+    protected WebResource[] listResources(String path, boolean validate) {
         if (validate) {
             path = validate(path);
         }
@@ -573,8 +574,11 @@ public class StandardRoot extends LifecycleMBeanBase implements WebResourceRoot 
      * the methods that are explicitly defined to return class loader resources.
      * This prevents calls to getResource("/WEB-INF/classes") returning from one
      * or more of the JAR files.
+     *
+     * @throws LifecycleException If an error occurs that should stop the web
+     *                            application from starting
      */
-    private void processWebInfLib() {
+    protected void processWebInfLib() throws LifecycleException {
         WebResource[] possibleJars = listResources("/WEB-INF/lib", false);
 
         for (WebResource possibleJar : possibleJars) {
@@ -640,6 +644,18 @@ public class StandardRoot extends LifecycleMBeanBase implements WebResourceRoot 
         }
         return result;
     }
+
+
+
+    /*
+     * Returns true if and only if all the resources for this web application
+     * are provided via a packed WAR file. It is used to optimise cache
+     * validation in this case on the basis that the WAR file will not change.
+     */
+    protected boolean isPackedWarFile() {
+        return main instanceof WarResourceSet && preResources.isEmpty() && postResources.isEmpty();
+    }
+
 
     // ----------------------------------------------------------- JMX Lifecycle
     @Override
@@ -806,7 +822,7 @@ public class StandardRoot extends LifecycleMBeanBase implements WebResourceRoot 
                 if ("jar".equals(url.getProtocol())) {
                     endOfFileUrl = jarUrl.indexOf("!/");
                 } else {
-                    endOfFileUrl = jarUrl.indexOf("*/");
+                    endOfFileUrl = jarUrl.indexOf(UriUtil.getWarSeparator());
                 }
                 String fileUrl = jarUrl.substring(4, endOfFileUrl);
                 try {

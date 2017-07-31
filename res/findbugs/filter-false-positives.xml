@@ -142,7 +142,7 @@
   </Match>
   <Match>
     <!-- the platform default encoding is a fallback when calculating the
-    lenght of the string -->
+    length of the string -->
     <Class name="org.apache.catalina.connector.Request"/>
     <Method name="parseParts"/>
     <Bug code="Dm" />
@@ -250,6 +250,12 @@
       <Method name="getReadme"/>
     </Or>
     <Bug code="Dm" />
+  </Match>
+  <Match>
+    <!-- The use of != with a String is a deliberate hack  -->
+    <Class name="org.apache.catalina.servlets.DefaultServlet" />
+    <Method name="serveResource" />
+    <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
   </Match>
   <Match>
     <!-- Non-constant strings are configuration settings rather than client
@@ -424,6 +430,12 @@
     <Bug pattern="AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION" />
   </Match>
   <Match>
+    <!-- readChunk will not be null due to previous call to readBytes() -->
+    <Class name="org.apache.coyote.http11.filters.ChunkedInputFilter" />
+    <Method name="parseHeader"/>
+    <Bug pattern="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE" />
+  </Match>
+  <Match>
     <!-- Locks are always released. Non-standard pattern is required because -->
     <!-- of lock upgrade that is used. -->
     <Class name="org.apache.coyote.http11.upgrade.AprServletInputStream" />
@@ -458,6 +470,12 @@
     <Bug code="UL" />
   </Match>
   <Match>
+    <!-- HpackDecoder is used by multiple streams but not concurrently. -->
+    <Class name="org.apache.coyote.http2.HpackDecoder" />
+    <Method name="emitHeader" />
+    <Bug pattern="VO_VOLATILE_INCREMENT" />
+  </Match>
+  <Match>
     <!-- Number being tested is unsigned. -->
     <Class name="org.apache.coyote.http2.Http2UpgradeHandler" />
     <Method name="createRemoteStream" />
@@ -474,6 +492,12 @@
     <Class name="org.apache.coyote.http2.Http2UpgradeHandler" />
     <Mehtod name="releaseBackLog" />
     <Bug pattern="NN_NAKED_NOTIFY" />
+  </Match>
+  <Match>
+    <!-- Return value is intentionally ignored. -->
+    <Class name="org.apache.coyote.http2.Http2UpgradeHandler$PingManager" />
+    <Mehtod name="receivePing" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED" />
   </Match>
   <Match>
     <!-- Notify is correct. Condition changed outside of this method. -->
@@ -937,6 +961,18 @@
     <Bug code="UG" />
   </Match>
   <Match>
+    <!-- Return value of latch is intentionally ignored -->
+    <Class name="org.apache.catalina.connector.TestSendFile"/>
+    <Method name="testBug60409"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
+  </Match>
+  <Match>
+    <!-- Return value of latch is intentionally ignored -->
+    <Class name="org.apache.catalina.nonblocking.TestNonBlockingAPI"/>
+    <Method name="testDelayedNBWrite"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
+  </Match>
+  <Match>
     <Or>
       <Class name="org.apache.catalina.startup.TestListener$SCL" />
       <Class name="org.apache.catalina.startup.TestListener$SCL3" />
@@ -1038,6 +1074,12 @@
     <Bug code="DE" />
   </Match>
   <Match>
+    <!-- Concrete Map type not affected -->
+    <Class name="org.apache.catalina.util.TestParameterMap" />
+    <Method name="testEntrySetImmutabilityAfterLocked" />
+    <Bug pattern="DMI_ENTRY_SETS_MAY_REUSE_ENTRY_OBJECTS" />
+  </Match>
+  <Match>
     <!-- Code is deliberately unused -->
     <Or>
       <Class name="org.apache.catalina.webresources.AbstractTestFileResourceSet" />
@@ -1049,16 +1091,33 @@
     <Bug pattern="DLS_DEAD_LOCAL_STORE"/>
   </Match>
   <Match>
+    <!-- Use of statics is unavoidable in all cases -->
+    <!-- Better to use it consistently rather than only where necessary -->
+    <Class name="org.apache.tomcat.jdbc.pool.interceptor.TestInterceptor" />
+    <Bug code="ST" />
+  </Match>
+  <Match>
+    <!-- The call with the ignored return value is used to ensure the pool -->
+    <!-- thinks the connection is being used.                              -->
+    <Class name="org.apache.tomcat.jdbc.test.AbandonPercentageTest" />
+    <Method name="testResetConnection" />
+    <Bug pattern="RV_RETURN_VALUE_IGNORED" />
+  </Match>
+  <Match>
     <!-- Use of static is unavoidable -->
     <Class name="org.apache.tomcat.jdbc.test.TestStatementCache" />
     <Method name="tearDown" />
     <Bug code="ST" />
   </Match>
   <Match>
-    <!-- Use of statics is unavoidable in all cases -->
-    <!-- Better to use it consistently rather than only where necessary -->
-    <Class name="org.apache.tomcat.jdbc.pool.interceptor.TestInterceptor" />
-    <Bug code="ST" />
+    <Class name="org.apache.tomcat.jdbc.test.TwoDataSources" />
+    <Method name="testTwoDataSources" />
+    <Or>
+      <!-- The object creation should fail -->
+      <Bug pattern="RV_RETURN_VALUE_IGNORED" />
+      <!-- The connection should be close by the pool -->
+      <Bug pattern="ODR_OPEN_DATABASE_RESOURCE" />
+    </Or>
   </Match>
   <Match>
     <Class name="org.apache.tomcat.util.http.TestCookieParsing$EchoCookieHeader"/>

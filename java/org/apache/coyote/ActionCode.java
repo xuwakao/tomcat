@@ -54,6 +54,12 @@ public enum ActionCode {
     IS_ERROR,
 
     /**
+     * The processor may have been placed into an error state and some error
+     * states do not permit any further I/O. Is I/O currently allowed?
+     */
+    IS_IO_ALLOWED,
+
+    /**
      * Hook called if swallowing request input should be disabled.
      * Example: Cancel a large file upload.
      *
@@ -245,5 +251,19 @@ public enum ActionCode {
     /**
      * Push a request on behalf of the client of the current request.
      */
-    PUSH_REQUEST
+    PUSH_REQUEST,
+
+    /**
+     * Are the request trailer fields ready to be read? Note that this returns
+     * true if it is known that request trailer fields are not supported so an
+     * empty collection of trailers can then be read.
+     */
+    IS_TRAILER_FIELDS_READY,
+
+    /**
+     * Are HTTP trailer fields supported for the current response? Note that
+     * once an HTTP/1.1 response has been committed, it will no longer support
+     * trailer fields.
+     */
+    IS_TRAILER_FIELDS_SUPPORTED
 }

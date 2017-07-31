@@ -39,7 +39,7 @@
 
   <p>The <strong>Host</strong> element represents a <em>virtual host</em>,
   which is an association of a network name for a server (such as
-  "www.mycompany.com" with the particular server on which Tomcat is running.
+  "www.mycompany.com") with the particular server on which Tomcat is running.
   For clients to be able to connect to a Tomcat server using its network name,
   this name must be registered in the <em>Domain Name Service</em> (DNS) server
   that manages the Internet domain you belong to - contact your Network
@@ -208,7 +208,9 @@
         Negative values will result in
         <code>Runtime.getRuntime().availableProcessors() + value</code> being
         used unless this is less than 1 in which case 1 thread will be used. If
-        not specified, the default value of 1 will be used.</p>
+        not specified, the default value of 1 will be used. If 1 thread is
+        used then rather than using an <code>ExecutorService</code> the current
+        thread will be used.</p>
       </attribute>
 
       <attribute name="undeployOldVersions" required="false">
@@ -259,7 +261,13 @@
         fail to start in case the descriptor contains necessary configuration
         for secure deployment (such as a RemoteAddrValve) which should not be
         ignored. The flag's value defaults to <code>true</code> unless a
-        security manager is enabled when the default is <code>false</code>.</p>
+        security manager is enabled when the default is <code>false</code>.
+        When running under a security manager this may be enabled on a per web
+        application basis by granting the
+        <code>org.apache.catalina.security.DeployXmlPermission</code> to the web
+        application. The Manager and Host Manager applications are granted this
+        permission by default so that they continue to work when running under a
+        security manager.</p>
       </attribute>
 
       <attribute name="errorReportValveClass" required="false">
@@ -287,6 +295,12 @@
         is not running. Any such change will trigger the deletion of the
         expanded directory and the deployment of the updated WAR file when
         Tomcat next starts.</p>
+        <p>Note: Running with this option set to <code>false</code> will incur
+        a performance penalty. To avoid a significant performance penalty, the
+        web application should be configured such that class scanning for
+        Servlet 3.0+ pluggability features is not required. Users may also wish
+        to consider the <strong>ExtractingRoot</strong>
+        <a href="resources.html">Resources</a> implementation.</p>
       </attribute>
 
       <attribute name="workDir" required="false">

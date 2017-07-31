@@ -111,6 +111,22 @@
   <p>Will cover this section in more detail later in this document.</p>
 </section>
 
+<section name="Security">
+
+<p>The cluster implementation is written on the basis that a secure, trusted
+network is used for all of the cluster related network traffic. It is not safe
+to run a cluster on a insecure, untrusted network.</p>
+
+<p>There are many options for providing a secure, trusted network for use by a
+Tomcat cluster. These include:</p>
+<ul>
+  <li>private LAN</li>
+  <li>a Virtual Private Network (VPN)</li>
+  <li>IPSEC</li>
+</ul>
+
+</section>
+
 <section name="Cluster Basics">
 
 <p>To run session replication in your Tomcat <version-major/> container, the following steps
@@ -194,10 +210,22 @@ should be completed:</p>
     sent over the wire and reinstantiated on all the other cluster nodes.
     Synchronous vs. asynchronous is configured using the <code>channelSendOptions</code>
     flag and is an integer value. The default value for the <code>SimpleTcpCluster/DeltaManager</code> combo is
-    8, which is asynchronous. You can read more on the <a href="tribes/introduction.html">send flag(overview)</a> or the
-    <doc path="/api/org/apache/catalina/tribes/Channel.html">send flag(javadoc)</doc>.
-    During async replication, the request is returned before the data has been replicated. async replication yields shorter
-    request times, and synchronous replication guarantees the session to be replicated before the request returns.
+    8, which is asynchronous.
+</p>
+<p>
+    For convenience, <code>channelSendOptions</code> can be set by name(s) rather than integer,
+    which are then translated to their integer value upon startup.  The valid option names are:
+    "asynchronous" (alias "async"), "byte_message" (alias "byte"), "multicast", "secure",
+    "synchronized_ack" (alias "sync"), "udp", "use_ack".  Use comma to separate multiple names,
+    e.g. pass "async, multicast" for the options
+    <code>SEND_OPTIONS_ASYNCHRONOUS | SEND_OPTIONS_MULTICAST</code>.
+</p>
+<p>
+  You can read more on the <a href="tribes/introduction.html">send flag(overview)</a> or the
+  <doc path="/api/org/apache/catalina/tribes/Channel.html">send flag(javadoc)</doc>.
+  During async replication, the request is returned before the data has been replicated. async
+  replication yields shorter request times, and synchronous replication guarantees the session
+  to be replicated before the request returns.
 </p>
 </section>
 
@@ -583,7 +611,7 @@ should be completed:</p>
     Tomcat does not keep session instances in sync across the cluster.
     The implementation of such logic would be to much overhead and cause all
     kinds of problems. If your client accesses the same session
-    simultanously using multiple requests, then the last request
+    simultaneously using multiple requests, then the last request
     will override the other sessions in the cluster.
 </p>
 

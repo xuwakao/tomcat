@@ -124,6 +124,8 @@ public class DataSourceFactory implements ObjectFactory {
 
     protected static final String PROP_IGNOREEXCEPTIONONPRELOAD = "ignoreExceptionOnPreLoad";
 
+    protected static final String PROP_USESTATEMENTFACADE = "useStatementFacade";
+
     public static final int UNKNOWN_TRANSACTIONISOLATION = -1;
 
     public static final String OBJECT_NAME = "object_name";
@@ -179,7 +181,8 @@ public class DataSourceFactory implements ObjectFactory {
         PROP_USEDISPOSABLECONNECTIONFACADE,
         PROP_LOGVALIDATIONERRORS,
         PROP_PROPAGATEINTERRUPTSTATE,
-        PROP_IGNOREEXCEPTIONONPRELOAD
+        PROP_IGNOREEXCEPTIONONPRELOAD,
+        PROP_USESTATEMENTFACADE
     };
 
     // -------------------------------------------------- ObjectFactory Methods
@@ -527,7 +530,10 @@ public class DataSourceFactory implements ObjectFactory {
         if (value != null) {
             poolProperties.setIgnoreExceptionOnPreLoad(Boolean.parseBoolean(value));
         }
-
+        value = properties.getProperty(PROP_USESTATEMENTFACADE);
+        if (value != null) {
+            poolProperties.setUseStatementFacade(Boolean.parseBoolean(value));
+        }
         return poolProperties;
     }
 
@@ -562,7 +568,7 @@ public class DataSourceFactory implements ObjectFactory {
             if (context!=null) {
                 jndiDS = context.lookup(poolProperties.getDataSourceJNDI());
             } else {
-                log.warn("dataSourceJNDI property is configued, but local JNDI context is null.");
+                log.warn("dataSourceJNDI property is configured, but local JNDI context is null.");
             }
         } catch (NamingException e) {
             log.debug("The name \""+poolProperties.getDataSourceJNDI()+"\" cannot be found in the local context.");
